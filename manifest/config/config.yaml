@@ -1,0 +1,25 @@
+server:
+  address:     ":8000"
+  openapiPath: "/api.json"
+  swaggerPath: "/swagger"
+
+logger:
+  level:  "all"
+  stdout: true
+
+# PostgreSQL
+database:
+  default:
+    link:  "pgsql:postgres:123456@tcp(127.0.0.1:5432)/my_service?sslmode=disable"
+    debug: true
+
+# Redis
+redis:
+  default:
+    address: "127.0.0.1:6379"
+    db:      0
+
+# Kafka(供 internal/mq 读取)
+kafka:
+  brokers: ["127.0.0.1:9092"]
+  groupId: "my_service"

@@ -1,0 +1,19 @@
+# Go
+/bin/
+*.exe
+*.out
+*.test
+vendor/
+
+# GoFrame
+/temp/
+/manifest/output/
+main
+
+# IDE
+.idea/workspace.xml
+.DS_Store
+
+# 本地配置(含密钥, 勿提交)
+manifest/config/config.local.yaml
+.env

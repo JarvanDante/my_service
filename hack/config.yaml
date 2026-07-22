@@ -1,0 +1,25 @@
+# GoFrame CLI 生成配置。折中方案: dao/model 统一生成, service/ctrl 按模块。
+gfcli:
+  gen:
+    # dao/model 统一生成到 internal/dao 与 internal/model
+    dao:
+      - link:            "pgsql:postgres:123456@tcp(127.0.0.1:5432)/my_service?sslmode=disable"
+        path:            "internal"
+        descriptionTag:  true
+        # tables: "users"   # 可按模块分批生成
+
+    # service 接口: 各模块 logic 反向生成到同模块 service
+    service:
+      - srcFolder:    "internal/modules/user/logic"
+        dstFolder:    "internal/modules/user/service"
+        packageName:  "service"
+      # - srcFolder: "internal/modules/order/logic"
+      #   dstFolder: "internal/modules/order/service"
+      #   packageName: "service"
+
+    # controller: 各模块 api 定义生成到同模块 controller
+    ctrl:
+      - srcFolder: "api/user"
+        dstFolder: "internal/modules/user/controller"
+      # - srcFolder: "api/order"
+      #   dstFolder: "internal/modules/order/controller"
