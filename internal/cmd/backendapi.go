@@ -19,7 +19,7 @@ var BackendAPI = gcmd.Command{
 	Func: func(ctx context.Context, parser *gcmd.Parser) error {
 		s := g.Server("backendapi")
 		s.SetAddr(cfgAddr(ctx, "backendapi.address", ":8002"))
-		s.Use(middleware.CORS, middleware.Response)
+		s.Use(middleware.CORS, ghttp.MiddlewareHandlerResponse)
 		s.Group("/backend", func(group *ghttp.RouterGroup) {
 			group.Middleware(middleware.Auth)
 			usermod.RegisterBackend(group, dao.NewUserRepo())

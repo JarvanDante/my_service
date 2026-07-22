@@ -19,7 +19,7 @@ var FrontAPI = gcmd.Command{
 	Func: func(ctx context.Context, parser *gcmd.Parser) error {
 		s := g.Server("frontapi")
 		s.SetAddr(cfgAddr(ctx, "frontapi.address", ":8001"))
-		s.Use(middleware.CORS, middleware.Response)
+		s.Use(middleware.CORS, ghttp.MiddlewareHandlerResponse)
 		s.Group("/front", func(group *ghttp.RouterGroup) {
 			group.Middleware(middleware.RateLimit)
 			usermod.RegisterFront(group, dao.NewUserRepo())

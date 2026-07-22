@@ -19,7 +19,7 @@ var ManageAPI = gcmd.Command{
 	Func: func(ctx context.Context, parser *gcmd.Parser) error {
 		s := g.Server("manageapi")
 		s.SetAddr(cfgAddr(ctx, "manageapi.address", ":8003"))
-		s.Use(middleware.CORS, middleware.Response)
+		s.Use(middleware.CORS, ghttp.MiddlewareHandlerResponse)
 		s.Group("/manage", func(group *ghttp.RouterGroup) {
 			group.Middleware(middleware.Auth)
 			usermod.RegisterManage(group, dao.NewUserRepo())

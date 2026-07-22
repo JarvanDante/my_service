@@ -29,7 +29,7 @@ var Main = gcmd.Command{
 	Brief: "漫隐 API · 一体化开发入口",
 	Func: func(ctx context.Context, parser *gcmd.Parser) error {
 		s := g.Server()
-		s.Use(middleware.CORS, middleware.Response)
+		s.Use(middleware.CORS, ghttp.MiddlewareHandlerResponse)
 
 		s.Group("/front", func(group *ghttp.RouterGroup) {
 			group.Middleware(middleware.RateLimit)
