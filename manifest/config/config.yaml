@@ -1,25 +1,34 @@
+# 一体化开发入口(根 main.go)使用的默认 server
 server:
   address:     ":8000"
   openapiPath: "/api.json"
   swaggerPath: "/swagger"
 
+# 各独立二进制的监听地址(app/* 读取)
+frontapi:
+  address: ":8001"
+backendapi:
+  address: ":8002"
+manageapi:
+  address: ":8003"
+
 logger:
   level:  "all"
   stdout: true
 
-# PostgreSQL
+# PostgreSQL(后台/总后台可指向只读副本, 进一步隔离对前台库的压力)
 database:
   default:
     link:  "pgsql:postgres:123456@tcp(127.0.0.1:5432)/my_service?sslmode=disable"
     debug: true
+  # replica:   # 可选: 后台走只读副本
+  #   link: "pgsql:postgres:123456@tcp(127.0.0.1:5433)/my_service?sslmode=disable"
 
-# Redis
 redis:
   default:
     address: "127.0.0.1:6379"
     db:      0
 
-# Kafka(供 internal/mq 读取)
 kafka:
   brokers: ["127.0.0.1:9092"]
   groupId: "my_service"

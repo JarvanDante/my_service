@@ -1,4 +1,4 @@
-// Package cmd 应用启动与依赖装配点。唯一把 dao 实现注入模块、并注册路由的地方。
+// Package cmd 各二进制的启动装配。业务依赖(dao)在此注入各模块。
 package cmd
 
 import (
@@ -14,23 +14,37 @@ import (
 	usermod "github.com/JarvanDante/my_service/internal/modules/user"
 )
 
+// cfgAddr 读监听地址, 缺省回退默认。
+func cfgAddr(ctx context.Context, key, def string) string {
+	if v, err := g.Cfg().Get(ctx, key); err == nil && !v.IsNil() && v.String() != "" {
+		return v.String()
+	}
+	return def
+}
+
+// Main 本地开发一体化入口: 单进程挂载全部门面 + 定时任务, 方便 gf run。
+// 生产环境请用 app/ 下的独立二进制以实现进程隔离。
 var Main = gcmd.Command{
 	Name:  "main",
-	Brief: "漫隐 API 服务",
+	Brief: "漫隐 API · 一体化开发入口",
 	Func: func(ctx context.Context, parser *gcmd.Parser) error {
 		s := g.Server()
-
-		// 全局中间件
 		s.Use(middleware.CORS, middleware.Response)
 
-		s.Group("/api/v1", func(group *ghttp.RouterGroup) {
-			group.Middleware(middleware.Auth) // 需鉴权的分组
-
-			// ==== 逐模块装配: 注入仓储 -> 注册路由 ====
-			usermod.Register(group, dao.NewUserRepo())
-			// ordermod.Register(group, dao.NewOrderRepo())  // 新增模块照此追加一行
+		s.Group("/front", func(group *ghttp.RouterGroup) {
+			group.Middleware(middleware.RateLimit)
+			usermod.RegisterFront(group, dao.NewUserRepo())
+		})
+		s.Group("/backend", func(group *ghttp.RouterGroup) {
+			group.Middleware(middleware.Auth)
+			usermod.RegisterBackend(group, dao.NewUserRepo())
+		})
+		s.Group("/manage", func(group *ghttp.RouterGroup) {
+			group.Middleware(middleware.Auth)
+			usermod.RegisterManage(group, dao.NewUserRepo())
 		})
 
+		registerCronJobs(ctx)
 		s.Run()
 		return nil
 	},
