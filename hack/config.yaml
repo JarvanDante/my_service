@@ -6,6 +6,7 @@ gfcli:
       - link:            "pgsql:postgres:654321@tcp(127.0.0.1:5432)/my_service?sslmode=disable"
         path:            "internal"
         descriptionTag:  true
+        tablesEx:        "goose_db_version"   # 排除 goose 版本表
         # tables: "users"   # 可按模块分批生成
 
     # service 接口: 各模块 logic 反向生成到同模块 service
