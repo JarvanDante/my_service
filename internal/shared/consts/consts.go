@@ -1,1 +1,1 @@
-package shared/consts
+package consts
