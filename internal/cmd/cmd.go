@@ -30,6 +30,7 @@ var Main = gcmd.Command{
 	Func: func(ctx context.Context, parser *gcmd.Parser) error {
 		s := g.Server()
 		s.Use(middleware.CORS, ghttp.MiddlewareHandlerResponse)
+		s.BindStatusHandler(404, middleware.NotFound)
 
 		s.Group("/front", func(group *ghttp.RouterGroup) {
 			group.Middleware(middleware.RateLimit)

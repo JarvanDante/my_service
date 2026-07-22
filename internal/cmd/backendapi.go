@@ -20,6 +20,7 @@ var BackendAPI = gcmd.Command{
 		s := g.Server("backendapi")
 		s.SetAddr(cfgAddr(ctx, "backendapi.address", ":8002"))
 		s.Use(middleware.CORS, ghttp.MiddlewareHandlerResponse)
+		s.BindStatusHandler(404, middleware.NotFound)
 		s.Group("/backend", func(group *ghttp.RouterGroup) {
 			group.Middleware(middleware.Auth)
 			usermod.RegisterBackend(group, dao.NewUserRepo())

@@ -74,3 +74,13 @@ func RevokeToken(ctx context.Context, token string) error {
 	_, err := g.Redis().Do(ctx, "DEL", tokenKey)
 	return err
 }
+
+// RevokeByUserId 按用户ID撤销其当前 token(退出登录, 单点场景直接用)。
+func RevokeByUserId(ctx context.Context, userId int64) error {
+	uidKey := uidKeyPrefix + gconv.String(userId)
+	if v, err := g.Redis().Do(ctx, "GET", uidKey); err == nil && !v.IsNil() && v.String() != "" {
+		_, _ = g.Redis().Do(ctx, "DEL", tokenKeyPrefix+v.String())
+	}
+	_, err := g.Redis().Do(ctx, "DEL", uidKey)
+	return err
+}

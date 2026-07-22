@@ -48,3 +48,16 @@ func (r *userRepo) Disable(ctx context.Context, id int64, reason string) error {
 	}).Update()
 	return err
 }
+
+func (r *userRepo) FindByPhone(ctx context.Context, phone string) (*entity.Users, error) {
+	var u *entity.Users
+	err := Users.Ctx(ctx).Where(Users.Columns().Phone, phone).Scan(&u)
+	return u, err
+}
+
+func (r *userRepo) UpdatePhone(ctx context.Context, id int64, phone string) error {
+	_, err := Users.Ctx(ctx).Where(Users.Columns().Id, id).Data(g.Map{
+		Users.Columns().Phone: phone,
+	}).Update()
+	return err
+}

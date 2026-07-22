@@ -122,3 +122,37 @@ func toUserInfo(u *entity.Users) *service.UserInfoDTO {
 		Follow:    u.Follow,
 	}
 }
+
+// Logout 退出登录: 撤销当前会话 token。
+func (s *sUser) Logout(ctx context.Context, userId int64) error {
+	return kit.RevokeByUserId(ctx, userId)
+}
+
+// Refresh 刷新 token: 重新签发(旧 token 自动失效)。
+func (s *sUser) Refresh(ctx context.Context, userId int64) (string, error) {
+	u, err := s.repo.FindById(ctx, userId)
+	if err != nil {
+		return "", err
+	}
+	if u == nil {
+		return "", gerror.New("用户不存在")
+	}
+	if u.IsDisabled == 1 {
+		return "", gerror.New("账号已被禁用")
+	}
+	return kit.IssueToken(ctx, userId)
+}
+
+// BindPhone 绑定手机号(校验唯一性)。
+func (s *sUser) BindPhone(ctx context.Context, userId int64, phone, code string) error {
+	// TODO: 校验短信验证码 code(接入短信服务后启用)
+	_ = code
+	other, err := s.repo.FindByPhone(ctx, phone)
+	if err != nil {
+		return err
+	}
+	if other != nil && other.Id != userId {
+		return gerror.New("该手机号已被其他账号绑定")
+	}
+	return s.repo.UpdatePhone(ctx, userId, phone)
+}

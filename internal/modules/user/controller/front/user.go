@@ -17,7 +17,16 @@ type Controller struct{ user service.IUser }
 
 func New(svc service.IUser) *Controller { return &Controller{user: svc} }
 
-// Login 公开接口。
+// uid 从 ctx 取当前用户(Auth 中间件写入)。
+func uid(ctx context.Context) (int64, error) {
+	id := ghttp.RequestFromCtx(ctx).GetCtxVar(consts.CtxUserId).Int64()
+	if id <= 0 {
+		return 0, gerror.NewCode(gcode.CodeNotAuthorized, "未登录")
+	}
+	return id, nil
+}
+
+// Login 公开。
 func (c *Controller) Login(ctx context.Context, req *v1.LoginReq) (res *v1.LoginRes, err error) {
 	r := ghttp.RequestFromCtx(ctx)
 	dto, err := c.user.Login(ctx, service.LoginInput{
@@ -32,17 +41,54 @@ func (c *Controller) Login(ctx context.Context, req *v1.LoginReq) (res *v1.Login
 	return &v1.LoginRes{Token: dto.Token, User: toApiUser(dto.User)}, nil
 }
 
-// Info 需登录: userId 由 Auth 中间件写入 ctx。
+// Info 需登录。
 func (c *Controller) Info(ctx context.Context, req *v1.InfoReq) (res *v1.InfoRes, err error) {
-	uid := ghttp.RequestFromCtx(ctx).GetCtxVar(consts.CtxUserId).Int64()
-	if uid <= 0 {
-		return nil, gerror.NewCode(gcode.CodeNotAuthorized, "未登录")
+	id, err := uid(ctx)
+	if err != nil {
+		return nil, err
 	}
-	dto, err := c.user.Info(ctx, uid)
+	dto, err := c.user.Info(ctx, id)
 	if err != nil {
 		return nil, err
 	}
 	return &v1.InfoRes{UserInfo: toApiUser(dto)}, nil
+}
+
+// Logout 退出登录。
+func (c *Controller) Logout(ctx context.Context, req *v1.LogoutReq) (res *v1.LogoutRes, err error) {
+	id, err := uid(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if err = c.user.Logout(ctx, id); err != nil {
+		return nil, err
+	}
+	return &v1.LogoutRes{}, nil
+}
+
+// Refresh 刷新 token。
+func (c *Controller) Refresh(ctx context.Context, req *v1.RefreshReq) (res *v1.RefreshRes, err error) {
+	id, err := uid(ctx)
+	if err != nil {
+		return nil, err
+	}
+	token, err := c.user.Refresh(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	return &v1.RefreshRes{Token: token}, nil
+}
+
+// BindPhone 绑定手机。
+func (c *Controller) BindPhone(ctx context.Context, req *v1.BindPhoneReq) (res *v1.BindPhoneRes, err error) {
+	id, err := uid(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if err = c.user.BindPhone(ctx, id, req.Phone, req.Code); err != nil {
+		return nil, err
+	}
+	return &v1.BindPhoneRes{}, nil
 }
 
 func toApiUser(d *service.UserInfoDTO) v1.UserInfo {
