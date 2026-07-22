@@ -22,7 +22,7 @@ database:
     link:  "pgsql:postgres:654321@tcp(127.0.0.1:5432)/my_service?sslmode=disable"
     debug: true
   # replica:   # 可选: 后台走只读副本
-  #   link: "pgsql:postgres:123456@tcp(127.0.0.1:5433)/my_service?sslmode=disable"
+  #   link: "pgsql:postgres:654321@tcp(127.0.0.1:5433)/my_service?sslmode=disable"
 
 redis:
   default:

@@ -3,7 +3,7 @@ gfcli:
   gen:
     # dao/model 统一生成到 internal/dao 与 internal/model
     dao:
-      - link:            "pgsql:postgres:123456@tcp(127.0.0.1:5432)/my_service?sslmode=disable"
+      - link:            "pgsql:postgres:654321@tcp(127.0.0.1:5432)/my_service?sslmode=disable"
         path:            "internal"
         descriptionTag:  true
         # tables: "users"   # 可按模块分批生成
