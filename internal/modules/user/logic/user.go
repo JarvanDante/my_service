@@ -68,8 +68,12 @@ func (s *sUser) Login(ctx context.Context, in service.LoginInput) (*service.Logi
 		}
 		_ = s.repo.UpdateLoginInfo(ctx, u.Id, in.Ip)
 	}
+	token, err := kit.IssueToken(ctx, u.Id)
+	if err != nil {
+		return nil, err
+	}
 	return &service.LoginDTO{
-		Token: kit.IssueToken(u.Id),
+		Token: token,
 		User:  toUserInfo(u),
 	}, nil
 }

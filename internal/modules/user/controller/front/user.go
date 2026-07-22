@@ -10,13 +10,14 @@ import (
 
 	v1 "github.com/JarvanDante/my_service/api/front/user/v1"
 	"github.com/JarvanDante/my_service/internal/modules/user/service"
-	"github.com/JarvanDante/my_service/internal/shared/kit"
+	"github.com/JarvanDante/my_service/internal/shared/consts"
 )
 
 type Controller struct{ user service.IUser }
 
 func New(svc service.IUser) *Controller { return &Controller{user: svc} }
 
+// Login 公开接口。
 func (c *Controller) Login(ctx context.Context, req *v1.LoginReq) (res *v1.LoginRes, err error) {
 	r := ghttp.RequestFromCtx(ctx)
 	dto, err := c.user.Login(ctx, service.LoginInput{
@@ -31,30 +32,17 @@ func (c *Controller) Login(ctx context.Context, req *v1.LoginReq) (res *v1.Login
 	return &v1.LoginRes{Token: dto.Token, User: toApiUser(dto.User)}, nil
 }
 
+// Info 需登录: userId 由 Auth 中间件写入 ctx。
 func (c *Controller) Info(ctx context.Context, req *v1.InfoReq) (res *v1.InfoRes, err error) {
-	uid, err := currentUserId(ctx)
-	if err != nil {
-		return nil, err
+	uid := ghttp.RequestFromCtx(ctx).GetCtxVar(consts.CtxUserId).Int64()
+	if uid <= 0 {
+		return nil, gerror.NewCode(gcode.CodeNotAuthorized, "未登录")
 	}
 	dto, err := c.user.Info(ctx, uid)
 	if err != nil {
 		return nil, err
 	}
 	return &v1.InfoRes{UserInfo: toApiUser(dto)}, nil
-}
-
-// currentUserId 从 Authorization 头解析当前用户(临时方案, 待接入正式鉴权中间件)。
-func currentUserId(ctx context.Context) (int64, error) {
-	r := ghttp.RequestFromCtx(ctx)
-	token := r.Header.Get("Authorization")
-	if token == "" {
-		return 0, gerror.NewCode(gcode.CodeNotAuthorized, "未登录")
-	}
-	uid, err := kit.ParseToken(token)
-	if err != nil {
-		return 0, gerror.NewCode(gcode.CodeNotAuthorized, "登录已失效")
-	}
-	return uid, nil
 }
 
 func toApiUser(d *service.UserInfoDTO) v1.UserInfo {
