@@ -1,0 +1,148 @@
+###############################################################################
+# 前台 User 接口 · 真实端到端测试(打到运行中的服务)
+#
+# 用法(GoLand/VSCode HTTP Client):
+#   1. 先启动服务:  gf run main.go   (默认 :8000)
+#   2. 点每个请求左侧 ▶ 单发, 或右上角「Run all requests in file」整条流程跑
+#
+# 说明: 登录后 token 自动存入全局变量, 后续请求用 {{token}} 接力。
+#       从上到下顺序执行时, 各断言都应通过。
+###############################################################################
+
+@baseUrl = http://127.0.0.1:8000
+
+### 1. 登录(公开) —— 成功并保存 token
+POST {{baseUrl}}/front/user/login
+Content-Type: application/json
+
+{
+  "device_id": "e2e-device-001",
+  "device_type": "ios",
+  "device_version": "1.0"
+}
+
+> {%
+client.test("登录成功", function () {
+    client.assert(response.status === 200, "HTTP 状态非 200");
+    client.assert(response.body.code === 0, "code 应为 0, 实际: " + response.body.code);
+    client.assert(response.body.data.token !== "", "未返回 token");
+    client.assert(response.body.data.user.username === "device_e2e-device-001", "username 不符");
+});
+client.global.set("token", response.body.data.token);
+%}
+
+### 2. 个人信息(带 token) —— 成功
+GET {{baseUrl}}/front/user/info
+Authorization: {{token}}
+
+> {%
+client.test("拿到个人信息", function () {
+    client.assert(response.body.code === 0, "code 应为 0");
+    client.assert(response.body.data.username !== undefined, "缺少 username");
+});
+%}
+
+### 3. 个人信息(不带 token) —— 应未授权
+GET {{baseUrl}}/front/user/info
+
+> {%
+client.test("无 token 被拒", function () {
+    client.assert(response.body.code !== 0, "无 token 时 code 不应为 0");
+});
+%}
+
+### 4. 绑定手机 —— 成功
+POST {{baseUrl}}/front/user/bind-phone
+Authorization: {{token}}
+Content-Type: application/json
+
+{
+  "phone": "13900139000"
+}
+
+> {%
+client.test("绑定手机成功", function () {
+    client.assert(response.body.code === 0, "code 应为 0, 实际: " + response.body.code);
+});
+%}
+
+### 5. 个人信息 —— 校验手机号已更新
+GET {{baseUrl}}/front/user/info
+Authorization: {{token}}
+
+> {%
+client.test("手机号已写入", function () {
+    client.assert(response.body.data.phone === "13900139000", "phone 未更新, 实际: " + response.body.data.phone);
+});
+%}
+
+### 6. 绑定手机(格式非法) —— 应被参数校验拦截
+POST {{baseUrl}}/front/user/bind-phone
+Authorization: {{token}}
+Content-Type: application/json
+
+{
+  "phone": "123"
+}
+
+> {%
+client.test("非法手机号被拦截", function () {
+    client.assert(response.body.code !== 0, "非法号码应报错");
+});
+%}
+
+### 7. 刷新 token —— 成功并替换全局 token(旧的随即失效)
+POST {{baseUrl}}/front/user/token/refresh
+Authorization: {{token}}
+
+> {%
+var oldToken = client.global.get("token");
+var newToken = response.body.data.token;
+client.log("旧 token: " + oldToken);
+client.log("新 token: " + newToken);
+client.test("刷新成功", function () {
+    client.assert(response.body.code === 0, "code 应为 0");
+    client.assert(newToken !== "", "未返回新 token");
+    client.assert(newToken !== oldToken, "新 token 应不同于旧: new=" + newToken + " | old=" + oldToken);
+});
+client.global.set("token", newToken);
+%}
+
+### 8. 个人信息(用新 token) —— 成功
+GET {{baseUrl}}/front/user/info
+Authorization: {{token}}
+
+> {%
+client.test("新 token 可用", function () {
+    client.assert(response.body.code === 0, "新 token 应可用");
+});
+%}
+
+### 9. 错误请求方式(login 用 GET) —— 应提示 405
+GET {{baseUrl}}/front/user/login
+
+> {%
+client.test("请求方式判断", function () {
+    client.assert(response.body.code === 405, "应返回 405, 实际: " + response.body.code);
+});
+%}
+
+### 10. 退出登录 —— 成功
+POST {{baseUrl}}/front/user/logout
+Authorization: {{token}}
+
+> {%
+client.test("退出成功", function () {
+    client.assert(response.body.code === 0, "code 应为 0");
+});
+%}
+
+### 11. 退出后再访问 —— token 应已失效
+GET {{baseUrl}}/front/user/info
+Authorization: {{token}}
+
+> {%
+client.test("退出后 token 失效", function () {
+    client.assert(response.body.code !== 0, "退出后不应再能访问");
+});
+%}

@@ -3,6 +3,7 @@ module github.com/JarvanDante/my_service
 go 1.23.0
 
 require (
+	github.com/alicebob/miniredis/v2 v2.38.0
 	github.com/gogf/gf/contrib/drivers/pgsql/v2 v2.10.2
 	github.com/gogf/gf/contrib/nosql/redis/v2 v2.10.2
 	github.com/gogf/gf/v2 v2.10.2
@@ -31,6 +32,7 @@ require (
 	github.com/olekukonko/tablewriter v1.1.0 // indirect
 	github.com/redis/go-redis/v9 v9.12.1 // indirect
 	github.com/rivo/uniseg v0.2.0 // indirect
+	github.com/yuin/gopher-lua v1.1.1 // indirect
 	go.opentelemetry.io/auto/sdk v1.1.0 // indirect
 	go.opentelemetry.io/otel v1.38.0 // indirect
 	go.opentelemetry.io/otel/metric v1.38.0 // indirect
