@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 
 	"github.com/gogf/gf/v2/database/gdb"
+	"github.com/gogf/gf/v2/errors/gerror"
 	"github.com/gogf/gf/v2/frame/g"
 	"github.com/gogf/gf/v2/os/gtime"
 
@@ -366,4 +367,111 @@ func (r *userRepo) TaskLogs(ctx context.Context, userId int64, page, size int) (
 	var list []*entity.UserTaskLog
 	err = m.Clone().Page(page, size).OrderDesc("id").Scan(&list)
 	return list, total, err
+}
+
+// ---- 充值 ----
+
+func (r *userRepo) ListRechargePackages(ctx context.Context) ([]*entity.RechargePackage, error) {
+	var list []*entity.RechargePackage
+	err := g.Model("recharge_package").Ctx(ctx).Where("status", 1).OrderAsc("sort").Scan(&list)
+	return list, err
+}
+
+func (r *userRepo) FindRechargePackage(ctx context.Context, id int64) (*entity.RechargePackage, error) {
+	var p *entity.RechargePackage
+	err := g.Model("recharge_package").Ctx(ctx).Where("id", id).Where("status", 1).Scan(&p)
+	return p, err
+}
+
+// CreateRechargeOrder 创建待支付订单(到账逻辑在支付回调, 见 TODO)。
+func (r *userRepo) CreateRechargeOrder(ctx context.Context, orderNo string, userId, packageId int64, amount, coin float64) error {
+	_, err := g.Model("recharge_order").Ctx(ctx).Data(g.Map{
+		"order_no":   orderNo,
+		"user_id":    userId,
+		"package_id": packageId,
+		"amount":     amount,
+		"coin":       coin,
+		"status":     0,
+	}).Insert()
+	return err
+}
+
+// ---- VIP ----
+
+func (r *userRepo) ListVipPackages(ctx context.Context) ([]*entity.VipPackage, error) {
+	var list []*entity.VipPackage
+	err := g.Model("vip_package").Ctx(ctx).Where("status", 1).OrderAsc("sort").Scan(&list)
+	return list, err
+}
+
+func (r *userRepo) FindVipPackage(ctx context.Context, id int64) (*entity.VipPackage, error) {
+	var p *entity.VipPackage
+	err := g.Model("vip_package").Ctx(ctx).Where("id", id).Where("status", 1).Scan(&p)
+	return p, err
+}
+
+// OpenVip 用金币开通/续费 VIP: 事务内扣金币(余额不足则失败) + 设置用户组 + 写记录 + 记账。
+func (r *userRepo) OpenVip(ctx context.Context, userId int64, pkg *entity.VipPackage, startAt, endAt int64) error {
+	return g.DB().Transaction(ctx, func(ctx context.Context, tx gdb.TX) error {
+		res, err := tx.Model("users").Ctx(ctx).
+			Where("id", userId).Where("balance >= ?", pkg.Price).
+			Data(g.Map{
+				"balance":        &gdb.Counter{Field: "balance", Value: -pkg.Price},
+				"group_id":       pkg.GroupId,
+				"group_name":     pkg.Name,
+				"group_end_time": endAt,
+			}).Update()
+		if err != nil {
+			return err
+		}
+		if n, _ := res.RowsAffected(); n == 0 {
+			return gerror.New("金币余额不足")
+		}
+		if _, err = tx.Model("vip_log").Ctx(ctx).Data(g.Map{
+			"user_id": userId, "package_id": pkg.Id, "days": pkg.Days,
+			"price": pkg.Price, "start_at": startAt, "end_at": endAt,
+		}).Insert(); err != nil {
+			return err
+		}
+		_, err = tx.Model("user_balance_log").Ctx(ctx).Data(g.Map{
+			"user_id": userId, "direction": 2, "scene": "vip",
+			"amount": pkg.Price, "remark": "开通VIP:" + pkg.Name,
+		}).Insert()
+		return err
+	})
+}
+
+func (r *userRepo) VipLogs(ctx context.Context, userId int64, page, size int) ([]*entity.VipLog, int, error) {
+	m := g.Model("vip_log").Ctx(ctx).Where("user_id", userId)
+	total, err := m.Clone().Count()
+	if err != nil {
+		return nil, 0, err
+	}
+	var list []*entity.VipLog
+	err = m.Clone().Page(page, size).OrderDesc("id").Scan(&list)
+	return list, total, err
+}
+
+// ---- 兑换(积分->金币) ----
+
+func (r *userRepo) ExchangeCreditToCoin(ctx context.Context, userId int64, creditCost, coinGain float64) error {
+	return g.DB().Transaction(ctx, func(ctx context.Context, tx gdb.TX) error {
+		res, err := tx.Model("users").Ctx(ctx).
+			Where("id", userId).Where("credit >= ?", creditCost).
+			Data(g.Map{
+				"credit":  &gdb.Counter{Field: "credit", Value: -creditCost},
+				"balance": &gdb.Counter{Field: "balance", Value: coinGain},
+			}).Update()
+		if err != nil {
+			return err
+		}
+		if n, _ := res.RowsAffected(); n == 0 {
+			return gerror.New("积分不足")
+		}
+		_, err = tx.Model("user_balance_log").Ctx(ctx).Data(g.Map{
+			"user_id": userId, "direction": 1, "scene": "exchange",
+			"amount": coinGain, "remark": "积分兑换金币",
+		}).Insert()
+		return err
+	})
 }

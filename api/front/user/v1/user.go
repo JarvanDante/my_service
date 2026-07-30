@@ -314,3 +314,84 @@ type UpRes struct {
 	Follow            int     `json:"follow"`
 	ShareNum          int     `json:"share_num"`
 }
+
+// ---- P6 资产(充值/VIP/兑换) ----
+
+type RechargePackage struct {
+	Id     int64   `json:"id"`
+	Name   string  `json:"name"`
+	Amount float64 `json:"amount"`
+	Coin   float64 `json:"coin"`
+	Bonus  float64 `json:"bonus"`
+}
+type RechargeReq struct {
+	g.Meta `path:"/user/recharge" method:"get" tags:"Front/User" summary:"充值套餐"`
+}
+type RechargeRes struct {
+	List []RechargePackage `json:"list"`
+}
+
+type RechargeDoReq struct {
+	g.Meta    `path:"/user/recharge/do" method:"post" tags:"Front/User" summary:"发起充值"`
+	PackageId int64 `json:"package_id" v:"required|min:1#套餐ID必填"`
+}
+type RechargeDoRes struct {
+	OrderNo string  `json:"order_no"`
+	Amount  float64 `json:"amount"`
+	Coin    float64 `json:"coin"`
+}
+
+type VipPackage struct {
+	Id    int64   `json:"id"`
+	Name  string  `json:"name"`
+	Days  int     `json:"days"`
+	Price float64 `json:"price"`
+}
+type VipReq struct {
+	g.Meta `path:"/user/vip" method:"get" tags:"Front/User" summary:"VIP套餐"`
+}
+type VipRes struct {
+	List []VipPackage `json:"list"`
+}
+
+type VipDoReq struct {
+	g.Meta    `path:"/user/vip/do" method:"post" tags:"Front/User" summary:"开通/续费VIP"`
+	PackageId int64 `json:"package_id" v:"required|min:1#套餐ID必填"`
+}
+type VipDoRes struct{}
+
+type VipLog struct {
+	Id        int64   `json:"id"`
+	PackageId int64   `json:"package_id"`
+	Days      int     `json:"days"`
+	Price     float64 `json:"price"`
+	StartAt   int64   `json:"start_at"`
+	EndAt     int64   `json:"end_at"`
+	CreatedAt string  `json:"created_at"`
+}
+type VipLogsReq struct {
+	g.Meta `path:"/user/vip/logs" method:"get" tags:"Front/User" summary:"VIP记录"`
+	Page   int `json:"page"`
+	Size   int `json:"size"`
+}
+type VipLogsRes struct {
+	List  []VipLog `json:"list"`
+	Total int      `json:"total"`
+	Page  int      `json:"page"`
+	Size  int      `json:"size"`
+}
+
+type ExchangeReq struct {
+	g.Meta `path:"/user/exchange" method:"get" tags:"Front/User" summary:"兑换信息"`
+}
+type ExchangeRes struct {
+	Rate    int     `json:"rate"` // 多少积分兑 1 金币
+	Credit  float64 `json:"credit"`
+	Balance float64 `json:"balance"`
+}
+
+type ExchangeDoReq struct {
+	g.Meta `path:"/user/exchange/do" method:"post" tags:"Front/User" summary:"积分兑换金币"`
+	Coin   int `json:"coin" v:"required|min:1#兑换金币数必填"`
+}
+type ExchangeDoRes struct{}

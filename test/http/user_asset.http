@@ -1,0 +1,116 @@
+###############################################################################
+# 前台 User · P6 资产(充值/VIP/兑换)真实端到端测试
+#
+# 覆盖: 套餐列表、发起充值(真建订单)、兑换信息、余额/积分不足的错误路径。
+# 「VIP 开通成功」「兑换成功」需要账户先有金币/积分, 见文件底部手动说明。
+# 迁移已内置示例套餐(充值3个、VIP2个), GET 接口开箱有数据。
+###############################################################################
+
+@baseUrl = http://127.0.0.1:8000
+
+### 1. 登录
+POST {{baseUrl}}/front/user/login
+Content-Type: application/json
+
+{ "device_id": "e2e-asset-A", "device_type": "ios" }
+
+> {%
+client.test("登录成功", function () { client.assert(response.body.code === 0, "登录失败"); });
+client.global.set("token", response.body.data.token);
+%}
+
+### 2. 充值套餐 —— 有数据
+GET {{baseUrl}}/front/user/recharge
+Authorization: {{token}}
+
+> {%
+client.test("充值套餐列表", function () {
+    client.assert(response.body.code === 0, "code 应为 0");
+    client.assert(response.body.data.list.length >= 1, "应有充值套餐");
+});
+client.global.set("rpid", response.body.data.list[0].id);
+%}
+
+### 3. 发起充值 —— 创建订单成功
+POST {{baseUrl}}/front/user/recharge/do
+Authorization: {{token}}
+Content-Type: application/json
+
+{ "package_id": {{rpid}} }
+
+> {%
+client.test("发起充值", function () {
+    client.assert(response.body.code === 0, "code 应为 0: " + response.body.message);
+    client.assert(response.body.data.order_no !== "", "应返回订单号");
+});
+%}
+
+### 4. VIP 套餐 —— 有数据
+GET {{baseUrl}}/front/user/vip
+Authorization: {{token}}
+
+> {%
+client.test("VIP套餐列表", function () {
+    client.assert(response.body.code === 0, "code 应为 0");
+    client.assert(response.body.data.list.length >= 1, "应有VIP套餐");
+});
+client.global.set("vpid", response.body.data.list[0].id);
+%}
+
+### 5. VIP 记录 —— 返回数组
+GET {{baseUrl}}/front/user/vip/logs?page=1&size=15
+Authorization: {{token}}
+
+> {%
+client.test("VIP记录为数组", function () {
+    client.assert(response.body.code === 0, "code 应为 0");
+    client.assert(Array.isArray(response.body.data.list), "list 应为数组");
+});
+%}
+
+### 6. 兑换信息 —— 成功
+GET {{baseUrl}}/front/user/exchange
+Authorization: {{token}}
+
+> {%
+client.test("兑换信息", function () {
+    client.assert(response.body.code === 0, "code 应为 0");
+    client.assert(response.body.data.rate >= 1, "应返回兑换比例");
+});
+%}
+
+### 7. 开通VIP(余额不足) —— 应报错
+POST {{baseUrl}}/front/user/vip/do
+Authorization: {{token}}
+Content-Type: application/json
+
+{ "package_id": {{vpid}} }
+
+> {%
+client.test("余额不足开通失败", function () {
+    client.assert(response.body.code !== 0, "新用户金币为0, 应报余额不足");
+});
+%}
+
+### 8. 兑换金币(积分不足) —— 应报错
+POST {{baseUrl}}/front/user/exchange/do
+Authorization: {{token}}
+Content-Type: application/json
+
+{ "coin": 1 }
+
+> {%
+client.test("积分不足兑换失败", function () {
+    client.assert(response.body.code !== 0, "新用户积分为0, 应报积分不足");
+});
+%}
+
+###############################################################################
+# 手动验证「VIP 开通成功 / 兑换成功」(需先给账户充值金币/积分):
+#   -- 给该用户加 10000 金币和 10000 积分:
+#   UPDATE users SET balance = 10000, credit = 10000 WHERE username = 'device_e2e-asset-A';
+#   然后:
+#   POST /front/user/vip/do        {"package_id": <vip套餐id>}   预期 code=0; 查 info 余额扣掉套餐价
+#   POST /front/user/exchange/do   {"coin": 5}                   预期 code=0; 积分-500, 金币+5
+#   再查 /front/user/vip/logs 能看到开通记录。
+###############################################################################

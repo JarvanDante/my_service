@@ -390,6 +390,108 @@ func (c *Controller) Up(ctx context.Context, req *v1.UpReq) (res *v1.UpRes, err 
 	}, nil
 }
 
+// Recharge 充值套餐(需登录)。
+func (c *Controller) Recharge(ctx context.Context, req *v1.RechargeReq) (res *v1.RechargeRes, err error) {
+	if _, err = uid(ctx); err != nil {
+		return nil, err
+	}
+	list, err := c.user.RechargePackages(ctx)
+	if err != nil {
+		return nil, err
+	}
+	items := make([]v1.RechargePackage, 0, len(list))
+	for _, p := range list {
+		items = append(items, v1.RechargePackage{Id: p.Id, Name: p.Name, Amount: p.Amount, Coin: p.Coin, Bonus: p.Bonus})
+	}
+	return &v1.RechargeRes{List: items}, nil
+}
+
+// RechargeDo 发起充值(需登录)。
+func (c *Controller) RechargeDo(ctx context.Context, req *v1.RechargeDoReq) (res *v1.RechargeDoRes, err error) {
+	id, err := uid(ctx)
+	if err != nil {
+		return nil, err
+	}
+	dto, err := c.user.DoRecharge(ctx, id, req.PackageId)
+	if err != nil {
+		return nil, err
+	}
+	return &v1.RechargeDoRes{OrderNo: dto.OrderNo, Amount: dto.Amount, Coin: dto.Coin}, nil
+}
+
+// Vip VIP套餐(需登录)。
+func (c *Controller) Vip(ctx context.Context, req *v1.VipReq) (res *v1.VipRes, err error) {
+	if _, err = uid(ctx); err != nil {
+		return nil, err
+	}
+	list, err := c.user.VipPackages(ctx)
+	if err != nil {
+		return nil, err
+	}
+	items := make([]v1.VipPackage, 0, len(list))
+	for _, p := range list {
+		items = append(items, v1.VipPackage{Id: p.Id, Name: p.Name, Days: p.Days, Price: p.Price})
+	}
+	return &v1.VipRes{List: items}, nil
+}
+
+// VipDo 开通/续费 VIP(需登录)。
+func (c *Controller) VipDo(ctx context.Context, req *v1.VipDoReq) (res *v1.VipDoRes, err error) {
+	id, err := uid(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if err = c.user.DoVip(ctx, id, req.PackageId); err != nil {
+		return nil, err
+	}
+	return &v1.VipDoRes{}, nil
+}
+
+// VipLogs VIP记录(需登录)。
+func (c *Controller) VipLogs(ctx context.Context, req *v1.VipLogsReq) (res *v1.VipLogsRes, err error) {
+	id, err := uid(ctx)
+	if err != nil {
+		return nil, err
+	}
+	list, total, err := c.user.VipLogs(ctx, id, req.Page, req.Size)
+	if err != nil {
+		return nil, err
+	}
+	items := make([]v1.VipLog, 0, len(list))
+	for _, l := range list {
+		items = append(items, v1.VipLog{
+			Id: l.Id, PackageId: l.PackageId, Days: l.Days, Price: l.Price,
+			StartAt: l.StartAt, EndAt: l.EndAt, CreatedAt: l.CreatedAt,
+		})
+	}
+	return &v1.VipLogsRes{List: items, Total: total, Page: req.Page, Size: req.Size}, nil
+}
+
+// Exchange 兑换信息(需登录)。
+func (c *Controller) Exchange(ctx context.Context, req *v1.ExchangeReq) (res *v1.ExchangeRes, err error) {
+	id, err := uid(ctx)
+	if err != nil {
+		return nil, err
+	}
+	dto, err := c.user.ExchangeInfo(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	return &v1.ExchangeRes{Rate: dto.Rate, Credit: dto.Credit, Balance: dto.Balance}, nil
+}
+
+// ExchangeDo 积分兑换金币(需登录)。
+func (c *Controller) ExchangeDo(ctx context.Context, req *v1.ExchangeDoReq) (res *v1.ExchangeDoRes, err error) {
+	id, err := uid(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if err = c.user.DoExchange(ctx, id, req.Coin); err != nil {
+		return nil, err
+	}
+	return &v1.ExchangeDoRes{}, nil
+}
+
 func toApiUser(d *service.UserInfoDTO) v1.UserInfo {
 	if d == nil {
 		return v1.UserInfo{}

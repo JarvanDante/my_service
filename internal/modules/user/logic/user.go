@@ -548,3 +548,108 @@ func (s *sUser) Up(ctx context.Context, userId int64) (*service.UpDTO, error) {
 		SignDaysThisMonth: len(days), Fans: me.Fans, Follow: me.Follow, ShareNum: me.ShareNum,
 	}, nil
 }
+
+const creditPerCoin = 100.0 // 100 积分 = 1 金币
+
+func (s *sUser) RechargePackages(ctx context.Context) ([]*service.RechargePackageDTO, error) {
+	list, err := s.repo.ListRechargePackages(ctx)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]*service.RechargePackageDTO, 0, len(list))
+	for _, p := range list {
+		out = append(out, &service.RechargePackageDTO{Id: p.Id, Name: p.Name, Amount: p.Amount, Coin: p.Coin, Bonus: p.Bonus})
+	}
+	return out, nil
+}
+
+// DoRecharge 发起充值: 创建待支付订单。到账在支付回调, 此处不加金币。
+func (s *sUser) DoRecharge(ctx context.Context, userId, packageId int64) (*service.RechargeOrderDTO, error) {
+	pkg, err := s.repo.FindRechargePackage(ctx, packageId)
+	if err != nil {
+		return nil, err
+	}
+	if pkg == nil {
+		return nil, gerror.New("充值套餐不存在")
+	}
+	orderNo := "R" + gconv.String(gtime.Timestamp()) + grand.Digits(6)
+	coin := pkg.Coin + pkg.Bonus
+	if err = s.repo.CreateRechargeOrder(ctx, orderNo, userId, packageId, pkg.Amount, coin); err != nil {
+		return nil, err
+	}
+	// TODO: 返回真实支付参数(接支付网关); 支付成功回调里再给用户加金币并置订单为已支付。
+	return &service.RechargeOrderDTO{OrderNo: orderNo, Amount: pkg.Amount, Coin: coin}, nil
+}
+
+func (s *sUser) VipPackages(ctx context.Context) ([]*service.VipPackageDTO, error) {
+	list, err := s.repo.ListVipPackages(ctx)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]*service.VipPackageDTO, 0, len(list))
+	for _, p := range list {
+		out = append(out, &service.VipPackageDTO{Id: p.Id, Name: p.Name, Days: p.Days, Price: p.Price})
+	}
+	return out, nil
+}
+
+// DoVip 用金币开通/续费 VIP。
+func (s *sUser) DoVip(ctx context.Context, userId, packageId int64) error {
+	pkg, err := s.repo.FindVipPackage(ctx, packageId)
+	if err != nil {
+		return err
+	}
+	if pkg == nil {
+		return gerror.New("VIP套餐不存在")
+	}
+	me, err := s.repo.FindById(ctx, userId)
+	if err != nil {
+		return err
+	}
+	if me == nil {
+		return gerror.New("用户不存在")
+	}
+	now := gtime.Timestamp()
+	base := now
+	if me.GroupEndTime > base {
+		base = me.GroupEndTime // 未过期则续期
+	}
+	endAt := base + int64(pkg.Days)*86400
+	return s.repo.OpenVip(ctx, userId, pkg, now, endAt)
+}
+
+func (s *sUser) VipLogs(ctx context.Context, userId int64, page, size int) ([]*service.VipLogDTO, int, error) {
+	page, size = normalizePage(page, size)
+	list, total, err := s.repo.VipLogs(ctx, userId, page, size)
+	if err != nil {
+		return nil, 0, err
+	}
+	out := make([]*service.VipLogDTO, 0, len(list))
+	for _, l := range list {
+		out = append(out, &service.VipLogDTO{
+			Id: l.Id, PackageId: l.PackageId, Days: l.Days, Price: l.Price,
+			StartAt: l.StartAt, EndAt: l.EndAt, CreatedAt: fmtTime(l.CreatedAt),
+		})
+	}
+	return out, total, nil
+}
+
+func (s *sUser) ExchangeInfo(ctx context.Context, userId int64) (*service.ExchangeInfoDTO, error) {
+	me, err := s.repo.FindById(ctx, userId)
+	if err != nil {
+		return nil, err
+	}
+	if me == nil {
+		return nil, gerror.New("用户不存在")
+	}
+	return &service.ExchangeInfoDTO{Rate: int(creditPerCoin), Credit: me.Credit, Balance: me.Balance}, nil
+}
+
+// DoExchange 积分兑金币: coin 为想兑换的金币数, 花费 coin*rate 积分。
+func (s *sUser) DoExchange(ctx context.Context, userId int64, coin int) error {
+	if coin <= 0 {
+		return gerror.New("兑换数量不合法")
+	}
+	cost := float64(coin) * creditPerCoin
+	return s.repo.ExchangeCreditToCoin(ctx, userId, cost, float64(coin))
+}

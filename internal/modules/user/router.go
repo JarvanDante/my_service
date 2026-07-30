@@ -27,6 +27,7 @@ func RegisterFront(group *ghttp.RouterGroup, repo domain.Repository) {
 			ctrl.BindParent, ctrl.BindCode, ctrl.Redeem, ctrl.CodeLogs,
 			ctrl.Share, ctrl.ShareLogs, ctrl.ShareReport,
 			ctrl.DoSign, ctrl.Tasks, ctrl.DoTask, ctrl.TaskLogs, ctrl.Up,
+			ctrl.Recharge, ctrl.RechargeDo, ctrl.Vip, ctrl.VipDo, ctrl.VipLogs, ctrl.Exchange, ctrl.ExchangeDo,
 		)
 	})
 }

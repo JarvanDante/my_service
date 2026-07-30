@@ -135,6 +135,45 @@ type UpDTO struct {
 	ShareNum          int
 }
 
+// ---- P6 资产(充值/VIP/兑换) ----
+
+type RechargePackageDTO struct {
+	Id     int64
+	Name   string
+	Amount float64
+	Coin   float64
+	Bonus  float64
+}
+
+type RechargeOrderDTO struct {
+	OrderNo string
+	Amount  float64
+	Coin    float64
+}
+
+type VipPackageDTO struct {
+	Id    int64
+	Name  string
+	Days  int
+	Price float64
+}
+
+type VipLogDTO struct {
+	Id        int64
+	PackageId int64
+	Days      int
+	Price     float64
+	StartAt   int64
+	EndAt     int64
+	CreatedAt string
+}
+
+type ExchangeInfoDTO struct {
+	Rate    int
+	Credit  float64
+	Balance float64
+}
+
 type UserDTO struct {
 	ID     int64
 	Name   string
@@ -170,6 +209,14 @@ type IUser interface {
 	DoTask(ctx context.Context, userId, taskId int64) (*TaskDoneDTO, error)
 	TaskLogs(ctx context.Context, userId int64, page, size int) ([]*TaskLogDTO, int, error)
 	Up(ctx context.Context, userId int64) (*UpDTO, error)
+	// 资产(充值/VIP/兑换)
+	RechargePackages(ctx context.Context) ([]*RechargePackageDTO, error)
+	DoRecharge(ctx context.Context, userId, packageId int64) (*RechargeOrderDTO, error)
+	VipPackages(ctx context.Context) ([]*VipPackageDTO, error)
+	DoVip(ctx context.Context, userId, packageId int64) error
+	VipLogs(ctx context.Context, userId int64, page, size int) ([]*VipLogDTO, int, error)
+	ExchangeInfo(ctx context.Context, userId int64) (*ExchangeInfoDTO, error)
+	DoExchange(ctx context.Context, userId int64, coin int) error
 	// 后台
 	GetUser(ctx context.Context, id int64) (*UserDTO, error)
 	DisableUser(ctx context.Context, id int64) error
