@@ -152,3 +152,90 @@ type FansRes struct {
 	Page  int          `json:"page"`
 	Size  int          `json:"size"`
 }
+
+// ---- P4 推广/兑换码 ----
+
+// 绑定推荐人(by 账号)
+type BindParentReq struct {
+	g.Meta  `path:"/user/bind-parent" method:"post" tags:"Front/User" summary:"绑定推荐人"`
+	Account string `json:"account" v:"required#推荐人账号必填"`
+}
+type BindParentRes struct{}
+
+// 绑定邀请码(by 邀请码=分享码)
+type BindCodeReq struct {
+	g.Meta `path:"/user/bind-code" method:"post" tags:"Front/User" summary:"绑定邀请码"`
+	Code   string `json:"code" v:"required#邀请码必填"`
+}
+type BindCodeRes struct{}
+
+// 使用兑换码
+type RedeemReq struct {
+	g.Meta `path:"/user/code/redeem" method:"post" tags:"Front/User" summary:"使用兑换码"`
+	Code   string `json:"code" v:"required#兑换码必填"`
+}
+type RedeemRes struct {
+	Type   string `json:"type"`
+	AddNum int    `json:"add_num"`
+	Name   string `json:"name"`
+}
+
+// 兑换记录
+type CodeLog struct {
+	Id        int64  `json:"id"`
+	Code      string `json:"code"`
+	Name      string `json:"name"`
+	Type      string `json:"type"`
+	AddNum    int    `json:"add_num"`
+	CreatedAt string `json:"created_at"`
+}
+type CodeLogsReq struct {
+	g.Meta `path:"/user/code/logs" method:"get" tags:"Front/User" summary:"兑换记录"`
+	Page   int `json:"page"`
+	Size   int `json:"size"`
+}
+type CodeLogsRes struct {
+	List  []CodeLog `json:"list"`
+	Total int       `json:"total"`
+	Page  int       `json:"page"`
+	Size  int       `json:"size"`
+}
+
+// 分享信息
+type ShareReq struct {
+	g.Meta `path:"/user/share" method:"get" tags:"Front/User" summary:"分享信息"`
+}
+type ShareRes struct {
+	ShareCode string `json:"share_code"`
+	ShareUrl  string `json:"share_url"`
+	ShareNum  int    `json:"share_num"`
+}
+
+// 分享记录(暂空)
+type ShareLog struct {
+	Id        int64  `json:"id"`
+	Type      string `json:"type"`
+	TargetId  int64  `json:"target_id"`
+	Channel   string `json:"channel"`
+	CreatedAt string `json:"created_at"`
+}
+
+// 上报分享
+type ShareReportReq struct {
+	g.Meta   `path:"/user/share/report" method:"post" tags:"Front/User" summary:"上报分享"`
+	Type     string `json:"type"`      // app/poster/link/invite...
+	TargetId int64  `json:"target_id"` // 分享对象(可选)
+	Channel  string `json:"channel"`   // 渠道(可选)
+}
+type ShareReportRes struct{}
+type ShareLogsReq struct {
+	g.Meta `path:"/user/share/logs" method:"get" tags:"Front/User" summary:"分享记录"`
+	Page   int `json:"page"`
+	Size   int `json:"size"`
+}
+type ShareLogsRes struct {
+	List  []ShareLog `json:"list"`
+	Total int        `json:"total"`
+	Page  int        `json:"page"`
+	Size  int        `json:"size"`
+}

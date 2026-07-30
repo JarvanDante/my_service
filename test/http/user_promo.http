@@ -1,0 +1,130 @@
+###############################################################################
+# 前台 User · P4 推广/兑换码 真实端到端测试
+#
+# 覆盖可重复的真实路径: 分享信息、上报分享、分享/兑换记录、各类错误校验。
+# 「真实兑换成功」「真实绑定推荐人」需要前置数据, 见文件底部手动验证说明。
+###############################################################################
+
+@baseUrl = http://127.0.0.1:8000
+
+### 1. 登录(取 token 和自己的 username)
+POST {{baseUrl}}/front/user/login
+Content-Type: application/json
+
+{ "device_id": "e2e-promo-A", "device_type": "ios" }
+
+> {%
+client.test("登录成功", function () {
+    client.assert(response.body.code === 0, "登录失败");
+});
+client.global.set("token", response.body.data.token);
+client.global.set("myname", response.body.data.user.username);
+%}
+
+### 2. 分享信息 —— 成功
+GET {{baseUrl}}/front/user/share
+Authorization: {{token}}
+
+> {%
+client.test("分享信息", function () {
+    client.assert(response.body.code === 0, "code 应为 0");
+    client.assert(response.body.data.share_code !== "", "应返回分享码");
+    client.assert(response.body.data.share_url.indexOf("http") === 0, "应返回分享链接");
+});
+%}
+
+### 3. 上报一次分享 —— 成功
+POST {{baseUrl}}/front/user/share/report
+Authorization: {{token}}
+Content-Type: application/json
+
+{ "type": "poster", "channel": "wechat" }
+
+> {%
+client.test("上报分享成功", function () {
+    client.assert(response.body.code === 0, "code 应为 0");
+});
+%}
+
+### 4. 分享记录 —— 上报后应至少 1 条
+GET {{baseUrl}}/front/user/share/logs?page=1&size=15
+Authorization: {{token}}
+
+> {%
+client.test("分享记录含刚上报的", function () {
+    client.assert(response.body.code === 0, "code 应为 0");
+    client.assert(Array.isArray(response.body.data.list), "list 应为数组");
+    client.assert(response.body.data.total >= 1, "上报后应至少 1 条");
+});
+%}
+
+### 5. 兑换记录 —— 返回数组
+GET {{baseUrl}}/front/user/code/logs?page=1&size=15
+Authorization: {{token}}
+
+> {%
+client.test("兑换记录为数组", function () {
+    client.assert(response.body.code === 0, "code 应为 0");
+    client.assert(Array.isArray(response.body.data.list), "list 应为数组");
+});
+%}
+
+### 6. 使用兑换码(不存在) —— 应报错
+POST {{baseUrl}}/front/user/code/redeem
+Authorization: {{token}}
+Content-Type: application/json
+
+{ "code": "NOT_EXIST_CODE_XYZ" }
+
+> {%
+client.test("无效兑换码被拒", function () {
+    client.assert(response.body.code !== 0, "不存在的码应报错");
+});
+%}
+
+### 7. 绑定推荐人(账号不存在) —— 应报错
+POST {{baseUrl}}/front/user/bind-parent
+Authorization: {{token}}
+Content-Type: application/json
+
+{ "account": "nobody_not_exist_999" }
+
+> {%
+client.test("推荐人不存在被拒", function () {
+    client.assert(response.body.code !== 0, "推荐人不存在应报错");
+});
+%}
+
+### 8. 绑定推荐人(绑自己) —— 应报错
+POST {{baseUrl}}/front/user/bind-parent
+Authorization: {{token}}
+Content-Type: application/json
+
+{ "account": "{{myname}}" }
+
+> {%
+client.test("不能绑定自己", function () {
+    client.assert(response.body.code !== 0, "绑自己应报错");
+});
+%}
+
+### 9. 绑定邀请码(不存在) —— 应报错
+POST {{baseUrl}}/front/user/bind-code
+Authorization: {{token}}
+Content-Type: application/json
+
+{ "code": "invalid_invite_code_999" }
+
+> {%
+client.test("无效邀请码被拒", function () {
+    client.assert(response.body.code !== 0, "无效邀请码应报错");
+});
+%}
+
+###############################################################################
+# 手动验证「真实兑换成功」(需先造一个兑换码):
+#   INSERT INTO user_code (name, code, code_key, type, object_id, add_num, can_use_num, used_num, status, expired_at)
+#   VALUES ('测试加币码', 'GIFT100', 'k1', 'point', 0, 100, 100, 0, 0, 0);
+#   然后 POST /front/user/code/redeem  body {"code":"GIFT100"}  (同一用户只能兑一次)
+#   预期 code=0, data.add_num=100; 查 /front/user/info 余额 +100。
+###############################################################################

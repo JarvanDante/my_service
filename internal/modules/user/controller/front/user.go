@@ -209,6 +209,106 @@ func toPublicApiList(ds []*service.PublicUserDTO) []v1.PublicUser {
 	return out
 }
 
+// BindParent 绑定推荐人(需登录)。
+func (c *Controller) BindParent(ctx context.Context, req *v1.BindParentReq) (res *v1.BindParentRes, err error) {
+	id, err := uid(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if err = c.user.BindParent(ctx, id, req.Account); err != nil {
+		return nil, err
+	}
+	return &v1.BindParentRes{}, nil
+}
+
+// BindCode 绑定邀请码(需登录, 复用绑定推荐人逻辑)。
+func (c *Controller) BindCode(ctx context.Context, req *v1.BindCodeReq) (res *v1.BindCodeRes, err error) {
+	id, err := uid(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if err = c.user.BindParent(ctx, id, req.Code); err != nil {
+		return nil, err
+	}
+	return &v1.BindCodeRes{}, nil
+}
+
+// Redeem 使用兑换码(需登录)。
+func (c *Controller) Redeem(ctx context.Context, req *v1.RedeemReq) (res *v1.RedeemRes, err error) {
+	id, err := uid(ctx)
+	if err != nil {
+		return nil, err
+	}
+	dto, err := c.user.RedeemCode(ctx, id, req.Code)
+	if err != nil {
+		return nil, err
+	}
+	return &v1.RedeemRes{Type: dto.Type, AddNum: dto.AddNum, Name: dto.Name}, nil
+}
+
+// CodeLogs 兑换记录(需登录)。
+func (c *Controller) CodeLogs(ctx context.Context, req *v1.CodeLogsReq) (res *v1.CodeLogsRes, err error) {
+	id, err := uid(ctx)
+	if err != nil {
+		return nil, err
+	}
+	list, total, err := c.user.CodeLogs(ctx, id, req.Page, req.Size)
+	if err != nil {
+		return nil, err
+	}
+	items := make([]v1.CodeLog, 0, len(list))
+	for _, l := range list {
+		items = append(items, v1.CodeLog{
+			Id: l.Id, Code: l.Code, Name: l.Name, Type: l.Type, AddNum: l.AddNum, CreatedAt: l.CreatedAt,
+		})
+	}
+	return &v1.CodeLogsRes{List: items, Total: total, Page: req.Page, Size: req.Size}, nil
+}
+
+// Share 分享信息(需登录)。
+func (c *Controller) Share(ctx context.Context, req *v1.ShareReq) (res *v1.ShareRes, err error) {
+	id, err := uid(ctx)
+	if err != nil {
+		return nil, err
+	}
+	dto, err := c.user.ShareInfo(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	return &v1.ShareRes{ShareCode: dto.ShareCode, ShareUrl: dto.ShareUrl, ShareNum: dto.ShareNum}, nil
+}
+
+// ShareLogs 分享记录(需登录)。
+func (c *Controller) ShareLogs(ctx context.Context, req *v1.ShareLogsReq) (res *v1.ShareLogsRes, err error) {
+	id, err := uid(ctx)
+	if err != nil {
+		return nil, err
+	}
+	list, total, err := c.user.ShareLogs(ctx, id, req.Page, req.Size)
+	if err != nil {
+		return nil, err
+	}
+	items := make([]v1.ShareLog, 0, len(list))
+	for _, l := range list {
+		items = append(items, v1.ShareLog{
+			Id: l.Id, Type: l.Type, TargetId: l.TargetId, Channel: l.Channel, CreatedAt: l.CreatedAt,
+		})
+	}
+	return &v1.ShareLogsRes{List: items, Total: total, Page: req.Page, Size: req.Size}, nil
+}
+
+// ShareReport 上报分享(需登录)。
+func (c *Controller) ShareReport(ctx context.Context, req *v1.ShareReportReq) (res *v1.ShareReportRes, err error) {
+	id, err := uid(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if err = c.user.ReportShare(ctx, id, req.Type, req.TargetId, req.Channel); err != nil {
+		return nil, err
+	}
+	return &v1.ShareReportRes{}, nil
+}
+
 func toApiUser(d *service.UserInfoDTO) v1.UserInfo {
 	if d == nil {
 		return v1.UserInfo{}

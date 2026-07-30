@@ -155,3 +155,120 @@ func (r *userRepo) FansList(ctx context.Context, userId int64, page, size int) (
 	err = m.Clone().Fields("u.*").Page(page, size).OrderDesc("f.id").Scan(&list)
 	return list, total, err
 }
+
+// BindInviter 绑定推荐人: 事务内设置 parent + 推荐人 share_num+1。
+func (r *userRepo) BindInviter(ctx context.Context, userId, inviterId int64, inviterName string) error {
+	return g.DB().Transaction(ctx, func(ctx context.Context, tx gdb.TX) error {
+		if _, err := tx.Model("users").Ctx(ctx).Where("id", userId).Data(g.Map{
+			"parent_id":   inviterId,
+			"parent_name": inviterName,
+		}).Update(); err != nil {
+			return err
+		}
+		if _, err := tx.Model("users").Ctx(ctx).Where("id", inviterId).Data(g.Map{
+			"share_num": &gdb.Counter{Field: "share_num", Value: 1},
+		}).Update(); err != nil {
+			return err
+		}
+		return nil
+	})
+}
+
+func (r *userRepo) FindCodeByCode(ctx context.Context, code string) (*entity.UserCode, error) {
+	var c *entity.UserCode
+	err := g.Model("user_code").Ctx(ctx).Where("code", code).Scan(&c)
+	return c, err
+}
+
+func (r *userRepo) HasRedeemed(ctx context.Context, codeId, userId int64) (bool, error) {
+	n, err := g.Model("user_code_log").Ctx(ctx).
+		Where("code_id", codeId).Where("user_id", userId).Count()
+	return n > 0, err
+}
+
+// RedeemCode 使用兑换码: 事务内发放(金币/用户组) + 改用量 + 写记录。
+func (r *userRepo) RedeemCode(ctx context.Context, userId int64, username string, c *entity.UserCode) error {
+	return g.DB().Transaction(ctx, func(ctx context.Context, tx gdb.TX) error {
+		switch c.Type {
+		case "point": // 加金币(balance)
+			if _, err := tx.Model("users").Ctx(ctx).Where("id", userId).
+				Data(g.Map{"balance": &gdb.Counter{Field: "balance", Value: float64(c.AddNum)}}).Update(); err != nil {
+				return err
+			}
+		case "group": // 加/续用户组, add_num 为天数
+			now := gtime.Timestamp()
+			base := now
+			v, err := tx.Model("users").Ctx(ctx).Where("id", userId).Fields("group_end_time").Value()
+			if err != nil {
+				return err
+			}
+			if cur := v.Int64(); cur > base {
+				base = cur
+			}
+			if _, err := tx.Model("users").Ctx(ctx).Where("id", userId).Data(g.Map{
+				"group_id":       c.ObjectId,
+				"group_end_time": base + int64(c.AddNum)*86400,
+			}).Update(); err != nil {
+				return err
+			}
+		}
+		// 用量 +1, 用完置为已使用
+		status := c.Status
+		if c.UsedNum+1 >= c.CanUseNum {
+			status = 1
+		}
+		if _, err := tx.Model("user_code").Ctx(ctx).Where("id", c.Id).Data(g.Map{
+			"used_num": &gdb.Counter{Field: "used_num", Value: 1},
+			"status":   status,
+		}).Update(); err != nil {
+			return err
+		}
+		// 记录
+		if _, err := tx.Model("user_code_log").Ctx(ctx).Data(g.Map{
+			"code_id":   c.Id,
+			"code":      c.Code,
+			"code_key":  c.CodeKey,
+			"name":      c.Name,
+			"type":      c.Type,
+			"object_id": c.ObjectId,
+			"user_id":   userId,
+			"username":  username,
+			"add_num":   c.AddNum,
+		}).Insert(); err != nil {
+			return err
+		}
+		return nil
+	})
+}
+
+func (r *userRepo) CodeLogs(ctx context.Context, userId int64, page, size int) ([]*entity.UserCodeLog, int, error) {
+	m := g.Model("user_code_log").Ctx(ctx).Where("user_id", userId)
+	total, err := m.Clone().Count()
+	if err != nil {
+		return nil, 0, err
+	}
+	var list []*entity.UserCodeLog
+	err = m.Clone().Page(page, size).OrderDesc("id").Scan(&list)
+	return list, total, err
+}
+
+func (r *userRepo) AddShareLog(ctx context.Context, userId int64, typ string, targetId int64, channel string) error {
+	_, err := g.Model("user_share_log").Ctx(ctx).Data(g.Map{
+		"user_id":   userId,
+		"type":      typ,
+		"target_id": targetId,
+		"channel":   channel,
+	}).Insert()
+	return err
+}
+
+func (r *userRepo) ShareLogList(ctx context.Context, userId int64, page, size int) ([]*entity.UserShareLog, int, error) {
+	m := g.Model("user_share_log").Ctx(ctx).Where("user_id", userId)
+	total, err := m.Clone().Count()
+	if err != nil {
+		return nil, 0, err
+	}
+	var list []*entity.UserShareLog
+	err = m.Clone().Page(page, size).OrderDesc("id").Scan(&list)
+	return list, total, err
+}

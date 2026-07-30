@@ -61,6 +61,37 @@ type LoginDTO struct {
 	User  *UserInfoDTO
 }
 
+// ---- P4 推广/兑换码 ----
+
+type RedeemDTO struct {
+	Type   string // point / group
+	AddNum int
+	Name   string
+}
+
+type CodeLogDTO struct {
+	Id        int64
+	Code      string
+	Name      string
+	Type      string
+	AddNum    int
+	CreatedAt string
+}
+
+type ShareDTO struct {
+	ShareCode string
+	ShareUrl  string
+	ShareNum  int
+}
+
+type ShareLogDTO struct {
+	Id        int64
+	Type      string
+	TargetId  int64
+	Channel   string
+	CreatedAt string
+}
+
 type UserDTO struct {
 	ID     int64
 	Name   string
@@ -83,6 +114,13 @@ type IUser interface {
 	DoFollow(ctx context.Context, userId, homeId int64) (bool, error)
 	Following(ctx context.Context, userId int64, page, size int) ([]*PublicUserDTO, int, error)
 	Fans(ctx context.Context, userId int64, page, size int) ([]*PublicUserDTO, int, error)
+	// 推广 / 兑换码
+	BindParent(ctx context.Context, userId int64, account string) error
+	RedeemCode(ctx context.Context, userId int64, code string) (*RedeemDTO, error)
+	CodeLogs(ctx context.Context, userId int64, page, size int) ([]*CodeLogDTO, int, error)
+	ShareInfo(ctx context.Context, userId int64) (*ShareDTO, error)
+	ShareLogs(ctx context.Context, userId int64, page, size int) ([]*ShareLogDTO, int, error)
+	ReportShare(ctx context.Context, userId int64, typ string, targetId int64, channel string) error
 	// 后台
 	GetUser(ctx context.Context, id int64) (*UserDTO, error)
 	DisableUser(ctx context.Context, id int64) error

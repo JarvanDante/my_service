@@ -312,3 +312,138 @@ func toPublicList(us []*entity.Users) []*service.PublicUserDTO {
 	}
 	return out
 }
+
+// BindParent 绑定推荐人(by account/邀请码), 已绑定则不可改。
+func (s *sUser) BindParent(ctx context.Context, userId int64, account string) error {
+	if account == "" {
+		return gerror.New("请填写推荐人/邀请码")
+	}
+	me, err := s.repo.FindById(ctx, userId)
+	if err != nil {
+		return err
+	}
+	if me == nil {
+		return gerror.New("用户不存在")
+	}
+	if me.ParentId != 0 {
+		return gerror.New("已绑定推荐人, 不可修改")
+	}
+	inviter, err := s.repo.FindByAccount(ctx, account)
+	if err != nil {
+		return err
+	}
+	if inviter == nil {
+		return gerror.New("推荐人不存在")
+	}
+	if inviter.Id == userId {
+		return gerror.New("不能绑定自己")
+	}
+	return s.repo.BindInviter(ctx, userId, inviter.Id, inviter.Username)
+}
+
+// RedeemCode 使用兑换码。
+func (s *sUser) RedeemCode(ctx context.Context, userId int64, code string) (*service.RedeemDTO, error) {
+	if code == "" {
+		return nil, gerror.New("请填写兑换码")
+	}
+	c, err := s.repo.FindCodeByCode(ctx, code)
+	if err != nil {
+		return nil, err
+	}
+	if c == nil {
+		return nil, gerror.New("兑换码不存在")
+	}
+	if c.Status == -1 {
+		return nil, gerror.New("兑换码已作废")
+	}
+	if c.ExpiredAt > 0 && c.ExpiredAt < gtime.Timestamp() {
+		return nil, gerror.New("兑换码已过期")
+	}
+	if c.UsedNum >= c.CanUseNum {
+		return nil, gerror.New("兑换码已用完")
+	}
+	used, err := s.repo.HasRedeemed(ctx, c.Id, userId)
+	if err != nil {
+		return nil, err
+	}
+	if used {
+		return nil, gerror.New("你已使用过该兑换码")
+	}
+	me, err := s.repo.FindById(ctx, userId)
+	if err != nil {
+		return nil, err
+	}
+	if me == nil {
+		return nil, gerror.New("用户不存在")
+	}
+	if err = s.repo.RedeemCode(ctx, userId, me.Username, c); err != nil {
+		return nil, err
+	}
+	return &service.RedeemDTO{Type: c.Type, AddNum: c.AddNum, Name: c.Name}, nil
+}
+
+// CodeLogs 兑换记录。
+func (s *sUser) CodeLogs(ctx context.Context, userId int64, page, size int) ([]*service.CodeLogDTO, int, error) {
+	page, size = normalizePage(page, size)
+	list, total, err := s.repo.CodeLogs(ctx, userId, page, size)
+	if err != nil {
+		return nil, 0, err
+	}
+	out := make([]*service.CodeLogDTO, 0, len(list))
+	for _, l := range list {
+		out = append(out, &service.CodeLogDTO{
+			Id: l.Id, Code: l.Code, Name: l.Name, Type: l.Type, AddNum: l.AddNum,
+			CreatedAt: fmtTime(l.CreatedAt),
+		})
+	}
+	return out, total, nil
+}
+
+// ShareInfo 分享信息(分享码=用户名)。
+func (s *sUser) ShareInfo(ctx context.Context, userId int64) (*service.ShareDTO, error) {
+	me, err := s.repo.FindById(ctx, userId)
+	if err != nil {
+		return nil, err
+	}
+	if me == nil {
+		return nil, gerror.New("用户不存在")
+	}
+	// TODO: 域名从配置读取, 海报图后续接图片服务
+	return &service.ShareDTO{
+		ShareCode: me.Username,
+		ShareUrl:  "https://example.com/share?code=" + me.Username,
+		ShareNum:  me.ShareNum,
+	}, nil
+}
+
+// ReportShare 上报一次分享。
+func (s *sUser) ReportShare(ctx context.Context, userId int64, typ string, targetId int64, channel string) error {
+	if typ == "" {
+		typ = "app"
+	}
+	return s.repo.AddShareLog(ctx, userId, typ, targetId, channel)
+}
+
+// ShareLogs 分享记录。
+func (s *sUser) ShareLogs(ctx context.Context, userId int64, page, size int) ([]*service.ShareLogDTO, int, error) {
+	page, size = normalizePage(page, size)
+	list, total, err := s.repo.ShareLogList(ctx, userId, page, size)
+	if err != nil {
+		return nil, 0, err
+	}
+	out := make([]*service.ShareLogDTO, 0, len(list))
+	for _, l := range list {
+		out = append(out, &service.ShareLogDTO{
+			Id: l.Id, Type: l.Type, TargetId: l.TargetId, Channel: l.Channel,
+			CreatedAt: fmtTime(l.CreatedAt),
+		})
+	}
+	return out, total, nil
+}
+
+func fmtTime(t *gtime.Time) string {
+	if t == nil {
+		return ""
+	}
+	return t.String()
+}

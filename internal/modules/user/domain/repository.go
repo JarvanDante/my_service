@@ -25,4 +25,12 @@ type Repository interface {
 	Unfollow(ctx context.Context, userId, homeId int64) error
 	FollowingList(ctx context.Context, userId int64, page, size int) ([]*entity.Users, int, error)
 	FansList(ctx context.Context, userId int64, page, size int) ([]*entity.Users, int, error)
+	// 推广 / 兑换码
+	BindInviter(ctx context.Context, userId, inviterId int64, inviterName string) error
+	FindCodeByCode(ctx context.Context, code string) (*entity.UserCode, error)
+	HasRedeemed(ctx context.Context, codeId, userId int64) (bool, error)
+	RedeemCode(ctx context.Context, userId int64, username string, code *entity.UserCode) error
+	CodeLogs(ctx context.Context, userId int64, page, size int) ([]*entity.UserCodeLog, int, error)
+	AddShareLog(ctx context.Context, userId int64, typ string, targetId int64, channel string) error
+	ShareLogList(ctx context.Context, userId int64, page, size int) ([]*entity.UserShareLog, int, error)
 }
