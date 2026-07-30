@@ -11,4 +11,5 @@ type Repository interface {
 	FindByUsername(ctx context.Context, username string) (*entity.AdminUser, error)
 	FindById(ctx context.Context, id int64) (*entity.AdminUser, error)
 	UpdateLoginInfo(ctx context.Context, id int64, ip string) error
+	ListRoles(ctx context.Context) ([]*entity.AdminRole, error)
 }

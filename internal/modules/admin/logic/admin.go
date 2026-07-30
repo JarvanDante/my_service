@@ -11,7 +11,10 @@ import (
 	"github.com/JarvanDante/my_service/internal/modules/admin/domain"
 	"github.com/JarvanDante/my_service/internal/modules/admin/service"
 	"github.com/JarvanDante/my_service/internal/shared/kit"
+	"github.com/JarvanDante/my_service/internal/shared/rbac"
 )
+
+const superAdminCode = "superadmin"
 
 type sAdmin struct {
 	repo domain.Repository
@@ -57,6 +60,51 @@ func (s *sAdmin) Info(ctx context.Context, adminId int64) (*service.AdminInfoDTO
 		return nil, gerror.New("管理员不存在")
 	}
 	return toInfo(a), nil
+}
+
+func (s *sAdmin) ListRoles(ctx context.Context) ([]*service.RoleDTO, error) {
+	roles, err := s.repo.ListRoles(ctx)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]*service.RoleDTO, 0, len(roles))
+	for _, r := range roles {
+		out = append(out, &service.RoleDTO{
+			Id: r.Id, Name: r.Name, Code: r.Code, Remark: r.Remark, Status: r.Status,
+		})
+	}
+	return out, nil
+}
+
+func (s *sAdmin) ListPerms(ctx context.Context, roleCode string) ([]*service.PermDTO, error) {
+	if roleCode == "" {
+		return nil, gerror.New("角色码不能为空")
+	}
+	rows := rbac.PermsForRole(roleCode)
+	out := make([]*service.PermDTO, 0, len(rows))
+	for _, r := range rows {
+		out = append(out, &service.PermDTO{Path: r[0], Method: r[1]})
+	}
+	return out, nil
+}
+
+func (s *sAdmin) AddPerm(ctx context.Context, roleCode, path, method string) error {
+	if roleCode == "" || path == "" || method == "" {
+		return gerror.New("角色码/路径/方法均不能为空")
+	}
+	if roleCode == superAdminCode {
+		return gerror.New("超级管理员无需配置权限")
+	}
+	_, err := rbac.AddPolicy(roleCode, path, method)
+	return err
+}
+
+func (s *sAdmin) RemovePerm(ctx context.Context, roleCode, path, method string) error {
+	if roleCode == "" || path == "" || method == "" {
+		return gerror.New("角色码/路径/方法均不能为空")
+	}
+	_, err := rbac.RemovePolicy(roleCode, path, method)
+	return err
 }
 
 func toInfo(a *entity.AdminUser) *service.AdminInfoDTO {

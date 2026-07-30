@@ -40,11 +40,16 @@ var Main = gcmd.Command{
 		s.Group("/backend", func(group *ghttp.RouterGroup) {
 			// 公开: 管理员登录
 			adminmod.RegisterPublic(group, dao.NewAdminRepo())
-			// 需管理员登录
+			// 仅需登录: 退出 / 查看自身信息(任何管理员)
 			group.Group("/", func(auth *ghttp.RouterGroup) {
 				auth.Middleware(middleware.AdminAuth, middleware.AdminOpLog)
 				adminmod.RegisterAuthed(auth, dao.NewAdminRepo())
-				usermod.RegisterBackend(auth, dao.NewUserRepo())
+			})
+			// 需权限校验: 角色/权限管理 + 业务接口(超管放行, 其余走 Casbin)
+			group.Group("/", func(perm *ghttp.RouterGroup) {
+				perm.Middleware(middleware.AdminAuth, middleware.AdminPerm, middleware.AdminOpLog)
+				adminmod.RegisterPermManage(perm, dao.NewAdminRepo())
+				usermod.RegisterBackend(perm, dao.NewUserRepo())
 			})
 		})
 		s.Group("/manage", func(group *ghttp.RouterGroup) {

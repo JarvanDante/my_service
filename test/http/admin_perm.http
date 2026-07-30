@@ -1,0 +1,100 @@
+###############################################################################
+# 后台 B0.1 · Casbin 角色权限 真实端到端测试
+# 超管种子账号: admin / admin123 (角色码 superadmin, 中间件直接放行)
+###############################################################################
+
+@baseUrl = http://127.0.0.1:8000
+
+### 1. 超管登录 —— 保存 token
+POST {{baseUrl}}/backend/auth/login
+Content-Type: application/json
+
+{ "username": "admin", "password": "admin123" }
+
+> {%
+client.test("超管登录成功", function () {
+    client.assert(response.body.code === 0, "code 应为 0: " + response.body.message);
+    client.assert(response.body.data.token !== "", "应返回 token");
+});
+client.global.set("adminToken", response.body.data.token);
+%}
+
+### 2. 角色列表 —— 超管可访问(perm 组), 至少含 superadmin
+GET {{baseUrl}}/backend/roles
+Authorization: {{adminToken}}
+
+> {%
+client.test("角色列表", function () {
+    client.assert(response.body.code === 0, "code 应为 0: " + response.body.message);
+    client.assert(response.body.data.list.length >= 1, "至少一个角色");
+    var hasSuper = response.body.data.list.some(function (r) { return r.code === "superadmin"; });
+    client.assert(hasSuper, "应包含 superadmin 角色");
+});
+%}
+
+### 3. 给运营角色 op 新增权限: 允许 GET /backend/users/:id
+POST {{baseUrl}}/backend/roles/op/perms
+Authorization: {{adminToken}}
+Content-Type: application/json
+
+{ "path": "/backend/users/:id", "method": "GET" }
+
+> {%
+client.test("新增权限成功", function () {
+    client.assert(response.body.code === 0, "code 应为 0: " + response.body.message);
+});
+%}
+
+### 4. 查询 op 角色权限 —— 应含刚加的那条
+GET {{baseUrl}}/backend/roles/op/perms
+Authorization: {{adminToken}}
+
+> {%
+client.test("op 权限列表含新增项", function () {
+    client.assert(response.body.code === 0, "code 应为 0");
+    var hit = response.body.data.list.some(function (p) {
+        return p.path === "/backend/users/:id" && p.method === "GET";
+    });
+    client.assert(hit, "应包含 GET /backend/users/:id");
+});
+%}
+
+### 5. 删除 op 角色刚加的权限
+DELETE {{baseUrl}}/backend/roles/op/perms
+Authorization: {{adminToken}}
+Content-Type: application/json
+
+{ "path": "/backend/users/:id", "method": "GET" }
+
+> {%
+client.test("删除权限成功", function () {
+    client.assert(response.body.code === 0, "code 应为 0: " + response.body.message);
+});
+%}
+
+### 6. 再查 op 权限 —— 应已为空(或不含该条)
+GET {{baseUrl}}/backend/roles/op/perms
+Authorization: {{adminToken}}
+
+> {%
+client.test("op 权限已删除", function () {
+    client.assert(response.body.code === 0, "code 应为 0");
+    var hit = response.body.data.list.some(function (p) {
+        return p.path === "/backend/users/:id" && p.method === "GET";
+    });
+    client.assert(!hit, "应不再包含该权限");
+});
+%}
+
+### 7. 给超管配权限 —— 应被拒(超管无需配置)
+POST {{baseUrl}}/backend/roles/superadmin/perms
+Authorization: {{adminToken}}
+Content-Type: application/json
+
+{ "path": "/backend/x", "method": "GET" }
+
+> {%
+client.test("超管配权被拒", function () {
+    client.assert(response.body.code !== 0, "应报错: 超管无需配置权限");
+});
+%}

@@ -14,8 +14,14 @@ func RegisterPublic(group *ghttp.RouterGroup, repo domain.Repository) {
 	group.Bind(backend.New(logic.New(repo)).Login)
 }
 
-// RegisterAuthed 需管理员登录的接口(退出/信息)。
+// RegisterAuthed 仅需登录的接口(退出/查看自身信息), 任何管理员可访问。
 func RegisterAuthed(group *ghttp.RouterGroup, repo domain.Repository) {
 	ctrl := backend.New(logic.New(repo))
 	group.Bind(ctrl.Logout, ctrl.Info)
+}
+
+// RegisterPermManage 需权限校验的接口(角色 / 权限管理)。
+func RegisterPermManage(group *ghttp.RouterGroup, repo domain.Repository) {
+	ctrl := backend.New(logic.New(repo))
+	group.Bind(ctrl.ListRoles, ctrl.ListPerms, ctrl.AddPerm, ctrl.RemovePerm)
 }

@@ -33,3 +33,9 @@ func (r *adminRepo) UpdateLoginInfo(ctx context.Context, id int64, ip string) er
 	}).Update()
 	return err
 }
+
+func (r *adminRepo) ListRoles(ctx context.Context) ([]*entity.AdminRole, error) {
+	var list []*entity.AdminRole
+	err := g.Model("admin_role").Ctx(ctx).Order("id asc").Scan(&list)
+	return list, err
+}
