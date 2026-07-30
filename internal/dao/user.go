@@ -2,6 +2,7 @@ package dao
 
 import (
 	"context"
+	"encoding/json"
 
 	"github.com/gogf/gf/v2/database/gdb"
 	"github.com/gogf/gf/v2/frame/g"
@@ -269,6 +270,100 @@ func (r *userRepo) ShareLogList(ctx context.Context, userId int64, page, size in
 		return nil, 0, err
 	}
 	var list []*entity.UserShareLog
+	err = m.Clone().Page(page, size).OrderDesc("id").Scan(&list)
+	return list, total, err
+}
+
+// GetSignDays 取某月已签到日, 及该月记录是否存在。
+func (r *userRepo) GetSignDays(ctx context.Context, userId int64, yearMonth int) ([]int, bool, error) {
+	one, err := g.Model("user_sign").Ctx(ctx).
+		Where("user_id", userId).Where("year_month", yearMonth).One()
+	if err != nil {
+		return nil, false, err
+	}
+	if one.IsEmpty() {
+		return []int{}, false, nil
+	}
+	return one["days"].Ints(), true, nil
+}
+
+// SaveSign 事务内: upsert 签到记录 + 发放签到积分。
+func (r *userRepo) SaveSign(ctx context.Context, userId int64, yearMonth int, days []int, exists bool, credit float64) error {
+	b, _ := json.Marshal(days)
+	daysJson := string(b)
+	return g.DB().Transaction(ctx, func(ctx context.Context, tx gdb.TX) error {
+		if exists {
+			if _, err := tx.Model("user_sign").Ctx(ctx).
+				Where("user_id", userId).Where("year_month", yearMonth).
+				Data(g.Map{"days": daysJson}).Update(); err != nil {
+				return err
+			}
+		} else {
+			if _, err := tx.Model("user_sign").Ctx(ctx).Data(g.Map{
+				"user_id":    userId,
+				"year_month": yearMonth,
+				"days":       daysJson,
+				"exchanges":  "[]",
+			}).Insert(); err != nil {
+				return err
+			}
+		}
+		if credit > 0 {
+			if _, err := tx.Model("users").Ctx(ctx).Where("id", userId).
+				Data(g.Map{"credit": &gdb.Counter{Field: "credit", Value: credit}}).Update(); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+}
+
+func (r *userRepo) ListTasks(ctx context.Context) ([]*entity.UserTask, error) {
+	var list []*entity.UserTask
+	err := g.Model("user_task").Ctx(ctx).OrderAsc("id").Scan(&list)
+	return list, err
+}
+
+func (r *userRepo) FindTask(ctx context.Context, taskId int64) (*entity.UserTask, error) {
+	var t *entity.UserTask
+	err := g.Model("user_task").Ctx(ctx).Where("id", taskId).Scan(&t)
+	return t, err
+}
+
+func (r *userRepo) TaskDoneToday(ctx context.Context, userId, taskId int64, logDate int) (int, error) {
+	return g.Model("user_task_log").Ctx(ctx).
+		Where("user_id", userId).Where("task_id", taskId).Where("log_date", logDate).Count()
+}
+
+// AddTaskLog 事务内: 写任务完成记录 + 发放积分。
+func (r *userRepo) AddTaskLog(ctx context.Context, userId, taskId int64, typ string, logDate int, credit float64) error {
+	return g.DB().Transaction(ctx, func(ctx context.Context, tx gdb.TX) error {
+		if _, err := tx.Model("user_task_log").Ctx(ctx).Data(g.Map{
+			"user_id":  userId,
+			"task_id":  taskId,
+			"type":     typ,
+			"num":      1,
+			"log_date": logDate,
+		}).Insert(); err != nil {
+			return err
+		}
+		if credit > 0 {
+			if _, err := tx.Model("users").Ctx(ctx).Where("id", userId).
+				Data(g.Map{"credit": &gdb.Counter{Field: "credit", Value: credit}}).Update(); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+}
+
+func (r *userRepo) TaskLogs(ctx context.Context, userId int64, page, size int) ([]*entity.UserTaskLog, int, error) {
+	m := g.Model("user_task_log").Ctx(ctx).Where("user_id", userId)
+	total, err := m.Clone().Count()
+	if err != nil {
+		return nil, 0, err
+	}
+	var list []*entity.UserTaskLog
 	err = m.Clone().Page(page, size).OrderDesc("id").Scan(&list)
 	return list, total, err
 }

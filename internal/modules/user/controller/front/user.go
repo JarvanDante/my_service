@@ -309,6 +309,87 @@ func (c *Controller) ShareReport(ctx context.Context, req *v1.ShareReportReq) (r
 	return &v1.ShareReportRes{}, nil
 }
 
+// DoSign 每日签到(需登录)。
+func (c *Controller) DoSign(ctx context.Context, req *v1.SignReq) (res *v1.SignRes, err error) {
+	id, err := uid(ctx)
+	if err != nil {
+		return nil, err
+	}
+	dto, err := c.user.DoDaySign(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	return &v1.SignRes{Today: dto.Today, Days: dto.Days, Count: dto.Count, Reward: dto.Reward}, nil
+}
+
+// Tasks 任务列表(需登录)。
+func (c *Controller) Tasks(ctx context.Context, req *v1.TasksReq) (res *v1.TasksRes, err error) {
+	id, err := uid(ctx)
+	if err != nil {
+		return nil, err
+	}
+	list, err := c.user.Tasks(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	items := make([]v1.Task, 0, len(list))
+	for _, t := range list {
+		items = append(items, v1.Task{
+			Id: t.Id, Name: t.Name, Type: t.Type, Description: t.Description,
+			MaxNum: t.MaxNum, DoneToday: t.DoneToday,
+		})
+	}
+	return &v1.TasksRes{List: items}, nil
+}
+
+// DoTask 完成任务(需登录)。
+func (c *Controller) DoTask(ctx context.Context, req *v1.TaskDoReq) (res *v1.TaskDoRes, err error) {
+	id, err := uid(ctx)
+	if err != nil {
+		return nil, err
+	}
+	dto, err := c.user.DoTask(ctx, id, req.TaskId)
+	if err != nil {
+		return nil, err
+	}
+	return &v1.TaskDoRes{DoneToday: dto.DoneToday, MaxNum: dto.MaxNum, Reward: dto.Reward}, nil
+}
+
+// TaskLogs 任务记录(需登录)。
+func (c *Controller) TaskLogs(ctx context.Context, req *v1.TaskLogsReq) (res *v1.TaskLogsRes, err error) {
+	id, err := uid(ctx)
+	if err != nil {
+		return nil, err
+	}
+	list, total, err := c.user.TaskLogs(ctx, id, req.Page, req.Size)
+	if err != nil {
+		return nil, err
+	}
+	items := make([]v1.TaskLog, 0, len(list))
+	for _, l := range list {
+		items = append(items, v1.TaskLog{
+			Id: l.Id, TaskId: l.TaskId, Type: l.Type, Num: l.Num, LogDate: l.LogDate, CreatedAt: l.CreatedAt,
+		})
+	}
+	return &v1.TaskLogsRes{List: items, Total: total, Page: req.Page, Size: req.Size}, nil
+}
+
+// Up 成长信息(需登录)。
+func (c *Controller) Up(ctx context.Context, req *v1.UpReq) (res *v1.UpRes, err error) {
+	id, err := uid(ctx)
+	if err != nil {
+		return nil, err
+	}
+	dto, err := c.user.Up(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	return &v1.UpRes{
+		Level: dto.Level, Credit: dto.Credit, Balance: dto.Balance,
+		SignDaysThisMonth: dto.SignDaysThisMonth, Fans: dto.Fans, Follow: dto.Follow, ShareNum: dto.ShareNum,
+	}, nil
+}
+
 func toApiUser(d *service.UserInfoDTO) v1.UserInfo {
 	if d == nil {
 		return v1.UserInfo{}

@@ -33,4 +33,12 @@ type Repository interface {
 	CodeLogs(ctx context.Context, userId int64, page, size int) ([]*entity.UserCodeLog, int, error)
 	AddShareLog(ctx context.Context, userId int64, typ string, targetId int64, channel string) error
 	ShareLogList(ctx context.Context, userId int64, page, size int) ([]*entity.UserShareLog, int, error)
+	// 成长: 签到 / 任务
+	GetSignDays(ctx context.Context, userId int64, yearMonth int) ([]int, bool, error)
+	SaveSign(ctx context.Context, userId int64, yearMonth int, days []int, exists bool, credit float64) error
+	ListTasks(ctx context.Context) ([]*entity.UserTask, error)
+	FindTask(ctx context.Context, taskId int64) (*entity.UserTask, error)
+	TaskDoneToday(ctx context.Context, userId, taskId int64, logDate int) (int, error)
+	AddTaskLog(ctx context.Context, userId, taskId int64, typ string, logDate int, credit float64) error
+	TaskLogs(ctx context.Context, userId int64, page, size int) ([]*entity.UserTaskLog, int, error)
 }

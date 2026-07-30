@@ -1,0 +1,90 @@
+###############################################################################
+# 前台 User · P5 成长(签到/任务/成长信息)真实端到端测试
+#
+# 签到「一天一次」, 用例做成可重复(成功或提示已签到都算通过)。
+# 「完成真实任务」需先造任务数据, 见文件底部说明。
+###############################################################################
+
+@baseUrl = http://127.0.0.1:8000
+
+### 1. 登录
+POST {{baseUrl}}/front/user/login
+Content-Type: application/json
+
+{ "device_id": "e2e-growth-A", "device_type": "ios" }
+
+> {%
+client.test("登录成功", function () {
+    client.assert(response.body.code === 0, "登录失败");
+});
+client.global.set("token", response.body.data.token);
+%}
+
+### 2. 每日签到 —— 成功 或 已签到(可重复)
+POST {{baseUrl}}/front/user/sign
+Authorization: {{token}}
+
+> {%
+client.test("签到成功或已签到", function () {
+    var ok = response.body.code === 0;
+    var already = response.body.code !== 0 && response.body.message.indexOf("签到") >= 0;
+    client.assert(ok || already, "应签到成功或提示已签到, 实际: " + response.body.message);
+});
+%}
+
+### 3. 成长信息 —— 成功
+GET {{baseUrl}}/front/user/up
+Authorization: {{token}}
+
+> {%
+client.test("成长信息", function () {
+    client.assert(response.body.code === 0, "code 应为 0");
+    client.assert(response.body.data.level !== undefined, "应含 level");
+    client.assert(response.body.data.sign_days_this_month >= 1, "本月签到天数应 >= 1");
+});
+%}
+
+### 4. 任务列表 —— 返回数组
+GET {{baseUrl}}/front/user/tasks
+Authorization: {{token}}
+
+> {%
+client.test("任务列表为数组", function () {
+    client.assert(response.body.code === 0, "code 应为 0");
+    client.assert(Array.isArray(response.body.data.list), "list 应为数组");
+});
+%}
+
+### 5. 任务记录 —— 返回数组
+GET {{baseUrl}}/front/user/task/logs?page=1&size=15
+Authorization: {{token}}
+
+> {%
+client.test("任务记录为数组", function () {
+    client.assert(response.body.code === 0, "code 应为 0");
+    client.assert(Array.isArray(response.body.data.list), "list 应为数组");
+});
+%}
+
+### 6. 完成任务(任务不存在) —— 应报错
+POST {{baseUrl}}/front/user/task/do
+Authorization: {{token}}
+Content-Type: application/json
+
+{ "task_id": 999999 }
+
+> {%
+client.test("无效任务被拒", function () {
+    client.assert(response.body.code !== 0, "不存在的任务应报错");
+});
+%}
+
+###############################################################################
+# 手动验证「真实完成任务」(需先造任务):
+#   INSERT INTO user_task (name, type, description, max_num)
+#   VALUES ('每日分享', 'share', '分享得积分', 3);
+#   -- 记下返回的 id, 然后:
+#   POST {{baseUrl}}/front/user/task/do   body {"task_id": <上面的id>}
+#   预期 code=0, data.done_today=1, data.reward=10; 再点 /front/user/tasks 看 done_today+1;
+#   同一天点超过 max_num 次后返回「今日该任务已完成」。
+###############################################################################

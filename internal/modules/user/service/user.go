@@ -92,6 +92,49 @@ type ShareLogDTO struct {
 	CreatedAt string
 }
 
+// ---- P5 成长(签到/任务) ----
+
+type SignDTO struct {
+	Today  int
+	Days   []int
+	Count  int
+	Reward float64
+}
+
+type TaskDTO struct {
+	Id          int64
+	Name        string
+	Type        string
+	Description string
+	MaxNum      int
+	DoneToday   int
+}
+
+type TaskDoneDTO struct {
+	DoneToday int
+	MaxNum    int
+	Reward    float64
+}
+
+type TaskLogDTO struct {
+	Id        int64
+	TaskId    int64
+	Type      string
+	Num       int
+	LogDate   int
+	CreatedAt string
+}
+
+type UpDTO struct {
+	Level             int
+	Credit            float64
+	Balance           float64
+	SignDaysThisMonth int
+	Fans              int
+	Follow            int
+	ShareNum          int
+}
+
 type UserDTO struct {
 	ID     int64
 	Name   string
@@ -121,6 +164,12 @@ type IUser interface {
 	ShareInfo(ctx context.Context, userId int64) (*ShareDTO, error)
 	ShareLogs(ctx context.Context, userId int64, page, size int) ([]*ShareLogDTO, int, error)
 	ReportShare(ctx context.Context, userId int64, typ string, targetId int64, channel string) error
+	// 成长(签到/任务)
+	DoDaySign(ctx context.Context, userId int64) (*SignDTO, error)
+	Tasks(ctx context.Context, userId int64) ([]*TaskDTO, error)
+	DoTask(ctx context.Context, userId, taskId int64) (*TaskDoneDTO, error)
+	TaskLogs(ctx context.Context, userId int64, page, size int) ([]*TaskLogDTO, int, error)
+	Up(ctx context.Context, userId int64) (*UpDTO, error)
 	// 后台
 	GetUser(ctx context.Context, id int64) (*UserDTO, error)
 	DisableUser(ctx context.Context, id int64) error

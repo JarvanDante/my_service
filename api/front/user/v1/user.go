@@ -239,3 +239,78 @@ type ShareLogsRes struct {
 	Page  int        `json:"page"`
 	Size  int        `json:"size"`
 }
+
+// ---- P5 成长(签到/任务) ----
+
+// 每日签到
+type SignReq struct {
+	g.Meta `path:"/user/sign" method:"post" tags:"Front/User" summary:"每日签到"`
+}
+type SignRes struct {
+	Today  int     `json:"today"`
+	Days   []int   `json:"days"`
+	Count  int     `json:"count"`
+	Reward float64 `json:"reward"`
+}
+
+// 任务列表
+type Task struct {
+	Id          int64  `json:"id"`
+	Name        string `json:"name"`
+	Type        string `json:"type"`
+	Description string `json:"description"`
+	MaxNum      int    `json:"max_num"`
+	DoneToday   int    `json:"done_today"`
+}
+type TasksReq struct {
+	g.Meta `path:"/user/tasks" method:"get" tags:"Front/User" summary:"任务列表"`
+}
+type TasksRes struct {
+	List []Task `json:"list"`
+}
+
+// 完成任务
+type TaskDoReq struct {
+	g.Meta `path:"/user/task/do" method:"post" tags:"Front/User" summary:"完成任务领奖"`
+	TaskId int64 `json:"task_id" v:"required|min:1#任务ID必填"`
+}
+type TaskDoRes struct {
+	DoneToday int     `json:"done_today"`
+	MaxNum    int     `json:"max_num"`
+	Reward    float64 `json:"reward"`
+}
+
+// 任务记录
+type TaskLog struct {
+	Id        int64  `json:"id"`
+	TaskId    int64  `json:"task_id"`
+	Type      string `json:"type"`
+	Num       int    `json:"num"`
+	LogDate   int    `json:"log_date"`
+	CreatedAt string `json:"created_at"`
+}
+type TaskLogsReq struct {
+	g.Meta `path:"/user/task/logs" method:"get" tags:"Front/User" summary:"任务记录"`
+	Page   int `json:"page"`
+	Size   int `json:"size"`
+}
+type TaskLogsRes struct {
+	List  []TaskLog `json:"list"`
+	Total int       `json:"total"`
+	Page  int       `json:"page"`
+	Size  int       `json:"size"`
+}
+
+// 成长信息
+type UpReq struct {
+	g.Meta `path:"/user/up" method:"get" tags:"Front/User" summary:"成长信息"`
+}
+type UpRes struct {
+	Level             int     `json:"level"`
+	Credit            float64 `json:"credit"`
+	Balance           float64 `json:"balance"`
+	SignDaysThisMonth int     `json:"sign_days_this_month"`
+	Fans              int     `json:"fans"`
+	Follow            int     `json:"follow"`
+	ShareNum          int     `json:"share_num"`
+}

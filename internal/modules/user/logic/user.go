@@ -447,3 +447,104 @@ func fmtTime(t *gtime.Time) string {
 	}
 	return t.String()
 }
+
+const (
+	signCredit = 5.0  // 每日签到奖励积分
+	taskCredit = 10.0 // 完成任务奖励积分
+)
+
+// DoDaySign 每日签到。
+func (s *sUser) DoDaySign(ctx context.Context, userId int64) (*service.SignDTO, error) {
+	now := gtime.Now()
+	ym := gconv.Int(now.Format("Ym"))
+	today := now.Day()
+	days, exists, err := s.repo.GetSignDays(ctx, userId, ym)
+	if err != nil {
+		return nil, err
+	}
+	for _, d := range days {
+		if d == today {
+			return nil, gerror.New("今日已签到")
+		}
+	}
+	days = append(days, today)
+	if err = s.repo.SaveSign(ctx, userId, ym, days, exists, signCredit); err != nil {
+		return nil, err
+	}
+	return &service.SignDTO{Today: today, Days: days, Count: len(days), Reward: signCredit}, nil
+}
+
+// Tasks 任务列表(含当日完成次数)。
+func (s *sUser) Tasks(ctx context.Context, userId int64) ([]*service.TaskDTO, error) {
+	list, err := s.repo.ListTasks(ctx)
+	if err != nil {
+		return nil, err
+	}
+	logDate := gconv.Int(gtime.Now().Format("Ymd"))
+	out := make([]*service.TaskDTO, 0, len(list))
+	for _, t := range list {
+		done, _ := s.repo.TaskDoneToday(ctx, userId, t.Id, logDate)
+		out = append(out, &service.TaskDTO{
+			Id: t.Id, Name: t.Name, Type: t.Type, Description: t.Description,
+			MaxNum: t.MaxNum, DoneToday: done,
+		})
+	}
+	return out, nil
+}
+
+// DoTask 完成任务领奖(受单日上限约束)。
+func (s *sUser) DoTask(ctx context.Context, userId, taskId int64) (*service.TaskDoneDTO, error) {
+	t, err := s.repo.FindTask(ctx, taskId)
+	if err != nil {
+		return nil, err
+	}
+	if t == nil {
+		return nil, gerror.New("任务不存在")
+	}
+	logDate := gconv.Int(gtime.Now().Format("Ymd"))
+	done, err := s.repo.TaskDoneToday(ctx, userId, taskId, logDate)
+	if err != nil {
+		return nil, err
+	}
+	if t.MaxNum > 0 && done >= t.MaxNum {
+		return nil, gerror.New("今日该任务已完成")
+	}
+	if err = s.repo.AddTaskLog(ctx, userId, taskId, t.Type, logDate, taskCredit); err != nil {
+		return nil, err
+	}
+	return &service.TaskDoneDTO{DoneToday: done + 1, MaxNum: t.MaxNum, Reward: taskCredit}, nil
+}
+
+// TaskLogs 任务记录。
+func (s *sUser) TaskLogs(ctx context.Context, userId int64, page, size int) ([]*service.TaskLogDTO, int, error) {
+	page, size = normalizePage(page, size)
+	list, total, err := s.repo.TaskLogs(ctx, userId, page, size)
+	if err != nil {
+		return nil, 0, err
+	}
+	out := make([]*service.TaskLogDTO, 0, len(list))
+	for _, l := range list {
+		out = append(out, &service.TaskLogDTO{
+			Id: l.Id, TaskId: l.TaskId, Type: l.Type, Num: l.Num, LogDate: l.LogDate,
+			CreatedAt: fmtTime(l.CreatedAt),
+		})
+	}
+	return out, total, nil
+}
+
+// Up 成长信息。
+func (s *sUser) Up(ctx context.Context, userId int64) (*service.UpDTO, error) {
+	me, err := s.repo.FindById(ctx, userId)
+	if err != nil {
+		return nil, err
+	}
+	if me == nil {
+		return nil, gerror.New("用户不存在")
+	}
+	ym := gconv.Int(gtime.Now().Format("Ym"))
+	days, _, _ := s.repo.GetSignDays(ctx, userId, ym)
+	return &service.UpDTO{
+		Level: me.Level, Credit: me.Credit, Balance: me.Balance,
+		SignDaysThisMonth: len(days), Fans: me.Fans, Follow: me.Follow, ShareNum: me.ShareNum,
+	}, nil
+}
