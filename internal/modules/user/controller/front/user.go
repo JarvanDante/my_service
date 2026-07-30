@@ -492,6 +492,81 @@ func (c *Controller) ExchangeDo(ctx context.Context, req *v1.ExchangeDoReq) (res
 	return &v1.ExchangeDoRes{}, nil
 }
 
+// Chats 会话列表(需登录)。
+func (c *Controller) Chats(ctx context.Context, req *v1.ChatsReq) (res *v1.ChatsRes, err error) {
+	id, err := uid(ctx)
+	if err != nil {
+		return nil, err
+	}
+	list, total, err := c.user.Chats(ctx, id, req.Page, req.Size)
+	if err != nil {
+		return nil, err
+	}
+	items := make([]v1.Chat, 0, len(list))
+	for _, d := range list {
+		items = append(items, v1.Chat{
+			PeerId: d.PeerId, Nickname: d.Nickname, Img: d.Img,
+			LastContent: d.LastContent, LastAt: d.LastAt, Unread: d.Unread,
+		})
+	}
+	return &v1.ChatsRes{List: items, Total: total, Page: req.Page, Size: req.Size}, nil
+}
+
+// ChatMessages 会话消息(需登录)。
+func (c *Controller) ChatMessages(ctx context.Context, req *v1.ChatMessagesReq) (res *v1.ChatMessagesRes, err error) {
+	id, err := uid(ctx)
+	if err != nil {
+		return nil, err
+	}
+	list, total, err := c.user.Messages(ctx, id, req.PeerId, req.Page, req.Size)
+	if err != nil {
+		return nil, err
+	}
+	items := make([]v1.Message, 0, len(list))
+	for _, m := range list {
+		items = append(items, v1.Message{
+			Id: m.Id, FromId: m.FromId, ToId: m.ToId, Content: m.Content, Mine: m.Mine, CreatedAt: m.CreatedAt,
+		})
+	}
+	return &v1.ChatMessagesRes{List: items, Total: total, Page: req.Page, Size: req.Size}, nil
+}
+
+// ChatSend 发消息(需登录)。
+func (c *Controller) ChatSend(ctx context.Context, req *v1.ChatSendReq) (res *v1.ChatSendRes, err error) {
+	id, err := uid(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if err = c.user.SendMessage(ctx, id, req.ToId, req.Content); err != nil {
+		return nil, err
+	}
+	return &v1.ChatSendRes{}, nil
+}
+
+// ChatDel 删除会话(需登录)。
+func (c *Controller) ChatDel(ctx context.Context, req *v1.ChatDelReq) (res *v1.ChatDelRes, err error) {
+	id, err := uid(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if err = c.user.DelChat(ctx, id, req.PeerId); err != nil {
+		return nil, err
+	}
+	return &v1.ChatDelRes{}, nil
+}
+
+// CustomerUrl 客服链接(需登录)。
+func (c *Controller) CustomerUrl(ctx context.Context, req *v1.CustomerUrlReq) (res *v1.CustomerUrlRes, err error) {
+	if _, err = uid(ctx); err != nil {
+		return nil, err
+	}
+	url, err := c.user.CustomerUrl(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return &v1.CustomerUrlRes{Url: url}, nil
+}
+
 func toApiUser(d *service.UserInfoDTO) v1.UserInfo {
 	if d == nil {
 		return v1.UserInfo{}

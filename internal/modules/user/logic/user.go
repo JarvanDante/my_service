@@ -653,3 +653,71 @@ func (s *sUser) DoExchange(ctx context.Context, userId int64, coin int) error {
 	cost := float64(coin) * creditPerCoin
 	return s.repo.ExchangeCreditToCoin(ctx, userId, cost, float64(coin))
 }
+
+// SendMessage 发私信。
+func (s *sUser) SendMessage(ctx context.Context, meId, toId int64, content string) error {
+	if content == "" {
+		return gerror.New("消息内容不能为空")
+	}
+	if toId == meId {
+		return gerror.New("不能给自己发消息")
+	}
+	peer, err := s.repo.FindById(ctx, toId)
+	if err != nil {
+		return err
+	}
+	if peer == nil {
+		return gerror.New("对方不存在")
+	}
+	return s.repo.SendMessage(ctx, meId, toId, content)
+}
+
+// Chats 会话列表(附对方昵称/头像)。
+func (s *sUser) Chats(ctx context.Context, meId int64, page, size int) ([]*service.ChatDTO, int, error) {
+	page, size = normalizePage(page, size)
+	list, total, err := s.repo.ListConversations(ctx, meId, page, size)
+	if err != nil {
+		return nil, 0, err
+	}
+	out := make([]*service.ChatDTO, 0, len(list))
+	for _, c := range list {
+		d := &service.ChatDTO{
+			PeerId: c.PeerId, LastContent: c.LastContent, Unread: c.Unread, LastAt: fmtTime(c.LastAt),
+		}
+		if peer, _ := s.repo.FindById(ctx, c.PeerId); peer != nil {
+			d.Nickname = peer.Nickname
+			d.Img = peer.Img
+		}
+		out = append(out, d)
+	}
+	return out, total, nil
+}
+
+// Messages 会话消息(读取后清零未读)。
+func (s *sUser) Messages(ctx context.Context, meId, peerId int64, page, size int) ([]*service.MessageDTO, int, error) {
+	page, size = normalizePage(page, size)
+	list, total, err := s.repo.Messages(ctx, meId, peerId, page, size)
+	if err != nil {
+		return nil, 0, err
+	}
+	_ = s.repo.MarkRead(ctx, meId, peerId)
+	out := make([]*service.MessageDTO, 0, len(list))
+	for _, m := range list {
+		out = append(out, &service.MessageDTO{
+			Id: m.Id, FromId: m.FromId, ToId: m.ToId, Content: m.Content,
+			Mine: m.FromId == meId, CreatedAt: fmtTime(m.CreatedAt),
+		})
+	}
+	return out, total, nil
+}
+
+// DelChat 删除会话(仅对自己)。
+func (s *sUser) DelChat(ctx context.Context, meId, peerId int64) error {
+	return s.repo.DeleteConversation(ctx, meId, peerId)
+}
+
+// CustomerUrl 客服链接(从配置读, 缺省占位)。
+func (s *sUser) CustomerUrl(ctx context.Context) (string, error) {
+	url := g.Cfg().MustGet(ctx, "customer.url", "https://example.com/kefu").String()
+	return url, nil
+}

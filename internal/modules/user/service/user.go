@@ -174,6 +174,26 @@ type ExchangeInfoDTO struct {
 	Balance float64
 }
 
+// ---- P7 私信 ----
+
+type ChatDTO struct {
+	PeerId      int64
+	Nickname    string
+	Img         string
+	LastContent string
+	LastAt      string
+	Unread      int
+}
+
+type MessageDTO struct {
+	Id        int64
+	FromId    int64
+	ToId      int64
+	Content   string
+	Mine      bool
+	CreatedAt string
+}
+
 type UserDTO struct {
 	ID     int64
 	Name   string
@@ -217,6 +237,12 @@ type IUser interface {
 	VipLogs(ctx context.Context, userId int64, page, size int) ([]*VipLogDTO, int, error)
 	ExchangeInfo(ctx context.Context, userId int64) (*ExchangeInfoDTO, error)
 	DoExchange(ctx context.Context, userId int64, coin int) error
+	// 私信
+	SendMessage(ctx context.Context, meId, toId int64, content string) error
+	Chats(ctx context.Context, meId int64, page, size int) ([]*ChatDTO, int, error)
+	Messages(ctx context.Context, meId, peerId int64, page, size int) ([]*MessageDTO, int, error)
+	DelChat(ctx context.Context, meId, peerId int64) error
+	CustomerUrl(ctx context.Context) (string, error)
 	// 后台
 	GetUser(ctx context.Context, id int64) (*UserDTO, error)
 	DisableUser(ctx context.Context, id int64) error

@@ -475,3 +475,78 @@ func (r *userRepo) ExchangeCreditToCoin(ctx context.Context, userId int64, credi
 		return err
 	})
 }
+
+// upsertConversation 会话 upsert(存在则更新, 否则插入)。
+func upsertConversation(ctx context.Context, tx gdb.TX, userId, peerId int64, lastContent string, addUnread int) error {
+	n, err := tx.Model("chat_conversation").Ctx(ctx).
+		Where("user_id", userId).Where("peer_id", peerId).Count()
+	if err != nil {
+		return err
+	}
+	if n == 0 {
+		_, err = tx.Model("chat_conversation").Ctx(ctx).Data(g.Map{
+			"user_id": userId, "peer_id": peerId, "last_content": lastContent,
+			"last_at": gtime.Now(), "unread": addUnread, "deleted": 0,
+		}).Insert()
+		return err
+	}
+	data := g.Map{"last_content": lastContent, "last_at": gtime.Now(), "deleted": 0}
+	if addUnread > 0 {
+		data["unread"] = &gdb.Counter{Field: "unread", Value: float64(addUnread)}
+	}
+	_, err = tx.Model("chat_conversation").Ctx(ctx).
+		Where("user_id", userId).Where("peer_id", peerId).Data(data).Update()
+	return err
+}
+
+// SendMessage 事务内: 写消息 + upsert 双方会话(对方未读+1)。
+func (r *userRepo) SendMessage(ctx context.Context, fromId, toId int64, content string) error {
+	return g.DB().Transaction(ctx, func(ctx context.Context, tx gdb.TX) error {
+		if _, err := tx.Model("chat_message").Ctx(ctx).Data(g.Map{
+			"from_id": fromId, "to_id": toId, "content": content,
+		}).Insert(); err != nil {
+			return err
+		}
+		if err := upsertConversation(ctx, tx, fromId, toId, content, 0); err != nil {
+			return err
+		}
+		return upsertConversation(ctx, tx, toId, fromId, content, 1)
+	})
+}
+
+func (r *userRepo) ListConversations(ctx context.Context, userId int64, page, size int) ([]*entity.ChatConversation, int, error) {
+	m := g.Model("chat_conversation").Ctx(ctx).Where("user_id", userId).Where("deleted", 0)
+	total, err := m.Clone().Count()
+	if err != nil {
+		return nil, 0, err
+	}
+	var list []*entity.ChatConversation
+	err = m.Clone().Page(page, size).OrderDesc("last_at").Scan(&list)
+	return list, total, err
+}
+
+func (r *userRepo) Messages(ctx context.Context, meId, peerId int64, page, size int) ([]*entity.ChatMessage, int, error) {
+	m := g.Model("chat_message").Ctx(ctx).
+		Where("(from_id=? AND to_id=?) OR (from_id=? AND to_id=?)", meId, peerId, peerId, meId)
+	total, err := m.Clone().Count()
+	if err != nil {
+		return nil, 0, err
+	}
+	var list []*entity.ChatMessage
+	err = m.Clone().Page(page, size).OrderDesc("id").Scan(&list)
+	return list, total, err
+}
+
+func (r *userRepo) MarkRead(ctx context.Context, userId, peerId int64) error {
+	_, err := g.Model("chat_conversation").Ctx(ctx).
+		Where("user_id", userId).Where("peer_id", peerId).
+		Data(g.Map{"unread": 0}).Update()
+	return err
+}
+
+func (r *userRepo) DeleteConversation(ctx context.Context, userId, peerId int64) error {
+	_, err := g.Model("chat_conversation").Ctx(ctx).
+		Where("user_id", userId).Where("peer_id", peerId).
+		Data(g.Map{"deleted": 1}).Update()
+	return err
+}

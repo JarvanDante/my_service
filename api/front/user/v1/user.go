@@ -395,3 +395,66 @@ type ExchangeDoReq struct {
 	Coin   int `json:"coin" v:"required|min:1#兑换金币数必填"`
 }
 type ExchangeDoRes struct{}
+
+// ---- P7 私信 ----
+
+type Chat struct {
+	PeerId      int64  `json:"peer_id"`
+	Nickname    string `json:"nickname"`
+	Img         string `json:"img"`
+	LastContent string `json:"last_content"`
+	LastAt      string `json:"last_at"`
+	Unread      int    `json:"unread"`
+}
+type ChatsReq struct {
+	g.Meta `path:"/user/chats" method:"get" tags:"Front/User" summary:"会话列表"`
+	Page   int `json:"page"`
+	Size   int `json:"size"`
+}
+type ChatsRes struct {
+	List  []Chat `json:"list"`
+	Total int    `json:"total"`
+	Page  int    `json:"page"`
+	Size  int    `json:"size"`
+}
+
+type Message struct {
+	Id        int64  `json:"id"`
+	FromId    int64  `json:"from_id"`
+	ToId      int64  `json:"to_id"`
+	Content   string `json:"content"`
+	Mine      bool   `json:"mine"`
+	CreatedAt string `json:"created_at"`
+}
+type ChatMessagesReq struct {
+	g.Meta `path:"/user/chat/messages" method:"get" tags:"Front/User" summary:"会话消息"`
+	PeerId int64 `json:"peer_id" v:"required|min:1#对方ID必填"`
+	Page   int   `json:"page"`
+	Size   int   `json:"size"`
+}
+type ChatMessagesRes struct {
+	List  []Message `json:"list"`
+	Total int       `json:"total"`
+	Page  int       `json:"page"`
+	Size  int       `json:"size"`
+}
+
+type ChatSendReq struct {
+	g.Meta  `path:"/user/chat/send" method:"post" tags:"Front/User" summary:"发消息"`
+	ToId    int64  `json:"to_id" v:"required|min:1#接收人ID必填"`
+	Content string `json:"content" v:"required#消息内容必填"`
+}
+type ChatSendRes struct{}
+
+type ChatDelReq struct {
+	g.Meta `path:"/user/chat/del" method:"post" tags:"Front/User" summary:"删除会话"`
+	PeerId int64 `json:"peer_id" v:"required|min:1#对方ID必填"`
+}
+type ChatDelRes struct{}
+
+type CustomerUrlReq struct {
+	g.Meta `path:"/user/customer-url" method:"get" tags:"Front/User" summary:"客服链接"`
+}
+type CustomerUrlRes struct {
+	Url string `json:"url"`
+}

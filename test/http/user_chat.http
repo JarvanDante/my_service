@@ -1,0 +1,138 @@
+###############################################################################
+# 前台 User · P7 私信(会话/消息/发送/删除/客服)真实端到端测试
+# 自包含双用户: A 发消息给 B, 验证会话、未读、已读、删除。可重复运行。
+###############################################################################
+
+@baseUrl = http://127.0.0.1:8000
+
+### 1. 登录 A
+POST {{baseUrl}}/front/user/login
+Content-Type: application/json
+
+{ "device_id": "e2e-chat-A", "device_type": "ios" }
+
+> {%
+client.test("A登录", function () { client.assert(response.body.code === 0, "A登录失败"); });
+client.global.set("tokenA", response.body.data.token);
+client.global.set("uidA", response.body.data.user.id);
+%}
+
+### 2. 登录 B
+POST {{baseUrl}}/front/user/login
+Content-Type: application/json
+
+{ "device_id": "e2e-chat-B", "device_type": "ios" }
+
+> {%
+client.test("B登录", function () { client.assert(response.body.code === 0, "B登录失败"); });
+client.global.set("tokenB", response.body.data.token);
+client.global.set("uidB", response.body.data.user.id);
+%}
+
+### 3. A 发消息给 B —— 成功
+POST {{baseUrl}}/front/user/chat/send
+Authorization: {{tokenA}}
+Content-Type: application/json
+
+{ "to_id": {{uidB}}, "content": "hello e2e" }
+
+> {%
+client.test("发消息成功", function () {
+    client.assert(response.body.code === 0, "code 应为 0: " + response.body.message);
+});
+%}
+
+### 4. B 的会话列表 —— 含与 A 的会话且有未读
+GET {{baseUrl}}/front/user/chats?page=1&size=15
+Authorization: {{tokenB}}
+
+> {%
+client.test("B会话含A且未读>=1", function () {
+    client.assert(response.body.code === 0, "code 应为 0");
+    var c = response.body.data.list.find(function (x) { return x.peer_id === client.global.get("uidA"); });
+    client.assert(c !== undefined, "应有与A的会话");
+    client.assert(c.unread >= 1, "应有未读");
+});
+%}
+
+### 5. B 查看与 A 的消息 —— 含 "hello e2e"(并标记已读)
+GET {{baseUrl}}/front/user/chat/messages?peer_id={{uidA}}&page=1&size=20
+Authorization: {{tokenB}}
+
+> {%
+client.test("消息含hello", function () {
+    client.assert(response.body.code === 0, "code 应为 0");
+    var hit = response.body.data.list.some(function (m) { return m.content === "hello e2e"; });
+    client.assert(hit, "应包含刚发的消息");
+});
+%}
+
+### 6. B 会话列表 —— 已读后未读清零
+GET {{baseUrl}}/front/user/chats?page=1&size=15
+Authorization: {{tokenB}}
+
+> {%
+client.test("已读后未读=0", function () {
+    var c = response.body.data.list.find(function (x) { return x.peer_id === client.global.get("uidA"); });
+    client.assert(c !== undefined && c.unread === 0, "读过后未读应为0");
+});
+%}
+
+### 7. A 的会话列表 —— 含与 B 的会话
+GET {{baseUrl}}/front/user/chats?page=1&size=15
+Authorization: {{tokenA}}
+
+> {%
+client.test("A会话含B", function () {
+    var c = response.body.data.list.find(function (x) { return x.peer_id === client.global.get("uidB"); });
+    client.assert(c !== undefined, "A应有与B的会话");
+});
+%}
+
+### 8. 给自己发消息 —— 应报错
+POST {{baseUrl}}/front/user/chat/send
+Authorization: {{tokenA}}
+Content-Type: application/json
+
+{ "to_id": {{uidA}}, "content": "self" }
+
+> {%
+client.test("不能给自己发", function () {
+    client.assert(response.body.code !== 0, "给自己发应报错");
+});
+%}
+
+### 9. B 删除与 A 的会话 —— 成功
+POST {{baseUrl}}/front/user/chat/del
+Authorization: {{tokenB}}
+Content-Type: application/json
+
+{ "peer_id": {{uidA}} }
+
+> {%
+client.test("删会话成功", function () {
+    client.assert(response.body.code === 0, "code 应为 0");
+});
+%}
+
+### 10. B 会话列表 —— 与 A 的会话已消失
+GET {{baseUrl}}/front/user/chats?page=1&size=15
+Authorization: {{tokenB}}
+
+> {%
+client.test("删后不再出现", function () {
+    var c = response.body.data.list.find(function (x) { return x.peer_id === client.global.get("uidA"); });
+    client.assert(c === undefined, "删除后不应再出现");
+});
+%}
+
+### 11. 客服链接 —— 成功
+GET {{baseUrl}}/front/user/customer-url
+Authorization: {{tokenB}}
+
+> {%
+client.test("客服链接", function () {
+    client.assert(response.body.code === 0, "code 应为 0");
+    client.assert(response.body.data.url.indexOf("http") === 0, "应返回链接");
+});
+%}

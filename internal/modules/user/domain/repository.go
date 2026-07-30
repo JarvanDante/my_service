@@ -50,4 +50,10 @@ type Repository interface {
 	OpenVip(ctx context.Context, userId int64, pkg *entity.VipPackage, startAt, endAt int64) error
 	VipLogs(ctx context.Context, userId int64, page, size int) ([]*entity.VipLog, int, error)
 	ExchangeCreditToCoin(ctx context.Context, userId int64, creditCost, coinGain float64) error
+	// 私信
+	SendMessage(ctx context.Context, fromId, toId int64, content string) error
+	ListConversations(ctx context.Context, userId int64, page, size int) ([]*entity.ChatConversation, int, error)
+	Messages(ctx context.Context, meId, peerId int64, page, size int) ([]*entity.ChatMessage, int, error)
+	MarkRead(ctx context.Context, userId, peerId int64) error
+	DeleteConversation(ctx context.Context, userId, peerId int64) error
 }
