@@ -35,11 +35,15 @@ func init() {
 	group := genv.Get("NACOS_GROUP", "DEFAULT_GROUP").String()
 	site := genv.Get("SITE_CODE", "my").String()
 	dataId := genv.Get("NACOS_DATAID", site+".yaml").String()
+	username := genv.Get("NACOS_USER").String()
+	password := genv.Get("NACOS_PASS").String()
 
 	adapter, err := nacos.New(ctx, nacos.Config{
 		ServerConfigs: []constant.ServerConfig{{IpAddr: host, Port: port}},
 		ClientConfig: constant.ClientConfig{
 			NamespaceId:         namespace,
+			Username:            username,
+			Password:            password,
 			TimeoutMs:           5000,
 			NotLoadCacheAtStart: true,
 			LogDir:              "./temp/nacos/log",
