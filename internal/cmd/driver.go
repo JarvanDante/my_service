@@ -4,4 +4,6 @@ package cmd
 import (
 	_ "github.com/gogf/gf/contrib/drivers/pgsql/v2" // PostgreSQL 驱动
 	_ "github.com/gogf/gf/contrib/nosql/redis/v2"   // Redis 适配器(g.Redis 需要)
+
+	_ "github.com/JarvanDante/my_service/internal/boot" // Nacos 配置引导(按 NACOS_ADDR 决定是否启用)
 )

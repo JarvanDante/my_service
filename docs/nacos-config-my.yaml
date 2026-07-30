@@ -1,0 +1,49 @@
+# ===== my_service 站点配置 =====
+# 贴进 Nacos: 配置管理 → 创建配置
+#   Data ID = my.yaml
+#   Group   = DEFAULT_GROUP
+#   格式    = YAML
+#   命名空间 = 选 dev(或 public/test)
+# 多商户时: 每个站点一条这样的配置, database.link 指向各自的库。
+
+server:
+  address:     ":8000"
+  openapiPath: "/api.json"
+  swaggerPath: "/swagger"
+
+frontapi:
+  address: ":8001"
+backendapi:
+  address: ":8002"
+manageapi:
+  address: ":8003"
+
+logger:
+  level:  "all"
+  stdout: true
+
+# 本站点信息(代码里从 g.Cfg 读, 不写死)
+site:
+  id:       1
+  code:     "my"
+  currency: "CNY"
+  timezone: "Asia/Shanghai"
+
+# 客服链接(/front/user/customer-url 读取)
+customer:
+  url: "https://example.com/kefu"
+
+# 本站点数据库(多商户时改成各自的库)
+database:
+  default:
+    link:  "pgsql:postgres:654321@tcp(127.0.0.1:5432)/my_service?sslmode=disable"
+    debug: true
+
+redis:
+  default:
+    address: "127.0.0.1:6379"
+    db:      0
+
+kafka:
+  brokers: ["127.0.0.1:9092"]
+  groupId: "my_service"
