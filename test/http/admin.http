@@ -1,0 +1,73 @@
+###############################################################################
+# 后台 B0 · 管理员认证(登录/信息/退出)真实端到端测试
+# 超管种子账号: admin / admin123
+###############################################################################
+
+@baseUrl = http://127.0.0.1:8000
+
+### 1. 管理员登录 —— 成功并保存 token
+POST {{baseUrl}}/backend/auth/login
+Content-Type: application/json
+
+{ "username": "admin", "password": "admin123" }
+
+> {%
+client.test("管理员登录成功", function () {
+    client.assert(response.body.code === 0, "code 应为 0: " + response.body.message);
+    client.assert(response.body.data.token !== "", "应返回 token");
+    client.assert(response.body.data.admin.username === "admin", "用户名应为 admin");
+});
+client.global.set("adminToken", response.body.data.token);
+%}
+
+### 2. 当前管理员信息(带 token) —— 成功
+GET {{baseUrl}}/backend/auth/info
+Authorization: {{adminToken}}
+
+> {%
+client.test("拿到管理员信息", function () {
+    client.assert(response.body.code === 0, "code 应为 0");
+    client.assert(response.body.data.username === "admin", "应为 admin");
+});
+%}
+
+### 3. 管理员信息(不带 token) —— 应未授权
+GET {{baseUrl}}/backend/auth/info
+
+> {%
+client.test("无 token 被拒", function () {
+    client.assert(response.body.code !== 0, "无 token 应报错");
+});
+%}
+
+### 4. 登录(密码错误) —— 应报错
+POST {{baseUrl}}/backend/auth/login
+Content-Type: application/json
+
+{ "username": "admin", "password": "wrongpwd" }
+
+> {%
+client.test("密码错误被拒", function () {
+    client.assert(response.body.code !== 0, "密码错误应报错");
+});
+%}
+
+### 5. 退出登录 —— 成功
+POST {{baseUrl}}/backend/auth/logout
+Authorization: {{adminToken}}
+
+> {%
+client.test("退出成功", function () {
+    client.assert(response.body.code === 0, "code 应为 0");
+});
+%}
+
+### 6. 退出后再访问 —— token 已失效
+GET {{baseUrl}}/backend/auth/info
+Authorization: {{adminToken}}
+
+> {%
+client.test("退出后 token 失效", function () {
+    client.assert(response.body.code !== 0, "退出后应失效");
+});
+%}

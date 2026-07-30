@@ -11,6 +11,7 @@ import (
 	"github.com/JarvanDante/my_service/internal/dao"
 	"github.com/JarvanDante/my_service/internal/shared/middleware"
 
+	adminmod "github.com/JarvanDante/my_service/internal/modules/admin"
 	usermod "github.com/JarvanDante/my_service/internal/modules/user"
 )
 
@@ -37,8 +38,14 @@ var Main = gcmd.Command{
 			usermod.RegisterFront(group, dao.NewUserRepo())
 		})
 		s.Group("/backend", func(group *ghttp.RouterGroup) {
-			group.Middleware(middleware.Auth)
-			usermod.RegisterBackend(group, dao.NewUserRepo())
+			// 公开: 管理员登录
+			adminmod.RegisterPublic(group, dao.NewAdminRepo())
+			// 需管理员登录
+			group.Group("/", func(auth *ghttp.RouterGroup) {
+				auth.Middleware(middleware.AdminAuth, middleware.AdminOpLog)
+				adminmod.RegisterAuthed(auth, dao.NewAdminRepo())
+				usermod.RegisterBackend(auth, dao.NewUserRepo())
+			})
 		})
 		s.Group("/manage", func(group *ghttp.RouterGroup) {
 			group.Middleware(middleware.Auth)

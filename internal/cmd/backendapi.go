@@ -8,6 +8,7 @@ import (
 	"github.com/gogf/gf/v2/os/gcmd"
 
 	"github.com/JarvanDante/my_service/internal/dao"
+	adminmod "github.com/JarvanDante/my_service/internal/modules/admin"
 	usermod "github.com/JarvanDante/my_service/internal/modules/user"
 	"github.com/JarvanDante/my_service/internal/shared/middleware"
 )
@@ -22,8 +23,14 @@ var BackendAPI = gcmd.Command{
 		s.Use(middleware.CORS, ghttp.MiddlewareHandlerResponse)
 		s.BindStatusHandler(404, middleware.NotFound)
 		s.Group("/backend", func(group *ghttp.RouterGroup) {
-			group.Middleware(middleware.Auth)
-			usermod.RegisterBackend(group, dao.NewUserRepo())
+			// 公开: 管理员登录
+			adminmod.RegisterPublic(group, dao.NewAdminRepo())
+			// 需管理员登录
+			group.Group("/", func(auth *ghttp.RouterGroup) {
+				auth.Middleware(middleware.AdminAuth, middleware.AdminOpLog)
+				adminmod.RegisterAuthed(auth, dao.NewAdminRepo())
+				usermod.RegisterBackend(auth, dao.NewUserRepo())
+			})
 		})
 		s.Run()
 		return nil

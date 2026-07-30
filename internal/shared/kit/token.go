@@ -84,3 +84,53 @@ func RevokeByUserId(ctx context.Context, userId int64) error {
 	_, err := g.Redis().Do(ctx, "DEL", uidKey)
 	return err
 }
+
+// ================= 后台管理员 token(与前台用户完全独立) =================
+
+const (
+	adminTokenPrefix = "admin:token:" // token   -> adminId
+	adminAidPrefix   = "admin:aid:"   // adminId -> 当前 token(单点)
+)
+
+func IssueAdminToken(ctx context.Context, adminId int64) (string, error) {
+	aidKey := adminAidPrefix + gconv.String(adminId)
+	if old, err := g.Redis().Do(ctx, "GET", aidKey); err == nil && !old.IsNil() && old.String() != "" {
+		_, _ = g.Redis().Do(ctx, "DEL", adminTokenPrefix+old.String())
+	}
+	token := guid.S()
+	if _, err := g.Redis().Do(ctx, "SETEX", adminTokenPrefix+token, tokenTTL, adminId); err != nil {
+		return "", err
+	}
+	if _, err := g.Redis().Do(ctx, "SETEX", aidKey, tokenTTL, token); err != nil {
+		return "", err
+	}
+	return token, nil
+}
+
+func ParseAdminToken(ctx context.Context, token string) (int64, error) {
+	token = normalize(token)
+	if token == "" {
+		return 0, gerror.New("empty token")
+	}
+	key := adminTokenPrefix + token
+	v, err := g.Redis().Do(ctx, "GET", key)
+	if err != nil {
+		return 0, err
+	}
+	if v.IsNil() || v.String() == "" {
+		return 0, gerror.New("admin token not found or expired")
+	}
+	uid := v.Int64()
+	_, _ = g.Redis().Do(ctx, "EXPIRE", key, tokenTTL)
+	_, _ = g.Redis().Do(ctx, "EXPIRE", adminAidPrefix+gconv.String(uid), tokenTTL)
+	return uid, nil
+}
+
+func RevokeAdminByAdminId(ctx context.Context, adminId int64) error {
+	aidKey := adminAidPrefix + gconv.String(adminId)
+	if v, err := g.Redis().Do(ctx, "GET", aidKey); err == nil && !v.IsNil() && v.String() != "" {
+		_, _ = g.Redis().Do(ctx, "DEL", adminTokenPrefix+v.String())
+	}
+	_, err := g.Redis().Do(ctx, "DEL", aidKey)
+	return err
+}
