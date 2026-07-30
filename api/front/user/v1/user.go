@@ -60,3 +60,58 @@ type BindPhoneReq struct {
 	Code   string `json:"code"` // 短信验证码(接入短信服务后校验)
 }
 type BindPhoneRes struct{}
+
+// ---- P2 个人资料 ----
+
+// PublicUser 对外公开信息(看他人)。
+type PublicUser struct {
+	Id        int64  `json:"id"`
+	Nickname  string `json:"nickname"`
+	Img       string `json:"img"`
+	BgImg     string `json:"bg_img"`
+	Signature string `json:"signature"`
+	Sex       int    `json:"sex"`
+	Level     int    `json:"level"`
+	Fans      int    `json:"fans"`
+	Follow    int    `json:"follow"`
+	ShareNum  int    `json:"share_num"`
+}
+
+// 他人主页(需登录)
+type HomeReq struct {
+	g.Meta `path:"/user/home/{id}" method:"get" tags:"Front/User" summary:"他人主页"`
+	Id     int64 `json:"id" v:"required|min:1#用户ID必填"`
+}
+type HomeRes struct {
+	User       PublicUser `json:"user"`
+	IsFollowed bool       `json:"is_followed"`
+}
+
+// 修改资料(需登录, 空字段表示不改)
+type UpdateReq struct {
+	g.Meta    `path:"/user/update" method:"post" tags:"Front/User" summary:"修改资料"`
+	Nickname  string `json:"nickname"`
+	Img       string `json:"img"`
+	BgImg     string `json:"bg_img"`
+	Signature string `json:"signature"`
+	Sex       int    `json:"sex" v:"in:0,1,2#性别不合法"`
+}
+type UpdateRes struct{}
+
+// 用户图片(需登录)
+type ImagesReq struct {
+	g.Meta `path:"/user/images" method:"get" tags:"Front/User" summary:"用户图片"`
+}
+type ImagesRes struct {
+	Images []string `json:"images"`
+}
+
+// 按账号查找(需登录)
+type FindReq struct {
+	g.Meta  `path:"/user/find" method:"get" tags:"Front/User" summary:"按账号查找用户"`
+	Account string `json:"account" v:"required#账号必填"`
+}
+type FindRes struct {
+	Found bool        `json:"found"`
+	User  *PublicUser `json:"user"`
+}

@@ -13,8 +13,11 @@ type Repository interface {
 	FindById(ctx context.Context, id int64) (*entity.Users, error)
 	FindByDeviceId(ctx context.Context, deviceId string) (*entity.Users, error)
 	FindByPhone(ctx context.Context, phone string) (*entity.Users, error)
+	FindByAccount(ctx context.Context, account string) (*entity.Users, error)
 	Create(ctx context.Context, data g.Map) (int64, error)
 	UpdateLoginInfo(ctx context.Context, id int64, ip string) error
 	UpdatePhone(ctx context.Context, id int64, phone string) error
+	UpdateProfile(ctx context.Context, id int64, data g.Map) error
 	Disable(ctx context.Context, id int64, reason string) error
+	ExistsFollow(ctx context.Context, userId, homeId int64) (bool, error)
 }

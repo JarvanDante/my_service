@@ -10,6 +10,7 @@ type LoginInput struct {
 	Ip            string
 }
 
+// UserInfoDTO 当前用户详情(含私密字段)。
 type UserInfoDTO struct {
 	Id        int64
 	Username  string
@@ -24,6 +25,35 @@ type UserInfoDTO struct {
 	GroupName string
 	Fans      int
 	Follow    int
+}
+
+// PublicUserDTO 对外公开信息(看他人时用, 不含手机/余额)。
+type PublicUserDTO struct {
+	Id        int64
+	Nickname  string
+	Img       string
+	BgImg     string
+	Signature string
+	Sex       int
+	Level     int
+	Fans      int
+	Follow    int
+	ShareNum  int
+}
+
+// HomeDTO 他人主页。
+type HomeDTO struct {
+	User       *PublicUserDTO
+	IsFollowed bool
+}
+
+// UpdateProfileInput 改资料入参(空值表示不改)。
+type UpdateProfileInput struct {
+	Nickname  string
+	Img       string
+	BgImg     string
+	Signature string
+	Sex       int // 1男 2女, 0 表示不改
 }
 
 type LoginDTO struct {
@@ -44,6 +74,10 @@ type IUser interface {
 	Refresh(ctx context.Context, userId int64) (string, error)
 	// 资料
 	Info(ctx context.Context, userId int64) (*UserInfoDTO, error)
+	Home(ctx context.Context, viewerId, homeId int64) (*HomeDTO, error)
+	UpdateProfile(ctx context.Context, userId int64, in UpdateProfileInput) error
+	Images(ctx context.Context, userId int64) ([]string, error)
+	FindByAccount(ctx context.Context, account string) (*PublicUserDTO, error)
 	BindPhone(ctx context.Context, userId int64, phone, code string) error
 	// 后台
 	GetUser(ctx context.Context, id int64) (*UserDTO, error)

@@ -61,3 +61,25 @@ func (r *userRepo) UpdatePhone(ctx context.Context, id int64, phone string) erro
 	}).Update()
 	return err
 }
+
+func (r *userRepo) FindByAccount(ctx context.Context, account string) (*entity.Users, error) {
+	var u *entity.Users
+	err := Users.Ctx(ctx).
+		Where(Users.Columns().Username, account).
+		WhereOr(Users.Columns().Phone, account).
+		Scan(&u)
+	return u, err
+}
+
+func (r *userRepo) UpdateProfile(ctx context.Context, id int64, data g.Map) error {
+	_, err := Users.Ctx(ctx).Where(Users.Columns().Id, id).Data(data).Update()
+	return err
+}
+
+func (r *userRepo) ExistsFollow(ctx context.Context, userId, homeId int64) (bool, error) {
+	n, err := g.Model("user_follow").Ctx(ctx).
+		Where("user_id", userId).
+		Where("home_id", homeId).
+		Count()
+	return n > 0, err
+}

@@ -91,6 +91,77 @@ func (c *Controller) BindPhone(ctx context.Context, req *v1.BindPhoneReq) (res *
 	return &v1.BindPhoneRes{}, nil
 }
 
+// Home 他人主页(需登录)。
+func (c *Controller) Home(ctx context.Context, req *v1.HomeReq) (res *v1.HomeRes, err error) {
+	viewer, err := uid(ctx)
+	if err != nil {
+		return nil, err
+	}
+	dto, err := c.user.Home(ctx, viewer, req.Id)
+	if err != nil {
+		return nil, err
+	}
+	return &v1.HomeRes{User: toPublicApi(dto.User), IsFollowed: dto.IsFollowed}, nil
+}
+
+// Update 修改资料(需登录)。
+func (c *Controller) Update(ctx context.Context, req *v1.UpdateReq) (res *v1.UpdateRes, err error) {
+	id, err := uid(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if err = c.user.UpdateProfile(ctx, id, service.UpdateProfileInput{
+		Nickname:  req.Nickname,
+		Img:       req.Img,
+		BgImg:     req.BgImg,
+		Signature: req.Signature,
+		Sex:       req.Sex,
+	}); err != nil {
+		return nil, err
+	}
+	return &v1.UpdateRes{}, nil
+}
+
+// Images 用户图片(需登录)。
+func (c *Controller) Images(ctx context.Context, req *v1.ImagesReq) (res *v1.ImagesRes, err error) {
+	id, err := uid(ctx)
+	if err != nil {
+		return nil, err
+	}
+	imgs, err := c.user.Images(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	return &v1.ImagesRes{Images: imgs}, nil
+}
+
+// Find 按账号查找(需登录)。
+func (c *Controller) Find(ctx context.Context, req *v1.FindReq) (res *v1.FindRes, err error) {
+	if _, err = uid(ctx); err != nil {
+		return nil, err
+	}
+	dto, err := c.user.FindByAccount(ctx, req.Account)
+	if err != nil {
+		return nil, err
+	}
+	if dto == nil {
+		return &v1.FindRes{Found: false}, nil
+	}
+	p := toPublicApi(dto)
+	return &v1.FindRes{Found: true, User: &p}, nil
+}
+
+func toPublicApi(d *service.PublicUserDTO) v1.PublicUser {
+	if d == nil {
+		return v1.PublicUser{}
+	}
+	return v1.PublicUser{
+		Id: d.Id, Nickname: d.Nickname, Img: d.Img, BgImg: d.BgImg,
+		Signature: d.Signature, Sex: d.Sex, Level: d.Level,
+		Fans: d.Fans, Follow: d.Follow, ShareNum: d.ShareNum,
+	}
+}
+
 func toApiUser(d *service.UserInfoDTO) v1.UserInfo {
 	if d == nil {
 		return v1.UserInfo{}

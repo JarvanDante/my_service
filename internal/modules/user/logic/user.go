@@ -156,3 +156,90 @@ func (s *sUser) BindPhone(ctx context.Context, userId int64, phone, code string)
 	}
 	return s.repo.UpdatePhone(ctx, userId, phone)
 }
+
+// Home 他人主页: 公开信息 + 当前用户是否已关注。
+func (s *sUser) Home(ctx context.Context, viewerId, homeId int64) (*service.HomeDTO, error) {
+	u, err := s.repo.FindById(ctx, homeId)
+	if err != nil {
+		return nil, err
+	}
+	if u == nil {
+		return nil, gerror.New("用户不存在")
+	}
+	followed := false
+	if viewerId > 0 && viewerId != homeId {
+		followed, _ = s.repo.ExistsFollow(ctx, viewerId, homeId)
+	}
+	return &service.HomeDTO{User: toPublic(u), IsFollowed: followed}, nil
+}
+
+// UpdateProfile 改资料: 仅更新传了值的字段。
+func (s *sUser) UpdateProfile(ctx context.Context, userId int64, in service.UpdateProfileInput) error {
+	data := g.Map{}
+	if in.Nickname != "" {
+		data["nickname"] = in.Nickname
+	}
+	if in.Img != "" {
+		data["img"] = in.Img
+	}
+	if in.BgImg != "" {
+		data["bg_img"] = in.BgImg
+	}
+	if in.Signature != "" {
+		data["signature"] = in.Signature
+	}
+	if in.Sex == 1 || in.Sex == 2 {
+		data["sex"] = in.Sex
+	}
+	if len(data) == 0 {
+		return gerror.New("没有要更新的内容")
+	}
+	return s.repo.UpdateProfile(ctx, userId, data)
+}
+
+// Images 用户图片: 目前返回头像+背景图。
+// TODO: 接入相册/帖子媒体表后, 改为查真实图片列表。
+func (s *sUser) Images(ctx context.Context, userId int64) ([]string, error) {
+	u, err := s.repo.FindById(ctx, userId)
+	if err != nil {
+		return nil, err
+	}
+	if u == nil {
+		return nil, gerror.New("用户不存在")
+	}
+	imgs := []string{}
+	if u.Img != "" {
+		imgs = append(imgs, u.Img)
+	}
+	if u.BgImg != "" {
+		imgs = append(imgs, u.BgImg)
+	}
+	return imgs, nil
+}
+
+// FindByAccount 按账号(用户名/手机号)查找, 未找到返回 (nil, nil)。
+func (s *sUser) FindByAccount(ctx context.Context, account string) (*service.PublicUserDTO, error) {
+	u, err := s.repo.FindByAccount(ctx, account)
+	if err != nil {
+		return nil, err
+	}
+	if u == nil {
+		return nil, nil
+	}
+	return toPublic(u), nil
+}
+
+func toPublic(u *entity.Users) *service.PublicUserDTO {
+	return &service.PublicUserDTO{
+		Id:        u.Id,
+		Nickname:  u.Nickname,
+		Img:       u.Img,
+		BgImg:     u.BgImg,
+		Signature: u.Signature,
+		Sex:       u.Sex,
+		Level:     u.Level,
+		Fans:      u.Fans,
+		Follow:    u.Follow,
+		ShareNum:  u.ShareNum,
+	}
+}

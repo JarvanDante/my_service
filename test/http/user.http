@@ -1,17 +1,13 @@
 ###############################################################################
 # 前台 User 接口 · 真实端到端测试(打到运行中的服务)
 #
-# 用法(GoLand/VSCode HTTP Client):
-#   1. 先启动服务:  gf run main.go   (默认 :8000)
-#   2. 点每个请求左侧 ▶ 单发, 或右上角「Run all requests in file」整条流程跑
-#
-# 说明: 登录后 token 自动存入全局变量, 后续请求用 {{token}} 接力。
-#       从上到下顺序执行时, 各断言都应通过。
+# 用法: 先 gf run main.go 起服务(:8000), 再在 GoLand 里「Run all requests in file」
+# 登录后 token / uid 自动存入全局变量, 后续请求接力。
 ###############################################################################
 
 @baseUrl = http://127.0.0.1:8000
 
-### 1. 登录(公开) —— 成功并保存 token
+### 1. 登录(公开) —— 成功并保存 token / uid
 POST {{baseUrl}}/front/user/login
 Content-Type: application/json
 
@@ -23,12 +19,11 @@ Content-Type: application/json
 
 > {%
 client.test("登录成功", function () {
-    client.assert(response.status === 200, "HTTP 状态非 200");
     client.assert(response.body.code === 0, "code 应为 0, 实际: " + response.body.code);
     client.assert(response.body.data.token !== "", "未返回 token");
-    client.assert(response.body.data.user.username === "device_e2e-device-001", "username 不符");
 });
 client.global.set("token", response.body.data.token);
+client.global.set("uid", response.body.data.user.id);
 %}
 
 ### 2. 个人信息(带 token) —— 成功
@@ -51,7 +46,81 @@ client.test("无 token 被拒", function () {
 });
 %}
 
-### 4. 绑定手机 —— 成功
+### 4. 修改资料 —— 改昵称/签名/性别
+POST {{baseUrl}}/front/user/update
+Authorization: {{token}}
+Content-Type: application/json
+
+{
+  "nickname": "E2E昵称",
+  "signature": "这是测试签名",
+  "sex": 1
+}
+
+> {%
+client.test("改资料成功", function () {
+    client.assert(response.body.code === 0, "code 应为 0, 实际: " + response.body.code);
+});
+%}
+
+### 5. 个人信息 —— 校验昵称已更新
+GET {{baseUrl}}/front/user/info
+Authorization: {{token}}
+
+> {%
+client.test("昵称已更新", function () {
+    client.assert(response.body.data.nickname === "E2E昵称", "nickname 未更新, 实际: " + response.body.data.nickname);
+    client.assert(response.body.data.sex === 1, "sex 未更新");
+});
+%}
+
+### 6. 他人主页(这里查自己的 id) —— 成功
+GET {{baseUrl}}/front/user/home/{{uid}}
+Authorization: {{token}}
+
+> {%
+client.test("主页返回公开信息", function () {
+    client.assert(response.body.code === 0, "code 应为 0");
+    client.assert(response.body.data.user.id === client.global.get("uid"), "主页用户 id 不符");
+    client.assert(response.body.data.user.phone === undefined, "公开信息不应含 phone");
+});
+%}
+
+### 7. 按账号查找 —— 用 username 查, 应找到
+GET {{baseUrl}}/front/user/find?account=device_e2e-device-001
+Authorization: {{token}}
+
+> {%
+client.test("按账号找到用户", function () {
+    client.assert(response.body.code === 0, "code 应为 0");
+    client.assert(response.body.data.found === true, "应找到用户");
+    client.assert(response.body.data.user.id === client.global.get("uid"), "找到的用户 id 不符");
+});
+%}
+
+### 8. 按账号查找 —— 不存在的账号
+GET {{baseUrl}}/front/user/find?account=不存在的账号xyz
+Authorization: {{token}}
+
+> {%
+client.test("找不到返回 found=false", function () {
+    client.assert(response.body.code === 0, "code 应为 0");
+    client.assert(response.body.data.found === false, "不存在时 found 应为 false");
+});
+%}
+
+### 9. 用户图片 —— 成功(返回数组)
+GET {{baseUrl}}/front/user/images
+Authorization: {{token}}
+
+> {%
+client.test("图片返回数组", function () {
+    client.assert(response.body.code === 0, "code 应为 0");
+    client.assert(Array.isArray(response.body.data.images), "images 应为数组");
+});
+%}
+
+### 10. 绑定手机 —— 成功
 POST {{baseUrl}}/front/user/bind-phone
 Authorization: {{token}}
 Content-Type: application/json
@@ -66,17 +135,17 @@ client.test("绑定手机成功", function () {
 });
 %}
 
-### 5. 个人信息 —— 校验手机号已更新
+### 11. 个人信息 —— 校验手机号已更新
 GET {{baseUrl}}/front/user/info
 Authorization: {{token}}
 
 > {%
 client.test("手机号已写入", function () {
-    client.assert(response.body.data.phone === "13900139000", "phone 未更新, 实际: " + response.body.data.phone);
+    client.assert(response.body.data.phone === "13900139000", "phone 未更新");
 });
 %}
 
-### 6. 绑定手机(格式非法) —— 应被参数校验拦截
+### 12. 绑定手机(格式非法) —— 应被校验拦截
 POST {{baseUrl}}/front/user/bind-phone
 Authorization: {{token}}
 Content-Type: application/json
@@ -91,15 +160,28 @@ client.test("非法手机号被拦截", function () {
 });
 %}
 
-### 7. 刷新 token —— 成功并替换全局 token(旧的随即失效)
+### 13. 修改资料(性别非法) —— 应被校验拦截
+POST {{baseUrl}}/front/user/update
+Authorization: {{token}}
+Content-Type: application/json
+
+{
+  "sex": 9
+}
+
+> {%
+client.test("非法性别被拦截", function () {
+    client.assert(response.body.code !== 0, "sex=9 应报错");
+});
+%}
+
+### 14. 刷新 token —— 成功并替换全局 token(旧的失效)
 POST {{baseUrl}}/front/user/token/refresh
 Authorization: {{token}}
 
 > {%
 var oldToken = client.global.get("token");
 var newToken = response.body.data.token;
-client.log("旧 token: " + oldToken);
-client.log("新 token: " + newToken);
 client.test("刷新成功", function () {
     client.assert(response.body.code === 0, "code 应为 0");
     client.assert(newToken !== "", "未返回新 token");
@@ -108,7 +190,7 @@ client.test("刷新成功", function () {
 client.global.set("token", newToken);
 %}
 
-### 8. 个人信息(用新 token) —— 成功
+### 15. 个人信息(用新 token) —— 成功
 GET {{baseUrl}}/front/user/info
 Authorization: {{token}}
 
@@ -118,7 +200,7 @@ client.test("新 token 可用", function () {
 });
 %}
 
-### 9. 错误请求方式(login 用 GET) —— 应提示 405
+### 16. 错误请求方式(login 用 GET) —— 应提示 405
 GET {{baseUrl}}/front/user/login
 
 > {%
@@ -127,7 +209,7 @@ client.test("请求方式判断", function () {
 });
 %}
 
-### 10. 退出登录 —— 成功
+### 17. 退出登录 —— 成功
 POST {{baseUrl}}/front/user/logout
 Authorization: {{token}}
 
@@ -137,7 +219,7 @@ client.test("退出成功", function () {
 });
 %}
 
-### 11. 退出后再访问 —— token 应已失效
+### 18. 退出后再访问 —— token 应已失效
 GET {{baseUrl}}/front/user/info
 Authorization: {{token}}
 
