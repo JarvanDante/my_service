@@ -11,6 +11,7 @@ import (
 // UserBalanceLog is the golang structure for table user_balance_log.
 type UserBalanceLog struct {
 	Id            int64       `json:"id"            orm:"id"             description:""` //
+	SiteId        int64       `json:"siteId"        orm:"site_id"        description:""` //
 	UserId        int64       `json:"userId"        orm:"user_id"        description:""` //
 	Direction     int         `json:"direction"     orm:"direction"      description:""` //
 	Scene         string      `json:"scene"         orm:"scene"          description:""` //

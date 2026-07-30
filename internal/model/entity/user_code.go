@@ -11,6 +11,7 @@ import (
 // UserCode is the golang structure for table user_code.
 type UserCode struct {
 	Id        int64       `json:"id"        orm:"id"          description:""` //
+	SiteId    int64       `json:"siteId"    orm:"site_id"     description:""` //
 	Name      string      `json:"name"      orm:"name"        description:""` //
 	Code      string      `json:"code"      orm:"code"        description:""` //
 	CodeKey   string      `json:"codeKey"   orm:"code_key"    description:""` //

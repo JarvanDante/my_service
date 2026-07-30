@@ -11,6 +11,7 @@ import (
 // UserFollow is the golang structure for table user_follow.
 type UserFollow struct {
 	Id        int64       `json:"id"        orm:"id"         description:""` //
+	SiteId    int64       `json:"siteId"    orm:"site_id"    description:""` //
 	UserId    int64       `json:"userId"    orm:"user_id"    description:""` //
 	HomeId    int64       `json:"homeId"    orm:"home_id"    description:""` //
 	CreatedAt *gtime.Time `json:"createdAt" orm:"created_at" description:""` //

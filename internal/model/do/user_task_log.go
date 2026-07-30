@@ -13,6 +13,7 @@ import (
 type UserTaskLog struct {
 	g.Meta    `orm:"table:user_task_log, do:true"`
 	Id        any         //
+	SiteId    any         //
 	UserId    any         //
 	TaskId    any         //
 	Type      any         //

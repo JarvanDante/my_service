@@ -11,6 +11,7 @@ import (
 // UserTask is the golang structure for table user_task.
 type UserTask struct {
 	Id          int64       `json:"id"          orm:"id"          description:""` //
+	SiteId      int64       `json:"siteId"      orm:"site_id"     description:""` //
 	Name        string      `json:"name"        orm:"name"        description:""` //
 	Type        string      `json:"type"        orm:"type"        description:""` //
 	Description string      `json:"description" orm:"description" description:""` //

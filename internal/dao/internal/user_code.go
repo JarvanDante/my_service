@@ -22,6 +22,7 @@ type UserCodeDao struct {
 // UserCodeColumns defines and stores column names for the table user_code.
 type UserCodeColumns struct {
 	Id        string //
+	SiteId    string //
 	Name      string //
 	Code      string //
 	CodeKey   string //
@@ -39,6 +40,7 @@ type UserCodeColumns struct {
 // userCodeColumns holds the columns for the table user_code.
 var userCodeColumns = UserCodeColumns{
 	Id:        "id",
+	SiteId:    "site_id",
 	Name:      "name",
 	Code:      "code",
 	CodeKey:   "code_key",

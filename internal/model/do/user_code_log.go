@@ -13,6 +13,7 @@ import (
 type UserCodeLog struct {
 	g.Meta    `orm:"table:user_code_log, do:true"`
 	Id        any         //
+	SiteId    any         //
 	CodeId    any         //
 	Code      any         //
 	CodeKey   any         //

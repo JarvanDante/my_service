@@ -22,6 +22,7 @@ type UserTaskDao struct {
 // UserTaskColumns defines and stores column names for the table user_task.
 type UserTaskColumns struct {
 	Id          string //
+	SiteId      string //
 	Name        string //
 	Type        string //
 	Description string //
@@ -33,6 +34,7 @@ type UserTaskColumns struct {
 // userTaskColumns holds the columns for the table user_task.
 var userTaskColumns = UserTaskColumns{
 	Id:          "id",
+	SiteId:      "site_id",
 	Name:        "name",
 	Type:        "type",
 	Description: "description",

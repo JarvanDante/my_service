@@ -11,6 +11,7 @@ import (
 // UserSign is the golang structure for table user_sign.
 type UserSign struct {
 	Id        int64       `json:"id"        orm:"id"         description:""` //
+	SiteId    int64       `json:"siteId"    orm:"site_id"    description:""` //
 	UserId    int64       `json:"userId"    orm:"user_id"    description:""` //
 	YearMonth int         `json:"yearMonth" orm:"year_month" description:""` //
 	Days      string      `json:"days"      orm:"days"       description:""` //

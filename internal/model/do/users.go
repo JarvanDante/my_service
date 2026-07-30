@@ -13,6 +13,7 @@ import (
 type Users struct {
 	g.Meta         `orm:"table:users, do:true"`
 	Id             any         //
+	SiteId         any         //
 	Username       any         //
 	Nickname       any         //
 	Phone          any         //

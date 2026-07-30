@@ -22,6 +22,7 @@ type UserBalanceLogDao struct {
 // UserBalanceLogColumns defines and stores column names for the table user_balance_log.
 type UserBalanceLogColumns struct {
 	Id            string //
+	SiteId        string //
 	UserId        string //
 	Direction     string //
 	Scene         string //
@@ -36,6 +37,7 @@ type UserBalanceLogColumns struct {
 // userBalanceLogColumns holds the columns for the table user_balance_log.
 var userBalanceLogColumns = UserBalanceLogColumns{
 	Id:            "id",
+	SiteId:        "site_id",
 	UserId:        "user_id",
 	Direction:     "direction",
 	Scene:         "scene",

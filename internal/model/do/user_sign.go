@@ -13,6 +13,7 @@ import (
 type UserSign struct {
 	g.Meta    `orm:"table:user_sign, do:true"`
 	Id        any         //
+	SiteId    any         //
 	UserId    any         //
 	YearMonth any         //
 	Days      any         //

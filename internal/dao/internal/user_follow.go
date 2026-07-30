@@ -22,6 +22,7 @@ type UserFollowDao struct {
 // UserFollowColumns defines and stores column names for the table user_follow.
 type UserFollowColumns struct {
 	Id        string //
+	SiteId    string //
 	UserId    string //
 	HomeId    string //
 	CreatedAt string //
@@ -31,6 +32,7 @@ type UserFollowColumns struct {
 // userFollowColumns holds the columns for the table user_follow.
 var userFollowColumns = UserFollowColumns{
 	Id:        "id",
+	SiteId:    "site_id",
 	UserId:    "user_id",
 	HomeId:    "home_id",
 	CreatedAt: "created_at",

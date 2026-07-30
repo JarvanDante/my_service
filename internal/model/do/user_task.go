@@ -13,6 +13,7 @@ import (
 type UserTask struct {
 	g.Meta      `orm:"table:user_task, do:true"`
 	Id          any         //
+	SiteId      any         //
 	Name        any         //
 	Type        any         //
 	Description any         //

@@ -13,6 +13,7 @@ import (
 type UserBalanceLog struct {
 	g.Meta        `orm:"table:user_balance_log, do:true"`
 	Id            any         //
+	SiteId        any         //
 	UserId        any         //
 	Direction     any         //
 	Scene         any         //

@@ -13,6 +13,7 @@ import (
 type UserFollow struct {
 	g.Meta    `orm:"table:user_follow, do:true"`
 	Id        any         //
+	SiteId    any         //
 	UserId    any         //
 	HomeId    any         //
 	CreatedAt *gtime.Time //

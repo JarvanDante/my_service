@@ -13,6 +13,7 @@ import (
 type UserCode struct {
 	g.Meta    `orm:"table:user_code, do:true"`
 	Id        any         //
+	SiteId    any         //
 	Name      any         //
 	Code      any         //
 	CodeKey   any         //

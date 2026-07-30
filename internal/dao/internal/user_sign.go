@@ -22,6 +22,7 @@ type UserSignDao struct {
 // UserSignColumns defines and stores column names for the table user_sign.
 type UserSignColumns struct {
 	Id        string //
+	SiteId    string //
 	UserId    string //
 	YearMonth string //
 	Days      string //
@@ -33,6 +34,7 @@ type UserSignColumns struct {
 // userSignColumns holds the columns for the table user_sign.
 var userSignColumns = UserSignColumns{
 	Id:        "id",
+	SiteId:    "site_id",
 	UserId:    "user_id",
 	YearMonth: "year_month",
 	Days:      "days",
