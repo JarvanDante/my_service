@@ -115,3 +115,40 @@ type FindRes struct {
 	Found bool        `json:"found"`
 	User  *PublicUser `json:"user"`
 }
+
+// ---- P3 社交 ----
+
+// 关注/取关(切换, 需登录)
+type FollowReq struct {
+	g.Meta `path:"/user/follow" method:"post" tags:"Front/User" summary:"关注/取关(切换)"`
+	HomeId int64 `json:"home_id" v:"required|min:1#目标用户ID必填"`
+}
+type FollowRes struct {
+	Followed bool `json:"followed"` // 操作后是否已关注
+}
+
+// 我的关注列表(需登录)
+type FollowsReq struct {
+	g.Meta `path:"/user/follows" method:"get" tags:"Front/User" summary:"我的关注列表"`
+	Page   int `json:"page"`
+	Size   int `json:"size"`
+}
+type FollowsRes struct {
+	List  []PublicUser `json:"list"`
+	Total int          `json:"total"`
+	Page  int          `json:"page"`
+	Size  int          `json:"size"`
+}
+
+// 我的粉丝列表(需登录)
+type FansReq struct {
+	g.Meta `path:"/user/fans" method:"get" tags:"Front/User" summary:"我的粉丝列表"`
+	Page   int `json:"page"`
+	Size   int `json:"size"`
+}
+type FansRes struct {
+	List  []PublicUser `json:"list"`
+	Total int          `json:"total"`
+	Page  int          `json:"page"`
+	Size  int          `json:"size"`
+}

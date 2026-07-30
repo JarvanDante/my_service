@@ -243,3 +243,72 @@ func toPublic(u *entity.Users) *service.PublicUserDTO {
 		ShareNum:  u.ShareNum,
 	}
 }
+
+// DoFollow 关注/取关切换, 返回操作后是否处于已关注状态。
+func (s *sUser) DoFollow(ctx context.Context, userId, homeId int64) (bool, error) {
+	if homeId <= 0 {
+		return false, gerror.New("目标用户不合法")
+	}
+	if userId == homeId {
+		return false, gerror.New("不能关注自己")
+	}
+	target, err := s.repo.FindById(ctx, homeId)
+	if err != nil {
+		return false, err
+	}
+	if target == nil {
+		return false, gerror.New("用户不存在")
+	}
+	exists, err := s.repo.ExistsFollow(ctx, userId, homeId)
+	if err != nil {
+		return false, err
+	}
+	if exists {
+		if err = s.repo.Unfollow(ctx, userId, homeId); err != nil {
+			return false, err
+		}
+		return false, nil
+	}
+	if err = s.repo.Follow(ctx, userId, homeId); err != nil {
+		return false, err
+	}
+	return true, nil
+}
+
+// Following 我的关注列表。
+func (s *sUser) Following(ctx context.Context, userId int64, page, size int) ([]*service.PublicUserDTO, int, error) {
+	page, size = normalizePage(page, size)
+	list, total, err := s.repo.FollowingList(ctx, userId, page, size)
+	if err != nil {
+		return nil, 0, err
+	}
+	return toPublicList(list), total, nil
+}
+
+// Fans 我的粉丝列表。
+func (s *sUser) Fans(ctx context.Context, userId int64, page, size int) ([]*service.PublicUserDTO, int, error) {
+	page, size = normalizePage(page, size)
+	list, total, err := s.repo.FansList(ctx, userId, page, size)
+	if err != nil {
+		return nil, 0, err
+	}
+	return toPublicList(list), total, nil
+}
+
+func normalizePage(page, size int) (int, int) {
+	if page < 1 {
+		page = 1
+	}
+	if size < 1 || size > 100 {
+		size = 15
+	}
+	return page, size
+}
+
+func toPublicList(us []*entity.Users) []*service.PublicUserDTO {
+	out := make([]*service.PublicUserDTO, 0, len(us))
+	for _, u := range us {
+		out = append(out, toPublic(u))
+	}
+	return out
+}

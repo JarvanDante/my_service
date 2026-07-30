@@ -1,0 +1,125 @@
+###############################################################################
+# 前台 User · P3 社交(关注/取关/关注列表/粉丝列表)真实端到端测试
+#
+# 自包含: 登录两个用户 A / B, A 关注 B 并校验关系与计数。
+# 完整跑一遍后会自动取关, 状态归零, 可重复运行。
+# 用法: 先 gf run main.go, 再「Run all requests in file」。
+###############################################################################
+
+@baseUrl = http://127.0.0.1:8000
+
+### 1. 登录用户 A
+POST {{baseUrl}}/front/user/login
+Content-Type: application/json
+
+{ "device_id": "e2e-follow-A", "device_type": "ios" }
+
+> {%
+client.test("A 登录成功", function () {
+    client.assert(response.body.code === 0, "A 登录失败");
+});
+client.global.set("tokenA", response.body.data.token);
+client.global.set("uidA", response.body.data.user.id);
+%}
+
+### 2. 登录用户 B
+POST {{baseUrl}}/front/user/login
+Content-Type: application/json
+
+{ "device_id": "e2e-follow-B", "device_type": "ios" }
+
+> {%
+client.test("B 登录成功", function () {
+    client.assert(response.body.code === 0, "B 登录失败");
+});
+client.global.set("tokenB", response.body.data.token);
+client.global.set("uidB", response.body.data.user.id);
+%}
+
+### 3. A 关注 B —— 应变为已关注
+POST {{baseUrl}}/front/user/follow
+Authorization: {{tokenA}}
+Content-Type: application/json
+
+{ "home_id": {{uidB}} }
+
+> {%
+client.test("A 关注 B 成功", function () {
+    client.assert(response.body.code === 0, "code 应为 0: " + response.body.message);
+    client.assert(response.body.data.followed === true, "操作后应为已关注");
+});
+%}
+
+### 4. A 看 B 的主页 —— is_followed 应为 true
+GET {{baseUrl}}/front/user/home/{{uidB}}
+Authorization: {{tokenA}}
+
+> {%
+client.test("主页显示已关注", function () {
+    client.assert(response.body.code === 0, "code 应为 0");
+    client.assert(response.body.data.is_followed === true, "is_followed 应为 true");
+});
+%}
+
+### 5. A 的关注列表 —— 应包含 B
+GET {{baseUrl}}/front/user/follows?page=1&size=15
+Authorization: {{tokenA}}
+
+> {%
+client.test("关注列表含 B", function () {
+    client.assert(response.body.code === 0, "code 应为 0");
+    client.assert(response.body.data.total >= 1, "关注数应 >= 1");
+    var hit = response.body.data.list.some(function (u) { return u.id === client.global.get("uidB"); });
+    client.assert(hit, "关注列表应包含 B");
+});
+%}
+
+### 6. B 的粉丝列表 —— 应包含 A
+GET {{baseUrl}}/front/user/fans?page=1&size=15
+Authorization: {{tokenB}}
+
+> {%
+client.test("粉丝列表含 A", function () {
+    client.assert(response.body.code === 0, "code 应为 0");
+    client.assert(response.body.data.total >= 1, "粉丝数应 >= 1");
+    var hit = response.body.data.list.some(function (u) { return u.id === client.global.get("uidA"); });
+    client.assert(hit, "粉丝列表应包含 A");
+});
+%}
+
+### 7. A 再次 follow B —— 切换为取关
+POST {{baseUrl}}/front/user/follow
+Authorization: {{tokenA}}
+Content-Type: application/json
+
+{ "home_id": {{uidB}} }
+
+> {%
+client.test("再次调用变为取关", function () {
+    client.assert(response.body.code === 0, "code 应为 0");
+    client.assert(response.body.data.followed === false, "操作后应为未关注");
+});
+%}
+
+### 8. A 再看 B 主页 —— is_followed 应为 false
+GET {{baseUrl}}/front/user/home/{{uidB}}
+Authorization: {{tokenA}}
+
+> {%
+client.test("取关后主页未关注", function () {
+    client.assert(response.body.data.is_followed === false, "is_followed 应为 false");
+});
+%}
+
+### 9. 关注自己 —— 应报错
+POST {{baseUrl}}/front/user/follow
+Authorization: {{tokenA}}
+Content-Type: application/json
+
+{ "home_id": {{uidA}} }
+
+> {%
+client.test("不能关注自己", function () {
+    client.assert(response.body.code !== 0, "关注自己应报错");
+});
+%}

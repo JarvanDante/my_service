@@ -162,6 +162,53 @@ func toPublicApi(d *service.PublicUserDTO) v1.PublicUser {
 	}
 }
 
+// DoFollow 关注/取关(需登录)。
+func (c *Controller) DoFollow(ctx context.Context, req *v1.FollowReq) (res *v1.FollowRes, err error) {
+	id, err := uid(ctx)
+	if err != nil {
+		return nil, err
+	}
+	followed, err := c.user.DoFollow(ctx, id, req.HomeId)
+	if err != nil {
+		return nil, err
+	}
+	return &v1.FollowRes{Followed: followed}, nil
+}
+
+// Follows 我的关注列表(需登录)。
+func (c *Controller) Follows(ctx context.Context, req *v1.FollowsReq) (res *v1.FollowsRes, err error) {
+	id, err := uid(ctx)
+	if err != nil {
+		return nil, err
+	}
+	list, total, err := c.user.Following(ctx, id, req.Page, req.Size)
+	if err != nil {
+		return nil, err
+	}
+	return &v1.FollowsRes{List: toPublicApiList(list), Total: total, Page: req.Page, Size: req.Size}, nil
+}
+
+// Fans 我的粉丝列表(需登录)。
+func (c *Controller) Fans(ctx context.Context, req *v1.FansReq) (res *v1.FansRes, err error) {
+	id, err := uid(ctx)
+	if err != nil {
+		return nil, err
+	}
+	list, total, err := c.user.Fans(ctx, id, req.Page, req.Size)
+	if err != nil {
+		return nil, err
+	}
+	return &v1.FansRes{List: toPublicApiList(list), Total: total, Page: req.Page, Size: req.Size}, nil
+}
+
+func toPublicApiList(ds []*service.PublicUserDTO) []v1.PublicUser {
+	out := make([]v1.PublicUser, 0, len(ds))
+	for _, d := range ds {
+		out = append(out, toPublicApi(d))
+	}
+	return out
+}
+
 func toApiUser(d *service.UserInfoDTO) v1.UserInfo {
 	if d == nil {
 		return v1.UserInfo{}

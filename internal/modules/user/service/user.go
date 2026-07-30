@@ -79,6 +79,10 @@ type IUser interface {
 	Images(ctx context.Context, userId int64) ([]string, error)
 	FindByAccount(ctx context.Context, account string) (*PublicUserDTO, error)
 	BindPhone(ctx context.Context, userId int64, phone, code string) error
+	// 社交
+	DoFollow(ctx context.Context, userId, homeId int64) (bool, error)
+	Following(ctx context.Context, userId int64, page, size int) ([]*PublicUserDTO, int, error)
+	Fans(ctx context.Context, userId int64, page, size int) ([]*PublicUserDTO, int, error)
 	// 后台
 	GetUser(ctx context.Context, id int64) (*UserDTO, error)
 	DisableUser(ctx context.Context, id int64) error

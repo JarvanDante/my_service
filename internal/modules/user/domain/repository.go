@@ -19,5 +19,10 @@ type Repository interface {
 	UpdatePhone(ctx context.Context, id int64, phone string) error
 	UpdateProfile(ctx context.Context, id int64, data g.Map) error
 	Disable(ctx context.Context, id int64, reason string) error
+	// 社交
 	ExistsFollow(ctx context.Context, userId, homeId int64) (bool, error)
+	Follow(ctx context.Context, userId, homeId int64) error
+	Unfollow(ctx context.Context, userId, homeId int64) error
+	FollowingList(ctx context.Context, userId int64, page, size int) ([]*entity.Users, int, error)
+	FansList(ctx context.Context, userId int64, page, size int) ([]*entity.Users, int, error)
 }

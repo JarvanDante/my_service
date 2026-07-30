@@ -23,6 +23,7 @@ func RegisterFront(group *ghttp.RouterGroup, repo domain.Repository) {
 		auth.Bind(
 			ctrl.Info, ctrl.Logout, ctrl.Refresh, ctrl.BindPhone,
 			ctrl.Home, ctrl.Update, ctrl.Images, ctrl.Find,
+			ctrl.DoFollow, ctrl.Follows, ctrl.Fans,
 		)
 	})
 }

@@ -83,3 +83,75 @@ func (r *userRepo) ExistsFollow(ctx context.Context, userId, homeId int64) (bool
 		Count()
 	return n > 0, err
 }
+
+// Follow 关注: 事务内写关注关系 + 双方计数。
+func (r *userRepo) Follow(ctx context.Context, userId, homeId int64) error {
+	return g.DB().Transaction(ctx, func(ctx context.Context, tx gdb.TX) error {
+		if _, err := tx.Model("user_follow").Ctx(ctx).Data(g.Map{
+			"user_id": userId,
+			"home_id": homeId,
+		}).Insert(); err != nil {
+			return err
+		}
+		if _, err := tx.Model("users").Ctx(ctx).Where("id", userId).
+			Data(g.Map{"follow": &gdb.Counter{Field: "follow", Value: 1}}).Update(); err != nil {
+			return err
+		}
+		if _, err := tx.Model("users").Ctx(ctx).Where("id", homeId).
+			Data(g.Map{"fans": &gdb.Counter{Field: "fans", Value: 1}}).Update(); err != nil {
+			return err
+		}
+		return nil
+	})
+}
+
+// Unfollow 取关: 事务内删关注关系 + 双方计数。
+func (r *userRepo) Unfollow(ctx context.Context, userId, homeId int64) error {
+	return g.DB().Transaction(ctx, func(ctx context.Context, tx gdb.TX) error {
+		res, err := tx.Model("user_follow").Ctx(ctx).
+			Where("user_id", userId).Where("home_id", homeId).Delete()
+		if err != nil {
+			return err
+		}
+		if n, _ := res.RowsAffected(); n == 0 {
+			return nil // 本来就没关注, 不改计数
+		}
+		if _, err := tx.Model("users").Ctx(ctx).Where("id", userId).
+			Data(g.Map{"follow": &gdb.Counter{Field: "follow", Value: -1}}).Update(); err != nil {
+			return err
+		}
+		if _, err := tx.Model("users").Ctx(ctx).Where("id", homeId).
+			Data(g.Map{"fans": &gdb.Counter{Field: "fans", Value: -1}}).Update(); err != nil {
+			return err
+		}
+		return nil
+	})
+}
+
+// FollowingList 我关注的人。
+func (r *userRepo) FollowingList(ctx context.Context, userId int64, page, size int) ([]*entity.Users, int, error) {
+	m := g.Model("user_follow f").Ctx(ctx).
+		LeftJoin("users u", "u.id=f.home_id").
+		Where("f.user_id", userId)
+	total, err := m.Clone().Count()
+	if err != nil {
+		return nil, 0, err
+	}
+	var list []*entity.Users
+	err = m.Clone().Fields("u.*").Page(page, size).OrderDesc("f.id").Scan(&list)
+	return list, total, err
+}
+
+// FansList 关注我的人。
+func (r *userRepo) FansList(ctx context.Context, userId int64, page, size int) ([]*entity.Users, int, error) {
+	m := g.Model("user_follow f").Ctx(ctx).
+		LeftJoin("users u", "u.id=f.user_id").
+		Where("f.home_id", userId)
+	total, err := m.Clone().Count()
+	if err != nil {
+		return nil, 0, err
+	}
+	var list []*entity.Users
+	err = m.Clone().Fields("u.*").Page(page, size).OrderDesc("f.id").Scan(&list)
+	return list, total, err
+}
