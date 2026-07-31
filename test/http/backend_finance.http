@@ -1,0 +1,211 @@
+###############################################################################
+# 后台 B2 · 财务/订单 真实端到端测试
+# 完整资金链路: 建套餐 -> 前台下单 -> 支付回调到账 -> 对账/流水 -> 幂等 -> 清理
+###############################################################################
+
+@baseUrl = http://127.0.0.1:8000
+
+### 1. 超管登录
+POST {{baseUrl}}/backend/auth/login
+Content-Type: application/json
+
+{ "username": "admin", "password": "admin123" }
+
+> {%
+client.test("超管登录成功", function () {
+    client.assert(response.body.code === 0, "code 应为 0: " + response.body.message);
+});
+client.global.set("adminToken", response.body.data.token);
+%}
+
+### 2. 创建充值套餐(6元=60金币 送6)
+POST {{baseUrl}}/backend/recharge-packages
+Authorization: {{adminToken}}
+Content-Type: application/json
+
+{ "name": "E2E充值包", "amount": 6, "coin": 60, "bonus": 6, "sort": 99, "status": 1 }
+
+> {%
+client.test("创建充值套餐成功", function () {
+    client.assert(response.body.code === 0, "code 应为 0: " + response.body.message);
+    client.assert(response.body.data.id > 0, "应返回套餐ID");
+});
+client.global.set("pkgId", response.body.data.id);
+%}
+
+### 3. 套餐列表应包含新套餐
+GET {{baseUrl}}/backend/recharge-packages
+Authorization: {{adminToken}}
+
+> {%
+client.test("列表包含新套餐", function () {
+    client.assert(response.body.code === 0, "code 应为 0");
+    var hit = response.body.data.list.some(function (p) { return p.id === client.global.get("pkgId"); });
+    client.assert(hit, "应包含刚创建的套餐");
+});
+%}
+
+### 4. 更新套餐(改名+调价)
+PUT {{baseUrl}}/backend/recharge-packages/{{pkgId}}
+Authorization: {{adminToken}}
+Content-Type: application/json
+
+{ "name": "E2E充值包-改", "amount": 8, "coin": 80, "bonus": 8, "sort": 99, "status": 1 }
+
+> {%
+client.test("更新套餐成功", function () {
+    client.assert(response.body.code === 0, "code 应为 0: " + response.body.message);
+});
+%}
+
+### 5. 创建 VIP 套餐
+POST {{baseUrl}}/backend/vip-packages
+Authorization: {{adminToken}}
+Content-Type: application/json
+
+{ "name": "E2E月卡", "days": 30, "price": 100, "group_id": 2, "sort": 99, "status": 1 }
+
+> {%
+client.test("创建VIP套餐成功", function () {
+    client.assert(response.body.code === 0, "code 应为 0: " + response.body.message);
+});
+client.global.set("vipPkgId", response.body.data.id);
+%}
+
+### 6. 前台设备登录 —— 造/取测试用户
+POST {{baseUrl}}/front/user/login
+Content-Type: application/json
+
+{ "device_id": "e2e-b2-user", "device_type": "ios", "device_version": "1.0" }
+
+> {%
+client.test("前台用户就绪", function () {
+    client.assert(response.body.code === 0, "code 应为 0: " + response.body.message);
+});
+client.global.set("uid", response.body.data.user.id);
+client.global.set("userToken", response.body.data.token);
+client.global.set("balBefore", response.body.data.user.balance);
+%}
+
+### 7. 前台下单(P6 接口, 创建待支付订单)
+POST {{baseUrl}}/front/user/recharge/do
+Authorization: {{userToken}}
+Content-Type: application/json
+
+{ "package_id": {{pkgId}} }
+
+> {%
+client.test("下单成功", function () {
+    client.assert(response.body.code === 0, "code 应为 0: " + response.body.message);
+    client.assert(response.body.data.order_no !== "", "应返回订单号");
+    client.assert(response.body.data.coin === 88, "到账金币应为 80+8=88");
+});
+client.global.set("orderNo", response.body.data.order_no);
+%}
+
+### 8. 后台订单列表 —— 找到该订单, 状态待支付
+GET {{baseUrl}}/backend/recharge-orders?order_no={{orderNo}}
+Authorization: {{adminToken}}
+
+> {%
+client.test("订单待支付", function () {
+    client.assert(response.body.code === 0, "code 应为 0");
+    client.assert(response.body.data.total === 1, "应命中1单");
+    client.assert(response.body.data.list[0].status === 0, "状态应为0待支付");
+});
+%}
+
+### 9. 支付回调 —— 到账
+POST {{baseUrl}}/backend/pay/callback
+Content-Type: application/json
+
+{ "order_no": "{{orderNo}}" }
+
+> {%
+client.test("回调成功", function () {
+    client.assert(response.body.code === 0, "code 应为 0: " + response.body.message);
+});
+%}
+
+### 10. 再次回调 —— 幂等拒绝
+POST {{baseUrl}}/backend/pay/callback
+Content-Type: application/json
+
+{ "order_no": "{{orderNo}}" }
+
+> {%
+client.test("重复回调被拒", function () {
+    client.assert(response.body.code !== 0, "应报错: 订单已处理");
+});
+%}
+
+### 11. 订单状态已支付
+GET {{baseUrl}}/backend/recharge-orders?order_no={{orderNo}}
+Authorization: {{adminToken}}
+
+> {%
+client.test("订单已支付", function () {
+    client.assert(response.body.code === 0, "code 应为 0");
+    client.assert(response.body.data.list[0].status === 1, "状态应为1已支付");
+    client.assert(response.body.data.list[0].pay_at !== "", "应有支付时间");
+});
+%}
+
+### 12. 用户余额已到账(+88)
+GET {{baseUrl}}/backend/users/{{uid}}
+Authorization: {{adminToken}}
+
+> {%
+client.test("余额到账", function () {
+    client.assert(response.body.code === 0, "code 应为 0");
+    var expect = client.global.get("balBefore") + 88;
+    client.assert(Math.abs(response.body.data.balance - expect) < 0.001,
+        "余额应为 " + expect + ", 实际 " + response.body.data.balance);
+});
+%}
+
+### 13. 全站流水 —— 该订单的 recharge 流水存在且前后值正确
+GET {{baseUrl}}/backend/balance-logs?user_id={{uid}}&scene=recharge&page=1&size=5
+Authorization: {{adminToken}}
+
+> {%
+client.test("充值流水正确", function () {
+    client.assert(response.body.code === 0, "code 应为 0");
+    var top = response.body.data.list[0];
+    client.assert(top.ref_id === client.global.get("orderNo"), "ref_id 应为订单号");
+    client.assert(top.amount === 88, "amount 应为 88");
+    client.assert(Math.abs(top.balance_after - top.balance_before - 88) < 0.001, "前后差应为 88");
+});
+%}
+
+### 14. 回调不存在的订单 —— 应报错
+POST {{baseUrl}}/backend/pay/callback
+Content-Type: application/json
+
+{ "order_no": "R_NOT_EXIST_000" }
+
+> {%
+client.test("订单不存在被拒", function () {
+    client.assert(response.body.code !== 0, "应报错: 订单不存在");
+});
+%}
+
+### 15. 清理: 删除充值套餐
+DELETE {{baseUrl}}/backend/recharge-packages/{{pkgId}}
+Authorization: {{adminToken}}
+
+> {%
+client.test("删除充值套餐成功", function () {
+    client.assert(response.body.code === 0, "code 应为 0: " + response.body.message);
+});
+%}
+
+### 16. 清理: 删除 VIP 套餐
+DELETE {{baseUrl}}/backend/vip-packages/{{vipPkgId}}
+Authorization: {{adminToken}}
+
+> {%
+client.test("删除VIP套餐成功", function () {
+    client.assert(response.body.code === 0, "code 应为 0: " + response.body.message);
+});
+%}

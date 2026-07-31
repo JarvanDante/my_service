@@ -12,6 +12,7 @@ import (
 	"github.com/JarvanDante/my_service/internal/shared/middleware"
 
 	adminmod "github.com/JarvanDante/my_service/internal/modules/admin"
+	finmod "github.com/JarvanDante/my_service/internal/modules/finance"
 	usermod "github.com/JarvanDante/my_service/internal/modules/user"
 )
 
@@ -40,6 +41,8 @@ var Main = gcmd.Command{
 		s.Group("/backend", func(group *ghttp.RouterGroup) {
 			// 公开: 管理员登录
 			adminmod.RegisterPublic(group, dao.NewAdminRepo())
+			// 公开: 支付回调(网关调用, 签名校验在 logic)
+			finmod.RegisterCallback(group, dao.NewFinanceRepo())
 			// 仅需登录: 退出 / 查看自身信息(任何管理员)
 			group.Group("/", func(auth *ghttp.RouterGroup) {
 				auth.Middleware(middleware.AdminAuth, middleware.AdminOpLog)
@@ -50,6 +53,7 @@ var Main = gcmd.Command{
 				perm.Middleware(middleware.AdminAuth, middleware.AdminPerm, middleware.AdminOpLog)
 				adminmod.RegisterPermManage(perm, dao.NewAdminRepo())
 				usermod.RegisterBackend(perm, dao.NewUserRepo())
+				finmod.RegisterBackend(perm, dao.NewFinanceRepo())
 			})
 		})
 		s.Group("/manage", func(group *ghttp.RouterGroup) {
