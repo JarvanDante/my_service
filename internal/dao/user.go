@@ -660,3 +660,54 @@ func (r *userRepo) BalanceLogs(ctx context.Context, userId int64, page, size int
 	err = m.Clone().OrderDesc("id").Page(page, size).Scan(&list)
 	return list, total, err
 }
+
+// ==================== 用户组定义(B4) ====================
+
+func (r *userRepo) GroupList(ctx context.Context) ([]*entity.UserGroup, error) {
+	var list []*entity.UserGroup
+	err := g.Model("user_group").Ctx(ctx).Order("sort asc, id asc").Scan(&list)
+	return list, err
+}
+
+func (r *userRepo) GroupFind(ctx context.Context, id int64) (*entity.UserGroup, error) {
+	var ug *entity.UserGroup
+	err := g.Model("user_group").Ctx(ctx).Where("id", id).Scan(&ug)
+	return ug, err
+}
+
+func (r *userRepo) GroupCreate(ctx context.Context, ug *entity.UserGroup) (int64, error) {
+	res, err := g.Model("user_group").Ctx(ctx).Data(g.Map{
+		"name": ug.Name, "rate": ug.Rate, "rights": ug.Rights,
+		"remark": ug.Remark, "sort": ug.Sort, "status": ug.Status,
+	}).Insert()
+	if err != nil {
+		return 0, err
+	}
+	return res.LastInsertId()
+}
+
+// GroupUpdate 更新组定义, 并同步该组所有用户的快照字段(name/rate)。
+func (r *userRepo) GroupUpdate(ctx context.Context, ug *entity.UserGroup) error {
+	return g.DB().Transaction(ctx, func(ctx context.Context, tx gdb.TX) error {
+		if _, err := tx.Model("user_group").Ctx(ctx).Where("id", ug.Id).Data(g.Map{
+			"name": ug.Name, "rate": ug.Rate, "rights": ug.Rights,
+			"remark": ug.Remark, "sort": ug.Sort, "status": ug.Status,
+			"updated_at": gtime.Now(),
+		}).Update(); err != nil {
+			return err
+		}
+		_, err := tx.Model("users").Ctx(ctx).Where("group_id", ug.Id).Data(g.Map{
+			"group_name": ug.Name, "group_rate": ug.Rate,
+		}).Update()
+		return err
+	})
+}
+
+func (r *userRepo) GroupDelete(ctx context.Context, id int64) error {
+	_, err := g.Model("user_group").Ctx(ctx).Where("id", id).Delete()
+	return err
+}
+
+func (r *userRepo) GroupUserCount(ctx context.Context, groupId int64) (int, error) {
+	return g.Model("users").Ctx(ctx).Where("group_id", groupId).Count()
+}

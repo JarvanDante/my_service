@@ -1,0 +1,180 @@
+###############################################################################
+# 后台 B4 · 用户组配置 真实端到端测试
+# 链路: 建组 -> 按组ID指派用户(自动回填快照) -> 改组同步快照 -> 删除保护 -> 清理
+###############################################################################
+
+@baseUrl = http://127.0.0.1:8000
+
+### 1. 超管登录
+POST {{baseUrl}}/backend/auth/login
+Content-Type: application/json
+
+{ "username": "admin", "password": "admin123" }
+
+> {%
+client.test("超管登录成功", function () {
+    client.assert(response.body.code === 0, "code 应为 0: " + response.body.message);
+});
+client.global.set("adminToken", response.body.data.token);
+%}
+
+### 2. 创建用户组「E2E黄金会员」折扣85
+POST {{baseUrl}}/backend/user-groups
+Authorization: {{adminToken}}
+Content-Type: application/json
+
+{ "name": "E2E黄金会员", "rate": 85, "rights": "{\"ad_free\": true}", "remark": "E2E", "sort": 99, "status": 1 }
+
+> {%
+client.test("创建组成功", function () {
+    client.assert(response.body.code === 0, "code 应为 0: " + response.body.message);
+    client.assert(response.body.data.id > 0, "应返回组ID");
+});
+client.global.set("gid", response.body.data.id);
+%}
+
+### 3. 组列表包含新组
+GET {{baseUrl}}/backend/user-groups
+Authorization: {{adminToken}}
+
+> {%
+client.test("列表包含新组", function () {
+    client.assert(response.body.code === 0, "code 应为 0");
+    var hit = response.body.data.list.some(function (x) { return x.id === client.global.get("gid"); });
+    client.assert(hit, "应包含刚创建的组");
+});
+%}
+
+### 4. 折扣越界 —— 校验拦截
+POST {{baseUrl}}/backend/user-groups
+Authorization: {{adminToken}}
+Content-Type: application/json
+
+{ "name": "坏组", "rate": 120 }
+
+> {%
+client.test("折扣越界被拒", function () {
+    client.assert(response.body.code !== 0, "应报错: 折扣须在0~100");
+});
+%}
+
+### 5. 前台设备登录 —— 造/取测试用户
+POST {{baseUrl}}/front/user/login
+Content-Type: application/json
+
+{ "device_id": "e2e-b4-user", "device_type": "ios", "device_version": "1.0" }
+
+> {%
+client.test("前台用户就绪", function () {
+    client.assert(response.body.code === 0, "code 应为 0: " + response.body.message);
+});
+client.global.set("uid", response.body.data.user.id);
+%}
+
+### 6. 指派用户到组 —— 只传 group_id, 名称/折扣应自动回填(B4 升级点)
+POST {{baseUrl}}/backend/users/{{uid}}/group
+Authorization: {{adminToken}}
+Content-Type: application/json
+
+{ "group_id": {{gid}}, "group_end_time": 0 }
+
+> {%
+client.test("按组ID指派成功", function () {
+    client.assert(response.body.code === 0, "code 应为 0: " + response.body.message);
+});
+%}
+
+### 7. 详情确认快照自动回填
+GET {{baseUrl}}/backend/users/{{uid}}
+Authorization: {{adminToken}}
+
+> {%
+client.test("快照回填正确", function () {
+    client.assert(response.body.code === 0, "code 应为 0");
+    client.assert(response.body.data.group_name === "E2E黄金会员", "组名应回填: " + response.body.data.group_name);
+    client.assert(response.body.data.group_rate === 85, "折扣应回填 85: " + response.body.data.group_rate);
+});
+%}
+
+### 8. 指派到不存在的组 —— 应被拒
+POST {{baseUrl}}/backend/users/{{uid}}/group
+Authorization: {{adminToken}}
+Content-Type: application/json
+
+{ "group_id": 999999 }
+
+> {%
+client.test("组不存在被拒", function () {
+    client.assert(response.body.code !== 0, "应报错: 用户组不存在");
+});
+%}
+
+### 9. 更新组(改名+折扣) —— 应同步组内用户快照
+PUT {{baseUrl}}/backend/user-groups/{{gid}}
+Authorization: {{adminToken}}
+Content-Type: application/json
+
+{ "name": "E2E铂金会员", "rate": 80, "rights": "{\"ad_free\": true}", "remark": "E2E改", "sort": 99, "status": 1 }
+
+> {%
+client.test("更新组成功", function () {
+    client.assert(response.body.code === 0, "code 应为 0: " + response.body.message);
+});
+%}
+
+### 10. 用户快照应已同步
+GET {{baseUrl}}/backend/users/{{uid}}
+Authorization: {{adminToken}}
+
+> {%
+client.test("快照同步生效", function () {
+    client.assert(response.body.code === 0, "code 应为 0");
+    client.assert(response.body.data.group_name === "E2E铂金会员", "组名应同步: " + response.body.data.group_name);
+    client.assert(response.body.data.group_rate === 80, "折扣应同步 80: " + response.body.data.group_rate);
+});
+%}
+
+### 11. 删除组 —— 组内有用户应被拒
+DELETE {{baseUrl}}/backend/user-groups/{{gid}}
+Authorization: {{adminToken}}
+
+> {%
+client.test("有用户时删组被拒", function () {
+    client.assert(response.body.code !== 0, "应报错: 该组下仍有用户");
+});
+%}
+
+### 12. 把用户移出组(group_id=0 清空快照)
+POST {{baseUrl}}/backend/users/{{uid}}/group
+Authorization: {{adminToken}}
+Content-Type: application/json
+
+{ "group_id": 0 }
+
+> {%
+client.test("移出组成功", function () {
+    client.assert(response.body.code === 0, "code 应为 0: " + response.body.message);
+});
+%}
+
+### 13. 快照已清空
+GET {{baseUrl}}/backend/users/{{uid}}
+Authorization: {{adminToken}}
+
+> {%
+client.test("快照清空", function () {
+    client.assert(response.body.code === 0, "code 应为 0");
+    client.assert(response.body.data.group_id === 0, "group_id 应为 0");
+    client.assert(response.body.data.group_name === "", "组名应清空");
+});
+%}
+
+### 14. 清理: 删除组(此时无用户)
+DELETE {{baseUrl}}/backend/user-groups/{{gid}}
+Authorization: {{adminToken}}
+
+> {%
+client.test("删除组成功", function () {
+    client.assert(response.body.code === 0, "code 应为 0: " + response.body.message);
+});
+%}

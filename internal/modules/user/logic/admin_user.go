@@ -93,6 +93,25 @@ func (s *sUser) AdminSetGroup(ctx context.Context, in service.AdminSetGroupInput
 	if in.GroupId < 0 || in.GroupRate < 0 {
 		return gerror.New("参数不合法")
 	}
+	if in.GroupId == 0 {
+		// 移出用户组: 清空快照
+		return s.repo.UpdateGroup(ctx, in.UserId, 0, "", 0, 0)
+	}
+	// B4: 未显式给名称时, 从用户组定义表回填名称/折扣
+	if in.GroupName == "" {
+		ug, err := s.repo.GroupFind(ctx, in.GroupId)
+		if err != nil {
+			return err
+		}
+		if ug == nil {
+			return gerror.New("用户组不存在, 请先在用户组配置中创建")
+		}
+		if ug.Status != 1 {
+			return gerror.New("用户组已停用")
+		}
+		in.GroupName = ug.Name
+		in.GroupRate = ug.Rate
+	}
 	return s.repo.UpdateGroup(ctx, in.UserId, in.GroupId, in.GroupName, in.GroupRate, in.GroupEndTime)
 }
 

@@ -284,6 +284,28 @@ type BalanceLogDTO struct {
 	CreatedAt     string
 }
 
+// ---- B4 用户组定义 ----
+
+type UserGroupDTO struct {
+	Id     int64
+	Name   string
+	Rate   int
+	Rights string
+	Remark string
+	Sort   int
+	Status int
+}
+
+type UserGroupInput struct {
+	Id     int64 // 更新时用
+	Name   string
+	Rate   int
+	Rights string
+	Remark string
+	Sort   int
+	Status int
+}
+
 type UserDTO struct {
 	ID     int64
 	Name   string
@@ -342,4 +364,9 @@ type IUser interface {
 	AdminSetGroup(ctx context.Context, in AdminSetGroupInput) error
 	AdminAdjustBalance(ctx context.Context, in AdminAdjustBalanceInput) error
 	AdminBalanceLogs(ctx context.Context, userId int64, page, size int) ([]*BalanceLogDTO, int, error)
+	// 后台(B4 用户组定义)
+	AdminGroups(ctx context.Context) ([]*UserGroupDTO, error)
+	AdminCreateGroup(ctx context.Context, in UserGroupInput) (int64, error)
+	AdminUpdateGroup(ctx context.Context, in UserGroupInput) error
+	AdminDeleteGroup(ctx context.Context, id int64) error
 }
