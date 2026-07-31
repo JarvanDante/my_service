@@ -11,6 +11,7 @@ import (
 	adminmod "github.com/JarvanDante/my_service/internal/modules/admin"
 	finmod "github.com/JarvanDante/my_service/internal/modules/finance"
 	promomod "github.com/JarvanDante/my_service/internal/modules/promo"
+	statsmod "github.com/JarvanDante/my_service/internal/modules/stats"
 	sysmod "github.com/JarvanDante/my_service/internal/modules/system"
 	usermod "github.com/JarvanDante/my_service/internal/modules/user"
 	"github.com/JarvanDante/my_service/internal/shared/middleware"
@@ -43,6 +44,7 @@ var BackendAPI = gcmd.Command{
 				finmod.RegisterBackend(perm, dao.NewFinanceRepo())
 				promomod.RegisterBackend(perm, dao.NewPromoRepo())
 				sysmod.RegisterBackend(perm, dao.NewSystemRepo())
+				statsmod.RegisterBackend(perm, dao.NewStatsRepo())
 			})
 		})
 		s.Run()

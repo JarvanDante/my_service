@@ -1,0 +1,119 @@
+###############################################################################
+# 后台 B8 · 数据统计 Dashboard 真实端到端测试
+###############################################################################
+
+@baseUrl = http://127.0.0.1:8000
+
+### 1. 超管登录
+POST {{baseUrl}}/backend/auth/login
+Content-Type: application/json
+
+{ "username": "admin", "password": "admin123" }
+
+> {%
+client.test("超管登录成功", function () {
+    client.assert(response.body.code === 0, "code 应为 0: " + response.body.message);
+});
+client.global.set("adminToken", response.body.data.token);
+%}
+
+### 2. 前台登录 —— 保证今日至少1个活跃用户
+POST {{baseUrl}}/front/user/login
+Content-Type: application/json
+
+{ "device_id": "e2e-b8-user", "device_type": "ios", "device_version": "1.0" }
+
+> {%
+client.test("前台用户就绪", function () {
+    client.assert(response.body.code === 0, "code 应为 0");
+});
+%}
+
+### 3. 概览 —— 字段齐全且数值合理
+GET {{baseUrl}}/backend/stats/overview
+Authorization: {{adminToken}}
+
+> {%
+client.test("概览数据合理", function () {
+    client.assert(response.body.code === 0, "code 应为 0: " + response.body.message);
+    var d = response.body.data;
+    client.assert(d.total_users >= 1, "用户总数应>=1");
+    client.assert(d.today_active >= 1, "今日活跃应>=1(刚登录过)");
+    client.assert(typeof d.today_new === "number", "today_new 应为数字");
+    client.assert(typeof d.total_paid_amount === "number", "total_paid_amount 应为数字");
+    client.assert(d.total_paid_orders >= 0, "累计充值单数应>=0");
+});
+%}
+
+### 4. 注册趋势(默认7天) —— 长度7、按日补零、含今日
+GET {{baseUrl}}/backend/stats/user-trend
+Authorization: {{adminToken}}
+
+> {%
+client.test("注册趋势正确", function () {
+    client.assert(response.body.code === 0, "code 应为 0: " + response.body.message);
+    var list = response.body.data.list;
+    client.assert(list.length === 7, "默认应7天: " + list.length);
+    client.assert(list[0].date < list[6].date, "应升序");
+    var today = new Date();
+    var ymd = today.getFullYear() * 10000 + (today.getMonth() + 1) * 100 + today.getDate();
+    client.assert(list[6].date === ymd, "最后一天应为今日: " + list[6].date);
+});
+%}
+
+### 5. 注册趋势 30 天 —— 长度30
+GET {{baseUrl}}/backend/stats/user-trend?days=30
+Authorization: {{adminToken}}
+
+> {%
+client.test("30天趋势长度正确", function () {
+    client.assert(response.body.code === 0, "code 应为 0");
+    client.assert(response.body.data.list.length === 30, "应30天");
+});
+%}
+
+### 6. 充值趋势(默认7天) —— 长度7、字段为数字
+GET {{baseUrl}}/backend/stats/recharge-trend
+Authorization: {{adminToken}}
+
+> {%
+client.test("充值趋势正确", function () {
+    client.assert(response.body.code === 0, "code 应为 0: " + response.body.message);
+    var list = response.body.data.list;
+    client.assert(list.length === 7, "默认应7天");
+    client.assert(typeof list[0].orders === "number" && typeof list[0].amount === "number", "字段应为数字");
+});
+%}
+
+### 7. 渠道分析 —— 返回数组且含用户数
+GET {{baseUrl}}/backend/stats/channels
+Authorization: {{adminToken}}
+
+> {%
+client.test("渠道分析正确", function () {
+    client.assert(response.body.code === 0, "code 应为 0: " + response.body.message);
+    var list = response.body.data.list;
+    client.assert(Array.isArray(list) && list.length >= 1, "应至少1个渠道分组");
+    var total = list.reduce(function (sum, c) { return sum + c.user_count; }, 0);
+    client.assert(total >= 1, "渠道用户数合计应>=1");
+});
+%}
+
+### 8. days 越界 —— 校验拦截
+GET {{baseUrl}}/backend/stats/user-trend?days=365
+Authorization: {{adminToken}}
+
+> {%
+client.test("days 越界被拒", function () {
+    client.assert(response.body.code !== 0, "应报错: days 最大90");
+});
+%}
+
+### 9. 未登录访问 —— 应被拒
+GET {{baseUrl}}/backend/stats/overview
+
+> {%
+client.test("未登录被拒", function () {
+    client.assert(response.body.code !== 0, "无 token 应报错");
+});
+%}

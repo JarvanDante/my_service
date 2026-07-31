@@ -14,6 +14,7 @@ import (
 	adminmod "github.com/JarvanDante/my_service/internal/modules/admin"
 	finmod "github.com/JarvanDante/my_service/internal/modules/finance"
 	promomod "github.com/JarvanDante/my_service/internal/modules/promo"
+	statsmod "github.com/JarvanDante/my_service/internal/modules/stats"
 	sysmod "github.com/JarvanDante/my_service/internal/modules/system"
 	usermod "github.com/JarvanDante/my_service/internal/modules/user"
 )
@@ -58,6 +59,7 @@ var Main = gcmd.Command{
 				finmod.RegisterBackend(perm, dao.NewFinanceRepo())
 				promomod.RegisterBackend(perm, dao.NewPromoRepo())
 				sysmod.RegisterBackend(perm, dao.NewSystemRepo())
+				statsmod.RegisterBackend(perm, dao.NewStatsRepo())
 			})
 		})
 		s.Group("/manage", func(group *ghttp.RouterGroup) {
