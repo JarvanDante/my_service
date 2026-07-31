@@ -10,6 +10,7 @@ import (
 	"github.com/JarvanDante/my_service/internal/dao"
 	adminmod "github.com/JarvanDante/my_service/internal/modules/admin"
 	finmod "github.com/JarvanDante/my_service/internal/modules/finance"
+	promomod "github.com/JarvanDante/my_service/internal/modules/promo"
 	usermod "github.com/JarvanDante/my_service/internal/modules/user"
 	"github.com/JarvanDante/my_service/internal/shared/middleware"
 )
@@ -39,6 +40,7 @@ var BackendAPI = gcmd.Command{
 				adminmod.RegisterPermManage(perm, dao.NewAdminRepo())
 				usermod.RegisterBackend(perm, dao.NewUserRepo())
 				finmod.RegisterBackend(perm, dao.NewFinanceRepo())
+				promomod.RegisterBackend(perm, dao.NewPromoRepo())
 			})
 		})
 		s.Run()

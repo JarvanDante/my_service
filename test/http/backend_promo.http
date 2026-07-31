@@ -1,0 +1,168 @@
+###############################################################################
+# 后台 B3 · 兑换码管理 真实端到端测试
+# 链路: 批量生成 -> 列表/批次查询 -> 前台兑换 -> 兑换记录 -> 作废 -> 作废码不可用
+###############################################################################
+
+@baseUrl = http://127.0.0.1:8000
+
+### 1. 超管登录
+POST {{baseUrl}}/backend/auth/login
+Content-Type: application/json
+
+{ "username": "admin", "password": "admin123" }
+
+> {%
+client.test("超管登录成功", function () {
+    client.assert(response.body.code === 0, "code 应为 0: " + response.body.message);
+});
+client.global.set("adminToken", response.body.data.token);
+%}
+
+### 2. 批量生成 3 张金币码(每张 50 金币)
+POST {{baseUrl}}/backend/codes
+Authorization: {{adminToken}}
+Content-Type: application/json
+
+{ "name": "E2E金币码", "type": "point", "add_num": 50, "count": 3 }
+
+> {%
+client.test("批量生成成功", function () {
+    client.assert(response.body.code === 0, "code 应为 0: " + response.body.message);
+    client.assert(response.body.data.count === 3, "应生成3张");
+    client.assert(response.body.data.codes.length === 3, "应返回3个码");
+    client.assert(response.body.data.code_key !== "", "应返回批次号");
+});
+client.global.set("codeKey", response.body.data.code_key);
+client.global.set("codeA", response.body.data.codes[0]);
+client.global.set("codeB", response.body.data.codes[1]);
+%}
+
+### 3. 按批次查列表 —— 恰好 3 张、可用
+GET {{baseUrl}}/backend/codes?code_key={{codeKey}}&status=1
+Authorization: {{adminToken}}
+
+> {%
+client.test("批次查询正确", function () {
+    client.assert(response.body.code === 0, "code 应为 0");
+    client.assert(response.body.data.total === 3, "本批次应3张可用");
+    client.global.set("codeAId", response.body.data.list.find(function (c) {
+        return c.code === client.global.get("codeA");
+    }).id);
+    client.global.set("codeBId", response.body.data.list.find(function (c) {
+        return c.code === client.global.get("codeB");
+    }).id);
+});
+%}
+
+### 4. 生成参数校验 —— type=group 但没给 object_id 应被拒
+POST {{baseUrl}}/backend/codes
+Authorization: {{adminToken}}
+Content-Type: application/json
+
+{ "name": "坏参数", "type": "group", "add_num": 30, "count": 1 }
+
+> {%
+client.test("group 缺 object_id 被拒", function () {
+    client.assert(response.body.code !== 0, "应报错: 必须指定 object_id");
+});
+%}
+
+### 5. 前台设备登录 —— 造/取测试用户
+POST {{baseUrl}}/front/user/login
+Content-Type: application/json
+
+{ "device_id": "e2e-b3-user", "device_type": "ios", "device_version": "1.0" }
+
+> {%
+client.test("前台用户就绪", function () {
+    client.assert(response.body.code === 0, "code 应为 0: " + response.body.message);
+});
+client.global.set("uid", response.body.data.user.id);
+client.global.set("userToken", response.body.data.token);
+%}
+
+### 6. 前台兑换 codeA(P4 接口)
+POST {{baseUrl}}/front/user/code/redeem
+Authorization: {{userToken}}
+Content-Type: application/json
+
+{ "code": "{{codeA}}" }
+
+> {%
+client.test("兑换成功", function () {
+    client.assert(response.body.code === 0, "code 应为 0: " + response.body.message);
+    client.assert(response.body.data.add_num === 50 || response.body.data.addNum === 50, "应到账50");
+});
+%}
+
+### 7. 后台兑换记录 —— codeA 有一条该用户的记录
+GET {{baseUrl}}/backend/code-logs?code={{codeA}}
+Authorization: {{adminToken}}
+
+> {%
+client.test("兑换记录正确", function () {
+    client.assert(response.body.code === 0, "code 应为 0");
+    client.assert(response.body.data.total >= 1, "应有兑换记录");
+    var top = response.body.data.list[0];
+    client.assert(top.user_id === client.global.get("uid"), "user_id 应为测试用户");
+    client.assert(top.add_num === 50, "add_num 应为 50");
+});
+%}
+
+### 8. 列表确认 codeA 已使用
+GET {{baseUrl}}/backend/codes?keyword={{codeA}}
+Authorization: {{adminToken}}
+
+> {%
+client.test("codeA 已使用", function () {
+    client.assert(response.body.code === 0, "code 应为 0");
+    var c = response.body.data.list[0];
+    client.assert(c.used_num === 1, "used_num 应为 1");
+});
+%}
+
+### 9. 作废 codeB
+POST {{baseUrl}}/backend/codes/{{codeBId}}/void
+Authorization: {{adminToken}}
+
+> {%
+client.test("作废成功", function () {
+    client.assert(response.body.code === 0, "code 应为 0: " + response.body.message);
+});
+%}
+
+### 10. 重复作废 —— 应被拒
+POST {{baseUrl}}/backend/codes/{{codeBId}}/void
+Authorization: {{adminToken}}
+
+> {%
+client.test("重复作废被拒", function () {
+    client.assert(response.body.code !== 0, "应报错: 已作废");
+});
+%}
+
+### 11. 前台兑换已作废的 codeB —— 应被拒
+POST {{baseUrl}}/front/user/code/redeem
+Authorization: {{userToken}}
+Content-Type: application/json
+
+{ "code": "{{codeB}}" }
+
+> {%
+client.test("作废码不可兑换", function () {
+    client.assert(response.body.code !== 0, "应报错: 兑换码已作废");
+});
+%}
+
+### 12. 前台重复兑换 codeA —— 应被拒(每人一次)
+POST {{baseUrl}}/front/user/code/redeem
+Authorization: {{userToken}}
+Content-Type: application/json
+
+{ "code": "{{codeA}}" }
+
+> {%
+client.test("重复兑换被拒", function () {
+    client.assert(response.body.code !== 0, "应报错: 已使用过该兑换码");
+});
+%}
