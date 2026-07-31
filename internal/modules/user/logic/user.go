@@ -14,6 +14,7 @@ import (
 	"github.com/JarvanDante/my_service/internal/modules/user/domain"
 	"github.com/JarvanDante/my_service/internal/modules/user/service"
 	"github.com/JarvanDante/my_service/internal/shared/kit"
+	"github.com/JarvanDante/my_service/internal/shared/siteconf"
 )
 
 type sUser struct {
@@ -725,6 +726,6 @@ func (s *sUser) DelChat(ctx context.Context, meId, peerId int64) error {
 
 // CustomerUrl 客服链接(从配置读, 缺省占位)。
 func (s *sUser) CustomerUrl(ctx context.Context) (string, error) {
-	url := g.Cfg().MustGet(ctx, "customer.url", "https://example.com/kefu").String()
-	return url, nil
+	def := g.Cfg().MustGet(ctx, "customer.url", "https://example.com/kefu").String()
+	return siteconf.Get(ctx, "customer_url", def), nil
 }

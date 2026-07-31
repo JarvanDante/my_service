@@ -50,6 +50,16 @@ type FollowItem struct {
 	CreatedAt string `orm:"created_at"`
 }
 
+// MessageFilter 消息监控筛选(B7)。
+type MessageFilter struct {
+	FromId    int64
+	ToId      int64
+	UserId    int64  // 任一侧(发或收)
+	Keyword   string // 内容模糊
+	StartDate string // created_at >= (YYYY-MM-DD)
+	EndDate   string
+}
+
 type Repository interface {
 	FindById(ctx context.Context, id int64) (*entity.Users, error)
 	FindByDeviceId(ctx context.Context, deviceId string) (*entity.Users, error)
@@ -82,6 +92,8 @@ type Repository interface {
 	SignStats(ctx context.Context, yearMonth int) (userCount int, signCount int, days []SignDayCount, err error)
 	// 社交查询(B6)
 	FollowList(ctx context.Context, f FollowFilter, page, size int) ([]*FollowItem, int, error)
+	// 消息监控(B7)
+	AdminMessageList(ctx context.Context, f MessageFilter, page, size int) ([]*entity.ChatMessage, int, error)
 	// 社交
 	ExistsFollow(ctx context.Context, userId, homeId int64) (bool, error)
 	Follow(ctx context.Context, userId, homeId int64) error

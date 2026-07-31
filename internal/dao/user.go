@@ -821,3 +821,34 @@ func (r *userRepo) FollowList(ctx context.Context, f domain.FollowFilter, page, 
 		OrderDesc("f.id").Page(page, size).Scan(&list)
 	return list, total, err
 }
+
+// ==================== 消息监控(B7) ====================
+
+func (r *userRepo) AdminMessageList(ctx context.Context, f domain.MessageFilter, page, size int) ([]*entity.ChatMessage, int, error) {
+	m := g.Model("chat_message").Ctx(ctx)
+	if f.FromId > 0 {
+		m = m.Where("from_id", f.FromId)
+	}
+	if f.ToId > 0 {
+		m = m.Where("to_id", f.ToId)
+	}
+	if f.UserId > 0 {
+		m = m.Where("(from_id = ? OR to_id = ?)", f.UserId, f.UserId)
+	}
+	if f.Keyword != "" {
+		m = m.Where("content ILIKE ?", "%"+f.Keyword+"%")
+	}
+	if f.StartDate != "" {
+		m = m.Where("created_at >= ?", f.StartDate)
+	}
+	if f.EndDate != "" {
+		m = m.Where("created_at < ?::date + interval '1 day'", f.EndDate)
+	}
+	total, err := m.Clone().Count()
+	if err != nil {
+		return nil, 0, err
+	}
+	var list []*entity.ChatMessage
+	err = m.Clone().OrderDesc("id").Page(page, size).Scan(&list)
+	return list, total, err
+}

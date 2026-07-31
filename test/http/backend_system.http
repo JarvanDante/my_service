@@ -1,0 +1,190 @@
+###############################################################################
+# 后台 B7 · 消息/客服/公告 真实端到端测试
+# 链路: 私信 -> 后台监控命中 -> 改客服链接 -> 前台即时生效 -> 发公告 -> 列表/下线
+###############################################################################
+
+@baseUrl = http://127.0.0.1:8000
+
+### 1. 超管登录
+POST {{baseUrl}}/backend/auth/login
+Content-Type: application/json
+
+{ "username": "admin", "password": "admin123" }
+
+> {%
+client.test("超管登录成功", function () {
+    client.assert(response.body.code === 0, "code 应为 0: " + response.body.message);
+});
+client.global.set("adminToken", response.body.data.token);
+%}
+
+### 2. 前台登录用户 A
+POST {{baseUrl}}/front/user/login
+Content-Type: application/json
+
+{ "device_id": "e2e-b7-a", "device_type": "ios", "device_version": "1.0" }
+
+> {%
+client.test("用户A就绪", function () {
+    client.assert(response.body.code === 0, "code 应为 0");
+});
+client.global.set("uidA", response.body.data.user.id);
+%}
+
+### 3. 前台登录用户 B
+POST {{baseUrl}}/front/user/login
+Content-Type: application/json
+
+{ "device_id": "e2e-b7-b", "device_type": "ios", "device_version": "1.0" }
+
+> {%
+client.test("用户B就绪", function () {
+    client.assert(response.body.code === 0, "code 应为 0");
+});
+client.global.set("uidB", response.body.data.user.id);
+client.global.set("tokenB", response.body.data.token);
+%}
+
+### 4. B 给 A 发私信(带时间戳保证内容唯一)
+POST {{baseUrl}}/front/user/chat/send
+Authorization: {{tokenB}}
+Content-Type: application/json
+
+{ "to_id": {{uidA}}, "content": "E2E监控测试-{{$timestamp}}" }
+
+> {%
+client.test("发消息成功", function () {
+    client.assert(response.body.code === 0, "code 应为 0: " + response.body.message);
+});
+%}
+
+### 5. 后台消息监控 —— 关键字命中
+GET {{baseUrl}}/backend/messages?keyword=E2E监控测试&user_id={{uidB}}
+Authorization: {{adminToken}}
+
+> {%
+client.test("消息监控命中", function () {
+    client.assert(response.body.code === 0, "code 应为 0");
+    client.assert(response.body.data.total >= 1, "应至少1条");
+    var msg = response.body.data.list[0];
+    client.assert(msg.from_id === client.global.get("uidB"), "发送方应为 B");
+    client.assert(msg.to_id === client.global.get("uidA"), "接收方应为 A");
+});
+%}
+
+### 6. 配置客服链接(带时间戳保证每次不同)
+PUT {{baseUrl}}/backend/config/customer-url
+Authorization: {{adminToken}}
+Content-Type: application/json
+
+{ "url": "https://kefu.example.com/chat?v={{$timestamp}}" }
+
+> {%
+client.test("配置客服链接成功", function () {
+    client.assert(response.body.code === 0, "code 应为 0: " + response.body.message);
+});
+%}
+
+### 7. 后台查看客服链接
+GET {{baseUrl}}/backend/config/customer-url
+Authorization: {{adminToken}}
+
+> {%
+client.test("后台读取一致", function () {
+    client.assert(response.body.code === 0, "code 应为 0");
+    client.assert(response.body.data.url.indexOf("https://kefu.example.com/chat") === 0, "应为刚配置的链接");
+});
+client.global.set("cfgUrl", response.body.data.url);
+%}
+
+### 8. 前台客服链接 —— 应即时生效(读库配置)
+GET {{baseUrl}}/front/user/customer-url
+Authorization: {{tokenB}}
+
+> {%
+client.test("前台即时生效", function () {
+    client.assert(response.body.code === 0, "code 应为 0");
+    var u = response.body.data.url || response.body.data;
+    client.assert(JSON.stringify(response.body.data).indexOf(client.global.get("cfgUrl")) >= 0,
+        "前台应返回后台配置的链接: " + JSON.stringify(response.body.data));
+});
+%}
+
+### 9. 链接格式非法 —— 应被拒
+PUT {{baseUrl}}/backend/config/customer-url
+Authorization: {{adminToken}}
+Content-Type: application/json
+
+{ "url": "ftp://bad.example.com" }
+
+> {%
+client.test("非法链接被拒", function () {
+    client.assert(response.body.code !== 0, "应报错: 须以 http(s):// 开头");
+});
+%}
+
+### 10. 发布系统公告
+POST {{baseUrl}}/backend/push
+Authorization: {{adminToken}}
+Content-Type: application/json
+
+{ "title": "E2E系统公告", "content": "这是一条端到端测试公告", "type": "notice" }
+
+> {%
+client.test("发布公告成功", function () {
+    client.assert(response.body.code === 0, "code 应为 0: " + response.body.message);
+    client.assert(response.body.data.id > 0, "应返回公告ID");
+});
+client.global.set("noticeId", response.body.data.id);
+%}
+
+### 11. 公告列表 —— 命中且记录了发布人
+GET {{baseUrl}}/backend/notices?type=notice&status=1
+Authorization: {{adminToken}}
+
+> {%
+client.test("公告列表命中", function () {
+    client.assert(response.body.code === 0, "code 应为 0");
+    var n = response.body.data.list.find(function (x) { return x.id === client.global.get("noticeId"); });
+    client.assert(n, "应包含刚发布的公告");
+    client.assert(n.created_by > 0, "应记录发布管理员");
+});
+%}
+
+### 12. 下线公告
+PUT {{baseUrl}}/backend/notices/{{noticeId}}/status
+Authorization: {{adminToken}}
+Content-Type: application/json
+
+{ "status": 0 }
+
+> {%
+client.test("下线成功", function () {
+    client.assert(response.body.code === 0, "code 应为 0: " + response.body.message);
+});
+%}
+
+### 13. 上架列表不再包含
+GET {{baseUrl}}/backend/notices?status=1
+Authorization: {{adminToken}}
+
+> {%
+client.test("下线后不在上架列表", function () {
+    client.assert(response.body.code === 0, "code 应为 0");
+    var hit = response.body.data.list.some(function (x) { return x.id === client.global.get("noticeId"); });
+    client.assert(!hit, "上架列表不应包含已下线公告");
+});
+%}
+
+### 14. type 非法 —— 校验拦截
+POST {{baseUrl}}/backend/push
+Authorization: {{adminToken}}
+Content-Type: application/json
+
+{ "title": "坏公告", "content": "x", "type": "sms" }
+
+> {%
+client.test("type 非法被拒", function () {
+    client.assert(response.body.code !== 0, "应报错: type 仅支持 notice/push");
+});
+%}

@@ -373,6 +373,27 @@ type FollowAdminDTO struct {
 	CreatedAt string
 }
 
+// ---- B7 消息监控 ----
+
+type AdminMessageDTO struct {
+	Id        int64
+	FromId    int64
+	ToId      int64
+	Content   string
+	CreatedAt string
+}
+
+type AdminMessageInput struct {
+	FromId    int64
+	ToId      int64
+	UserId    int64
+	Keyword   string
+	StartDate string
+	EndDate   string
+	Page      int
+	Size      int
+}
+
 type UserDTO struct {
 	ID     int64
 	Name   string
@@ -445,4 +466,6 @@ type IUser interface {
 	AdminSignStats(ctx context.Context, yearMonth int) (*SignStatsDTO, error)
 	// 后台(B6 社交查询)
 	AdminFollows(ctx context.Context, userId, homeId int64, page, size int) ([]*FollowAdminDTO, int, error)
+	// 后台(B7 消息监控)
+	AdminMessages(ctx context.Context, in AdminMessageInput) ([]*AdminMessageDTO, int, error)
 }
