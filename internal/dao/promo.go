@@ -89,3 +89,89 @@ func (r *promoRepo) ListCodeLogs(ctx context.Context, f promodomain.CodeLogFilte
 	err = m.Clone().OrderDesc("id").Page(page, size).Scan(&list)
 	return list, total, err
 }
+
+// ==================== 分享 / 拉新(B6) ====================
+
+func (r *promoRepo) ShareLogList(ctx context.Context, f promodomain.ShareLogFilter, page, size int) ([]*entity.UserShareLog, int, error) {
+	m := g.Model("user_share_log").Ctx(ctx)
+	if f.UserId > 0 {
+		m = m.Where("user_id", f.UserId)
+	}
+	if f.Type != "" {
+		m = m.Where("type", f.Type)
+	}
+	if f.Channel != "" {
+		m = m.Where("channel", f.Channel)
+	}
+	if f.StartDate != "" {
+		m = m.Where("created_at >= ?", f.StartDate)
+	}
+	if f.EndDate != "" {
+		m = m.Where("created_at < ?::date + interval '1 day'", f.EndDate)
+	}
+	total, err := m.Clone().Count()
+	if err != nil {
+		return nil, 0, err
+	}
+	var list []*entity.UserShareLog
+	err = m.Clone().OrderDesc("id").Page(page, size).Scan(&list)
+	return list, total, err
+}
+
+// ShareStats 分享总次数 / 分享人数 / 渠道分布。
+func (r *promoRepo) ShareStats(ctx context.Context, startDate, endDate string) (int, int, []promodomain.ChannelCount, error) {
+	m := g.Model("user_share_log").Ctx(ctx)
+	if startDate != "" {
+		m = m.Where("created_at >= ?", startDate)
+	}
+	if endDate != "" {
+		m = m.Where("created_at < ?::date + interval '1 day'", endDate)
+	}
+	total, err := m.Clone().Count()
+	if err != nil {
+		return 0, 0, nil, err
+	}
+	sharerCount, err := m.Clone().Fields("DISTINCT user_id").Count()
+	if err != nil {
+		return 0, 0, nil, err
+	}
+	all, err := m.Clone().Fields("channel, count(*) AS cnt").Group("channel").OrderDesc("cnt").All()
+	if err != nil {
+		return 0, 0, nil, err
+	}
+	channels := make([]promodomain.ChannelCount, 0, len(all))
+	for _, rec := range all {
+		channels = append(channels, promodomain.ChannelCount{
+			Channel: rec["channel"].String(), Count: rec["cnt"].Int(),
+		})
+	}
+	return total, sharerCount, channels, nil
+}
+
+// InviteRank 拉新排行: 按推荐人聚合被邀请注册的用户数(register_date 范围可选, YYYY-MM-DD)。
+func (r *promoRepo) InviteRank(ctx context.Context, startDate, endDate string, top int) ([]*promodomain.InviteRankItem, error) {
+	if top <= 0 || top > 100 {
+		top = 10
+	}
+	m := g.Model("users").Ctx(ctx).Where("parent_id > 0")
+	if startDate != "" {
+		m = m.Where("created_at >= ?", startDate)
+	}
+	if endDate != "" {
+		m = m.Where("created_at < ?::date + interval '1 day'", endDate)
+	}
+	all, err := m.Fields("parent_id, max(parent_name) AS parent_name, count(*) AS cnt").
+		Group("parent_id").OrderDesc("cnt").Limit(top).All()
+	if err != nil {
+		return nil, err
+	}
+	out := make([]*promodomain.InviteRankItem, 0, len(all))
+	for _, rec := range all {
+		out = append(out, &promodomain.InviteRankItem{
+			UserId:      rec["parent_id"].Int64(),
+			Username:    rec["parent_name"].String(),
+			InviteCount: rec["cnt"].Int(),
+		})
+	}
+	return out, nil
+}

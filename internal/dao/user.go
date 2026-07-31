@@ -797,3 +797,27 @@ func (r *userRepo) SignStats(ctx context.Context, yearMonth int) (int, int, []do
 	}
 	return userCount, signCount, days, nil
 }
+
+// ==================== 社交查询(B6) ====================
+
+// FollowList 关注关系(联表出双方用户名)。
+func (r *userRepo) FollowList(ctx context.Context, f domain.FollowFilter, page, size int) ([]*domain.FollowItem, int, error) {
+	m := g.Model("user_follow f").Ctx(ctx)
+	if f.UserId > 0 {
+		m = m.Where("f.user_id", f.UserId)
+	}
+	if f.HomeId > 0 {
+		m = m.Where("f.home_id", f.HomeId)
+	}
+	total, err := m.Clone().Count()
+	if err != nil {
+		return nil, 0, err
+	}
+	var list []*domain.FollowItem
+	err = m.Clone().
+		LeftJoin("users u1", "u1.id=f.user_id").
+		LeftJoin("users u2", "u2.id=f.home_id").
+		Fields("f.id, f.user_id, u1.username AS user_name, f.home_id, u2.username AS home_name, f.created_at").
+		OrderDesc("f.id").Page(page, size).Scan(&list)
+	return list, total, err
+}

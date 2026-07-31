@@ -64,6 +64,45 @@ type CodeLogListInput struct {
 	Size   int
 }
 
+// ---- B6 分享 / 拉新 ----
+
+type ShareLogAdminDTO struct {
+	Id        int64
+	UserId    int64
+	Type      string
+	TargetId  int64
+	Channel   string
+	CreatedAt string
+}
+
+type ShareLogListInput struct {
+	UserId    int64
+	Type      string
+	Channel   string
+	StartDate string
+	EndDate   string
+	Page      int
+	Size      int
+}
+
+type ChannelCountDTO struct {
+	Channel string
+	Count   int
+}
+
+type InviteRankDTO struct {
+	UserId      int64
+	Username    string
+	InviteCount int
+}
+
+type ShareStatsDTO struct {
+	TotalShares int
+	SharerCount int
+	Channels    []ChannelCountDTO
+	InviteRank  []InviteRankDTO
+}
+
 type PageDTO[T any] struct {
 	List  []*T
 	Total int
@@ -76,4 +115,7 @@ type IPromo interface {
 	GenerateCodes(ctx context.Context, in CodeGenInput) (*CodeGenDTO, error)
 	VoidCode(ctx context.Context, id int64) error
 	CodeLogs(ctx context.Context, in CodeLogListInput) (*PageDTO[CodeLogDTO], error)
+	// B6 分享 / 拉新
+	ShareLogs(ctx context.Context, in ShareLogListInput) (*PageDTO[ShareLogAdminDTO], error)
+	ShareStats(ctx context.Context, startDate, endDate string, top int) (*ShareStatsDTO, error)
 }

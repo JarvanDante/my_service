@@ -362,6 +362,17 @@ type SignStatsDTO struct {
 	Days      []SignDayCountDTO
 }
 
+// ---- B6 社交查询 ----
+
+type FollowAdminDTO struct {
+	Id        int64
+	UserId    int64
+	UserName  string
+	HomeId    int64
+	HomeName  string
+	CreatedAt string
+}
+
 type UserDTO struct {
 	ID     int64
 	Name   string
@@ -432,4 +443,6 @@ type IUser interface {
 	AdminDeleteTask(ctx context.Context, id int64) error
 	AdminTaskLogs(ctx context.Context, in AdminTaskLogInput) ([]*AdminTaskLogDTO, int, error)
 	AdminSignStats(ctx context.Context, yearMonth int) (*SignStatsDTO, error)
+	// 后台(B6 社交查询)
+	AdminFollows(ctx context.Context, userId, homeId int64, page, size int) ([]*FollowAdminDTO, int, error)
 }

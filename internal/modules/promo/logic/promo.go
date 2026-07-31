@@ -138,3 +138,53 @@ func fmtTime(t *gtime.Time) string {
 	}
 	return t.String()
 }
+
+// ==================== B6 分享 / 拉新 ====================
+
+func (s *sPromo) ShareLogs(ctx context.Context, in service.ShareLogListInput) (*service.PageDTO[service.ShareLogAdminDTO], error) {
+	if in.Page <= 0 {
+		in.Page = 1
+	}
+	if in.Size <= 0 {
+		in.Size = 20
+	}
+	list, total, err := s.repo.ShareLogList(ctx, domain.ShareLogFilter{
+		UserId: in.UserId, Type: in.Type, Channel: in.Channel,
+		StartDate: in.StartDate, EndDate: in.EndDate,
+	}, in.Page, in.Size)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]*service.ShareLogAdminDTO, 0, len(list))
+	for _, l := range list {
+		out = append(out, &service.ShareLogAdminDTO{
+			Id: l.Id, UserId: l.UserId, Type: l.Type, TargetId: l.TargetId,
+			Channel: l.Channel, CreatedAt: fmtTime(l.CreatedAt),
+		})
+	}
+	return &service.PageDTO[service.ShareLogAdminDTO]{List: out, Total: total, Page: in.Page, Size: in.Size}, nil
+}
+
+func (s *sPromo) ShareStats(ctx context.Context, startDate, endDate string, top int) (*service.ShareStatsDTO, error) {
+	totalShares, sharerCount, channels, err := s.repo.ShareStats(ctx, startDate, endDate)
+	if err != nil {
+		return nil, err
+	}
+	rank, err := s.repo.InviteRank(ctx, startDate, endDate, top)
+	if err != nil {
+		return nil, err
+	}
+	chs := make([]service.ChannelCountDTO, 0, len(channels))
+	for _, c := range channels {
+		chs = append(chs, service.ChannelCountDTO{Channel: c.Channel, Count: c.Count})
+	}
+	ranks := make([]service.InviteRankDTO, 0, len(rank))
+	for _, r := range rank {
+		ranks = append(ranks, service.InviteRankDTO{
+			UserId: r.UserId, Username: r.Username, InviteCount: r.InviteCount,
+		})
+	}
+	return &service.ShareStatsDTO{
+		TotalShares: totalShares, SharerCount: sharerCount, Channels: chs, InviteRank: ranks,
+	}, nil
+}

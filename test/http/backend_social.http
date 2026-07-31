@@ -1,0 +1,151 @@
+###############################################################################
+# 后台 B6 · 社交/推广 真实端到端测试
+# A 为固定用户, B 每次运行用时间戳设备号新建 -> 关注/绑定推荐人/分享必定全新, 可重复跑
+###############################################################################
+
+@baseUrl = http://127.0.0.1:8000
+
+### 1. 超管登录
+POST {{baseUrl}}/backend/auth/login
+Content-Type: application/json
+
+{ "username": "admin", "password": "admin123" }
+
+> {%
+client.test("超管登录成功", function () {
+    client.assert(response.body.code === 0, "code 应为 0: " + response.body.message);
+});
+client.global.set("adminToken", response.body.data.token);
+%}
+
+### 2. 前台登录固定用户 A
+POST {{baseUrl}}/front/user/login
+Content-Type: application/json
+
+{ "device_id": "e2e-b6-a", "device_type": "ios", "device_version": "1.0" }
+
+> {%
+client.test("用户A就绪", function () {
+    client.assert(response.body.code === 0, "code 应为 0: " + response.body.message);
+});
+client.global.set("uidA", response.body.data.user.id);
+client.global.set("unameA", response.body.data.user.username);
+%}
+
+### 3. 前台登录新用户 B(时间戳设备号, 每次全新)
+POST {{baseUrl}}/front/user/login
+Content-Type: application/json
+
+{ "device_id": "e2e-b6-b-{{$timestamp}}", "device_type": "ios", "device_version": "1.0" }
+
+> {%
+client.test("用户B就绪", function () {
+    client.assert(response.body.code === 0, "code 应为 0: " + response.body.message);
+});
+client.global.set("uidB", response.body.data.user.id);
+client.global.set("tokenB", response.body.data.token);
+%}
+
+### 4. B 关注 A
+POST {{baseUrl}}/front/user/follow
+Authorization: {{tokenB}}
+Content-Type: application/json
+
+{ "home_id": {{uidA}} }
+
+> {%
+client.test("关注成功", function () {
+    client.assert(response.body.code === 0, "code 应为 0: " + response.body.message);
+    client.assert(response.body.data.followed === true, "操作后应为已关注");
+});
+%}
+
+### 5. 后台查 B 关注了谁 —— 应含 A 且带双方用户名
+GET {{baseUrl}}/backend/follows?user_id={{uidB}}
+Authorization: {{adminToken}}
+
+> {%
+client.test("正向查询命中", function () {
+    client.assert(response.body.code === 0, "code 应为 0");
+    client.assert(response.body.data.total >= 1, "应至少1条");
+    var f = response.body.data.list[0];
+    client.assert(f.home_id === client.global.get("uidA"), "被关注人应为 A");
+    client.assert(f.user_name !== "" && f.home_name !== "", "应联表带出双方用户名");
+});
+%}
+
+### 6. 后台查谁关注了 A —— 应含 B
+GET {{baseUrl}}/backend/follows?home_id={{uidA}}
+Authorization: {{adminToken}}
+
+> {%
+client.test("反向查询命中", function () {
+    client.assert(response.body.code === 0, "code 应为 0");
+    var hit = response.body.data.list.some(function (f) { return f.user_id === client.global.get("uidB"); });
+    client.assert(hit, "粉丝列表应含 B");
+});
+%}
+
+### 7. B 绑定 A 为推荐人(拉新+1)
+POST {{baseUrl}}/front/user/bind-parent
+Authorization: {{tokenB}}
+Content-Type: application/json
+
+{ "account": "{{unameA}}" }
+
+> {%
+client.test("绑定推荐人成功", function () {
+    client.assert(response.body.code === 0, "code 应为 0: " + response.body.message);
+});
+%}
+
+### 8. B 分享上报(wechat 渠道)
+POST {{baseUrl}}/front/user/share/report
+Authorization: {{tokenB}}
+Content-Type: application/json
+
+{ "type": "app", "channel": "wechat" }
+
+> {%
+client.test("分享上报成功", function () {
+    client.assert(response.body.code === 0, "code 应为 0: " + response.body.message);
+});
+%}
+
+### 9. 后台分享记录 —— 命中 B 的 wechat 分享
+GET {{baseUrl}}/backend/share-logs?user_id={{uidB}}&channel=wechat
+Authorization: {{adminToken}}
+
+> {%
+client.test("分享记录命中", function () {
+    client.assert(response.body.code === 0, "code 应为 0");
+    client.assert(response.body.data.total >= 1, "应至少1条");
+    client.assert(response.body.data.list[0].type === "app", "type 应为 app");
+});
+%}
+
+### 10. 分享统计 + 拉新排行 —— A 应上榜
+GET {{baseUrl}}/backend/share-stats?top=50
+Authorization: {{adminToken}}
+
+> {%
+client.test("统计与排行正确", function () {
+    client.assert(response.body.code === 0, "code 应为 0: " + response.body.message);
+    var d = response.body.data;
+    client.assert(d.total_shares >= 1, "分享总次数应>=1");
+    client.assert(d.sharer_count >= 1, "分享人数应>=1");
+    var wc = d.channels.some(function (c) { return c.channel === "wechat" && c.count >= 1; });
+    client.assert(wc, "渠道分布应含 wechat");
+    var rank = d.invite_rank.find(function (r) { return r.user_id === client.global.get("uidA"); });
+    client.assert(rank && rank.invite_count >= 1, "A 应在拉新排行且>=1");
+});
+%}
+
+### 11. 无 token 访问后台接口 —— 应被拒
+GET {{baseUrl}}/backend/share-stats
+
+> {%
+client.test("未登录被拒", function () {
+    client.assert(response.body.code !== 0, "无 token 应报错");
+});
+%}

@@ -66,3 +66,46 @@ func (c *Controller) CodeLogs(ctx context.Context, req *v1.CodeLogListReq) (res 
 	}
 	return &v1.CodeLogListRes{List: items, Total: dto.Total, Page: dto.Page, Size: dto.Size}, nil
 }
+
+// ==================== B6 分享 / 拉新 ====================
+
+// ShareLogs 分享记录。
+func (c *Controller) ShareLogs(ctx context.Context, req *v1.ShareLogListReq) (res *v1.ShareLogListRes, err error) {
+	dto, err := c.promo.ShareLogs(ctx, service.ShareLogListInput{
+		UserId: req.UserId, Type: req.Type, Channel: req.Channel,
+		StartDate: req.StartDate, EndDate: req.EndDate, Page: req.Page, Size: req.Size,
+	})
+	if err != nil {
+		return nil, err
+	}
+	items := make([]v1.ShareLogAdminItem, 0, len(dto.List))
+	for _, l := range dto.List {
+		items = append(items, v1.ShareLogAdminItem{
+			Id: l.Id, UserId: l.UserId, Type: l.Type, TargetId: l.TargetId,
+			Channel: l.Channel, CreatedAt: l.CreatedAt,
+		})
+	}
+	return &v1.ShareLogListRes{List: items, Total: dto.Total, Page: dto.Page, Size: dto.Size}, nil
+}
+
+// ShareStats 分享统计与拉新排行。
+func (c *Controller) ShareStats(ctx context.Context, req *v1.ShareStatsReq) (res *v1.ShareStatsRes, err error) {
+	dto, err := c.promo.ShareStats(ctx, req.StartDate, req.EndDate, req.Top)
+	if err != nil {
+		return nil, err
+	}
+	chs := make([]v1.ChannelCount, 0, len(dto.Channels))
+	for _, ch := range dto.Channels {
+		chs = append(chs, v1.ChannelCount{Channel: ch.Channel, Count: ch.Count})
+	}
+	ranks := make([]v1.InviteRankItem, 0, len(dto.InviteRank))
+	for _, r := range dto.InviteRank {
+		ranks = append(ranks, v1.InviteRankItem{
+			UserId: r.UserId, Username: r.Username, InviteCount: r.InviteCount,
+		})
+	}
+	return &v1.ShareStatsRes{
+		TotalShares: dto.TotalShares, SharerCount: dto.SharerCount,
+		Channels: chs, InviteRank: ranks,
+	}, nil
+}

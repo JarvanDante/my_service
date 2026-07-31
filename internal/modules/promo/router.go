@@ -12,5 +12,9 @@ import (
 // RegisterBackend 后台管理接口(挂权限组)。
 func RegisterBackend(group *ghttp.RouterGroup, repo domain.Repository) {
 	ctrl := backend.New(logic.New(repo))
-	group.Bind(ctrl.CodeList, ctrl.CodeGen, ctrl.CodeVoid, ctrl.CodeLogs)
+	group.Bind(
+		ctrl.CodeList, ctrl.CodeGen, ctrl.CodeVoid, ctrl.CodeLogs,
+		// B6 分享 / 拉新
+		ctrl.ShareLogs, ctrl.ShareStats,
+	)
 }

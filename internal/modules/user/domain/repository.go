@@ -34,6 +34,22 @@ type SignDayCount struct {
 	Count int
 }
 
+// FollowFilter 关注关系筛选(B6)。
+type FollowFilter struct {
+	UserId int64 // 关注人
+	HomeId int64 // 被关注人
+}
+
+// FollowItem 关注关系(联表用户名, B6)。
+type FollowItem struct {
+	Id        int64  `orm:"id"`
+	UserId    int64  `orm:"user_id"`
+	UserName  string `orm:"user_name"`
+	HomeId    int64  `orm:"home_id"`
+	HomeName  string `orm:"home_name"`
+	CreatedAt string `orm:"created_at"`
+}
+
 type Repository interface {
 	FindById(ctx context.Context, id int64) (*entity.Users, error)
 	FindByDeviceId(ctx context.Context, deviceId string) (*entity.Users, error)
@@ -64,6 +80,8 @@ type Repository interface {
 	TaskDelete(ctx context.Context, id int64) error
 	TaskLogList(ctx context.Context, f TaskLogFilter, page, size int) ([]*entity.UserTaskLog, int, error)
 	SignStats(ctx context.Context, yearMonth int) (userCount int, signCount int, days []SignDayCount, err error)
+	// 社交查询(B6)
+	FollowList(ctx context.Context, f FollowFilter, page, size int) ([]*FollowItem, int, error)
 	// 社交
 	ExistsFollow(ctx context.Context, userId, homeId int64) (bool, error)
 	Follow(ctx context.Context, userId, homeId int64) error
