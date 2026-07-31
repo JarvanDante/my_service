@@ -321,7 +321,7 @@ func (r *userRepo) SaveSign(ctx context.Context, userId int64, yearMonth int, da
 
 func (r *userRepo) ListTasks(ctx context.Context) ([]*entity.UserTask, error) {
 	var list []*entity.UserTask
-	err := g.Model("user_task").Ctx(ctx).OrderAsc("id").Scan(&list)
+	err := g.Model("user_task").Ctx(ctx).Where("status", 1).Order("sort asc, id asc").Scan(&list)
 	return list, err
 }
 
@@ -710,4 +710,90 @@ func (r *userRepo) GroupDelete(ctx context.Context, id int64) error {
 
 func (r *userRepo) GroupUserCount(ctx context.Context, groupId int64) (int, error) {
 	return g.Model("users").Ctx(ctx).Where("group_id", groupId).Count()
+}
+
+// ==================== 成长配置(B5) ====================
+
+func (r *userRepo) TaskListAll(ctx context.Context) ([]*entity.UserTask, error) {
+	var list []*entity.UserTask
+	err := g.Model("user_task").Ctx(ctx).Order("sort asc, id asc").Scan(&list)
+	return list, err
+}
+
+func (r *userRepo) TaskCreate(ctx context.Context, t *entity.UserTask) (int64, error) {
+	res, err := g.Model("user_task").Ctx(ctx).Data(g.Map{
+		"name": t.Name, "type": t.Type, "description": t.Description,
+		"max_num": t.MaxNum, "reward": t.Reward, "status": t.Status, "sort": t.Sort,
+	}).Insert()
+	if err != nil {
+		return 0, err
+	}
+	return res.LastInsertId()
+}
+
+func (r *userRepo) TaskUpdate(ctx context.Context, t *entity.UserTask) error {
+	_, err := g.Model("user_task").Ctx(ctx).Where("id", t.Id).Data(g.Map{
+		"name": t.Name, "type": t.Type, "description": t.Description,
+		"max_num": t.MaxNum, "reward": t.Reward, "status": t.Status, "sort": t.Sort,
+		"updated_at": gtime.Now(),
+	}).Update()
+	return err
+}
+
+func (r *userRepo) TaskDelete(ctx context.Context, id int64) error {
+	_, err := g.Model("user_task").Ctx(ctx).Where("id", id).Delete()
+	return err
+}
+
+func (r *userRepo) TaskLogList(ctx context.Context, f domain.TaskLogFilter, page, size int) ([]*entity.UserTaskLog, int, error) {
+	m := g.Model("user_task_log").Ctx(ctx)
+	if f.UserId > 0 {
+		m = m.Where("user_id", f.UserId)
+	}
+	if f.TaskId > 0 {
+		m = m.Where("task_id", f.TaskId)
+	}
+	if f.Type != "" {
+		m = m.Where("type", f.Type)
+	}
+	if f.StartDate > 0 {
+		m = m.Where("log_date >= ?", f.StartDate)
+	}
+	if f.EndDate > 0 {
+		m = m.Where("log_date <= ?", f.EndDate)
+	}
+	total, err := m.Clone().Count()
+	if err != nil {
+		return nil, 0, err
+	}
+	var list []*entity.UserTaskLog
+	err = m.Clone().OrderDesc("id").Page(page, size).Scan(&list)
+	return list, total, err
+}
+
+// SignStats 某月签到统计: 签到用户数 / 总签到人次 / 按日分布(jsonb 展开聚合)。
+func (r *userRepo) SignStats(ctx context.Context, yearMonth int) (int, int, []domain.SignDayCount, error) {
+	// 签到用户数 + 总人次
+	one, err := g.DB().GetOne(ctx,
+		`SELECT count(*) AS user_count, coalesce(sum(jsonb_array_length(days)), 0) AS sign_count
+		   FROM user_sign WHERE year_month = ?`, yearMonth)
+	if err != nil {
+		return 0, 0, nil, err
+	}
+	userCount := one["user_count"].Int()
+	signCount := one["sign_count"].Int()
+	// 按日分布
+	all, err := g.DB().GetAll(ctx,
+		`SELECT d::int AS day, count(*) AS cnt
+		   FROM user_sign, jsonb_array_elements_text(days) AS d
+		  WHERE year_month = ?
+		  GROUP BY 1 ORDER BY 1`, yearMonth)
+	if err != nil {
+		return 0, 0, nil, err
+	}
+	days := make([]domain.SignDayCount, 0, len(all))
+	for _, rec := range all {
+		days = append(days, domain.SignDayCount{Day: rec["day"].Int(), Count: rec["cnt"].Int()})
+	}
+	return userCount, signCount, days, nil
 }

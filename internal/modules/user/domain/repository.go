@@ -19,6 +19,21 @@ type AdminUserFilter struct {
 	EndDate   int    // 注册日止 YYYYMMDD
 }
 
+// TaskLogFilter 任务记录筛选(B5)。
+type TaskLogFilter struct {
+	UserId    int64
+	TaskId    int64
+	Type      string
+	StartDate int // log_date YYYYMMDD
+	EndDate   int
+}
+
+// SignDayCount 某日签到人数(B5)。
+type SignDayCount struct {
+	Day   int
+	Count int
+}
+
 type Repository interface {
 	FindById(ctx context.Context, id int64) (*entity.Users, error)
 	FindByDeviceId(ctx context.Context, deviceId string) (*entity.Users, error)
@@ -42,6 +57,13 @@ type Repository interface {
 	GroupUpdate(ctx context.Context, g *entity.UserGroup) error
 	GroupDelete(ctx context.Context, id int64) error
 	GroupUserCount(ctx context.Context, groupId int64) (int, error)
+	// 成长配置(B5)
+	TaskListAll(ctx context.Context) ([]*entity.UserTask, error)
+	TaskCreate(ctx context.Context, t *entity.UserTask) (int64, error)
+	TaskUpdate(ctx context.Context, t *entity.UserTask) error
+	TaskDelete(ctx context.Context, id int64) error
+	TaskLogList(ctx context.Context, f TaskLogFilter, page, size int) ([]*entity.UserTaskLog, int, error)
+	SignStats(ctx context.Context, yearMonth int) (userCount int, signCount int, days []SignDayCount, err error)
 	// 社交
 	ExistsFollow(ctx context.Context, userId, homeId int64) (bool, error)
 	Follow(ctx context.Context, userId, homeId int64) error

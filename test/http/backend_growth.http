@@ -1,0 +1,197 @@
+###############################################################################
+# 后台 B5 · 成长配置 真实端到端测试
+# 链路: 建任务(奖励20) -> 前台完成领奖 -> 记录 -> 下线拦截 -> 签到统计 -> 清理
+# 每次运行新建任务, 可重复跑
+###############################################################################
+
+@baseUrl = http://127.0.0.1:8000
+
+### 1. 超管登录
+POST {{baseUrl}}/backend/auth/login
+Content-Type: application/json
+
+{ "username": "admin", "password": "admin123" }
+
+> {%
+client.test("超管登录成功", function () {
+    client.assert(response.body.code === 0, "code 应为 0: " + response.body.message);
+});
+client.global.set("adminToken", response.body.data.token);
+%}
+
+### 2. 创建任务(奖励20, 单日上限2)
+POST {{baseUrl}}/backend/tasks
+Authorization: {{adminToken}}
+Content-Type: application/json
+
+{ "name": "E2E观看视频", "type": "e2e_watch", "description": "E2E测试任务", "max_num": 2, "reward": 20, "status": 1, "sort": 99 }
+
+> {%
+client.test("创建任务成功", function () {
+    client.assert(response.body.code === 0, "code 应为 0: " + response.body.message);
+    client.assert(response.body.data.id > 0, "应返回任务ID");
+});
+client.global.set("taskId", response.body.data.id);
+%}
+
+### 3. 奖励为0 —— 校验拦截
+POST {{baseUrl}}/backend/tasks
+Authorization: {{adminToken}}
+Content-Type: application/json
+
+{ "name": "坏任务", "type": "bad", "max_num": 1, "reward": 0 }
+
+> {%
+client.test("奖励为0被拒", function () {
+    client.assert(response.body.code !== 0, "应报错: 奖励必须大于0");
+});
+%}
+
+### 4. 后台任务列表包含新任务
+GET {{baseUrl}}/backend/tasks
+Authorization: {{adminToken}}
+
+> {%
+client.test("后台列表包含新任务", function () {
+    client.assert(response.body.code === 0, "code 应为 0");
+    var t = response.body.data.list.find(function (x) { return x.id === client.global.get("taskId"); });
+    client.assert(t, "应包含新任务");
+    client.assert(t.reward === 20, "奖励应为 20");
+});
+%}
+
+### 5. 前台设备登录
+POST {{baseUrl}}/front/user/login
+Content-Type: application/json
+
+{ "device_id": "e2e-b5-user", "device_type": "ios", "device_version": "1.0" }
+
+> {%
+client.test("前台用户就绪", function () {
+    client.assert(response.body.code === 0, "code 应为 0: " + response.body.message);
+});
+client.global.set("uid", response.body.data.user.id);
+client.global.set("userToken", response.body.data.token);
+%}
+
+### 6. 前台任务列表可见新任务(status=1)
+GET {{baseUrl}}/front/user/tasks
+Authorization: {{userToken}}
+
+> {%
+client.test("前台可见新任务", function () {
+    client.assert(response.body.code === 0, "code 应为 0");
+    var hit = response.body.data.list.some(function (x) { return x.id === client.global.get("taskId"); });
+    client.assert(hit, "前台应可见上架任务");
+});
+%}
+
+### 7. 前台完成任务 —— 奖励应为配置的 20(B5 升级点)
+POST {{baseUrl}}/front/user/task/do
+Authorization: {{userToken}}
+Content-Type: application/json
+
+{ "task_id": {{taskId}} }
+
+> {%
+client.test("完成任务奖励=20", function () {
+    client.assert(response.body.code === 0, "code 应为 0: " + response.body.message);
+    client.assert(response.body.data.reward === 20, "奖励应为配置的 20: " + response.body.data.reward);
+    client.assert(response.body.data.done_today === 1, "今日完成次数应为 1");
+});
+%}
+
+### 8. 后台任务记录 —— 命中该用户该任务
+GET {{baseUrl}}/backend/task-logs?task_id={{taskId}}&user_id={{uid}}
+Authorization: {{adminToken}}
+
+> {%
+client.test("任务记录正确", function () {
+    client.assert(response.body.code === 0, "code 应为 0");
+    client.assert(response.body.data.total >= 1, "应有记录");
+    client.assert(response.body.data.list[0].type === "e2e_watch", "type 应一致");
+});
+%}
+
+### 9. 下线任务(status=0)
+PUT {{baseUrl}}/backend/tasks/{{taskId}}
+Authorization: {{adminToken}}
+Content-Type: application/json
+
+{ "name": "E2E观看视频", "type": "e2e_watch", "description": "E2E测试任务", "max_num": 2, "reward": 20, "status": 0, "sort": 99 }
+
+> {%
+client.test("下线成功", function () {
+    client.assert(response.body.code === 0, "code 应为 0: " + response.body.message);
+});
+%}
+
+### 10. 前台再做已下线任务 —— 应被拒
+POST {{baseUrl}}/front/user/task/do
+Authorization: {{userToken}}
+Content-Type: application/json
+
+{ "task_id": {{taskId}} }
+
+> {%
+client.test("下线任务被拦截", function () {
+    client.assert(response.body.code !== 0, "应报错: 任务已下线");
+});
+%}
+
+### 11. 前台任务列表不再显示下线任务
+GET {{baseUrl}}/front/user/tasks
+Authorization: {{userToken}}
+
+> {%
+client.test("前台不可见下线任务", function () {
+    client.assert(response.body.code === 0, "code 应为 0");
+    var hit = response.body.data.list.some(function (x) { return x.id === client.global.get("taskId"); });
+    client.assert(!hit, "前台不应显示下线任务");
+});
+%}
+
+### 12. 前台签到(重复运行时可能已签, 两种都算过)
+POST {{baseUrl}}/front/user/sign
+Authorization: {{userToken}}
+
+> {%
+client.test("签到成功或已签", function () {
+    var ok = response.body.code === 0 ||
+        (response.body.message && response.body.message.indexOf("已签") >= 0);
+    client.assert(ok, "应签到成功或提示已签: " + response.body.message);
+});
+%}
+
+### 13. 签到统计(当月) —— 至少1人1次
+GET {{baseUrl}}/backend/sign-stats
+Authorization: {{adminToken}}
+
+> {%
+client.test("签到统计正确", function () {
+    client.assert(response.body.code === 0, "code 应为 0: " + response.body.message);
+    client.assert(response.body.data.user_count >= 1, "签到用户数应>=1");
+    client.assert(response.body.data.sign_count >= 1, "签到人次应>=1");
+    client.assert(response.body.data.days.length >= 1, "按日分布应非空");
+});
+%}
+
+### 14. year_month 非法 —— 应被拒
+GET {{baseUrl}}/backend/sign-stats?year_month=123
+Authorization: {{adminToken}}
+
+> {%
+client.test("year_month 非法被拒", function () {
+    client.assert(response.body.code !== 0, "应报错: 格式应为 YYYYMM");
+});
+%}
+
+### 15. 清理: 删除任务
+DELETE {{baseUrl}}/backend/tasks/{{taskId}}
+Authorization: {{adminToken}}
+
+> {%
+client.test("删除任务成功", function () {
+    client.assert(response.body.code === 0, "code 应为 0: " + response.body.message);
+});
+%}

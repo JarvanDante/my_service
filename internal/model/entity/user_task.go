@@ -16,6 +16,9 @@ type UserTask struct {
 	Type        string      `json:"type"        orm:"type"        description:""` //
 	Description string      `json:"description" orm:"description" description:""` //
 	MaxNum      int         `json:"maxNum"      orm:"max_num"     description:""` //
+	Reward      float64     `json:"reward"      orm:"reward"      description:""` //
+	Status      int         `json:"status"      orm:"status"      description:""` //
+	Sort        int         `json:"sort"        orm:"sort"        description:""` //
 	CreatedAt   *gtime.Time `json:"createdAt"   orm:"created_at"  description:""` //
 	UpdatedAt   *gtime.Time `json:"updatedAt"   orm:"updated_at"  description:""` //
 }

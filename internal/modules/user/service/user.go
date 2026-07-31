@@ -306,6 +306,62 @@ type UserGroupInput struct {
 	Status int
 }
 
+// ---- B5 成长配置 ----
+
+type AdminTaskDTO struct {
+	Id          int64
+	Name        string
+	Type        string
+	Description string
+	MaxNum      int
+	Reward      float64
+	Status      int
+	Sort        int
+}
+
+type AdminTaskInput struct {
+	Id          int64 // 更新时用
+	Name        string
+	Type        string
+	Description string
+	MaxNum      int
+	Reward      float64
+	Status      int
+	Sort        int
+}
+
+type AdminTaskLogDTO struct {
+	Id        int64
+	UserId    int64
+	TaskId    int64
+	Type      string
+	Num       int
+	LogDate   int
+	CreatedAt string
+}
+
+type AdminTaskLogInput struct {
+	UserId    int64
+	TaskId    int64
+	Type      string
+	StartDate int
+	EndDate   int
+	Page      int
+	Size      int
+}
+
+type SignDayCountDTO struct {
+	Day   int
+	Count int
+}
+
+type SignStatsDTO struct {
+	YearMonth int
+	UserCount int // 签到用户数
+	SignCount int // 总签到人次
+	Days      []SignDayCountDTO
+}
+
 type UserDTO struct {
 	ID     int64
 	Name   string
@@ -369,4 +425,11 @@ type IUser interface {
 	AdminCreateGroup(ctx context.Context, in UserGroupInput) (int64, error)
 	AdminUpdateGroup(ctx context.Context, in UserGroupInput) error
 	AdminDeleteGroup(ctx context.Context, id int64) error
+	// 后台(B5 成长配置)
+	AdminTasks(ctx context.Context) ([]*AdminTaskDTO, error)
+	AdminCreateTask(ctx context.Context, in AdminTaskInput) (int64, error)
+	AdminUpdateTask(ctx context.Context, in AdminTaskInput) error
+	AdminDeleteTask(ctx context.Context, id int64) error
+	AdminTaskLogs(ctx context.Context, in AdminTaskLogInput) ([]*AdminTaskLogDTO, int, error)
+	AdminSignStats(ctx context.Context, yearMonth int) (*SignStatsDTO, error)
 }

@@ -501,6 +501,9 @@ func (s *sUser) DoTask(ctx context.Context, userId, taskId int64) (*service.Task
 	if t == nil {
 		return nil, gerror.New("任务不存在")
 	}
+	if t.Status != 1 {
+		return nil, gerror.New("任务已下线")
+	}
 	logDate := gconv.Int(gtime.Now().Format("Ymd"))
 	done, err := s.repo.TaskDoneToday(ctx, userId, taskId, logDate)
 	if err != nil {
@@ -509,10 +512,14 @@ func (s *sUser) DoTask(ctx context.Context, userId, taskId int64) (*service.Task
 	if t.MaxNum > 0 && done >= t.MaxNum {
 		return nil, gerror.New("今日该任务已完成")
 	}
-	if err = s.repo.AddTaskLog(ctx, userId, taskId, t.Type, logDate, taskCredit); err != nil {
+	reward := t.Reward
+	if reward <= 0 {
+		reward = taskCredit // 兜底: 未配置奖励时用默认值
+	}
+	if err = s.repo.AddTaskLog(ctx, userId, taskId, t.Type, logDate, reward); err != nil {
 		return nil, err
 	}
-	return &service.TaskDoneDTO{DoneToday: done + 1, MaxNum: t.MaxNum, Reward: taskCredit}, nil
+	return &service.TaskDoneDTO{DoneToday: done + 1, MaxNum: t.MaxNum, Reward: reward}, nil
 }
 
 // TaskLogs 任务记录。
