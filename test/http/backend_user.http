@@ -1,0 +1,204 @@
+###############################################################################
+# 后台 B1 · 用户管理 真实端到端测试
+# 依赖: 超管 admin/admin123;前台设备登录自动造一个测试用户
+# 用例可重复运行
+###############################################################################
+
+@baseUrl = http://127.0.0.1:8000
+
+### 1. 超管登录
+POST {{baseUrl}}/backend/auth/login
+Content-Type: application/json
+
+{ "username": "admin", "password": "admin123" }
+
+> {%
+client.test("超管登录成功", function () {
+    client.assert(response.body.code === 0, "code 应为 0: " + response.body.message);
+});
+client.global.set("adminToken", response.body.data.token);
+%}
+
+### 2. 前台设备登录 —— 造/取一个测试用户
+POST {{baseUrl}}/front/user/login
+Content-Type: application/json
+
+{ "device_id": "e2e-b1-user", "device_type": "ios", "device_version": "1.0" }
+
+> {%
+client.test("前台用户就绪", function () {
+    client.assert(response.body.code === 0, "code 应为 0: " + response.body.message);
+    client.assert(response.body.data.user.id > 0, "应有用户ID");
+});
+client.global.set("uid", response.body.data.user.id);
+%}
+
+### 3. 用户列表 —— 关键字搜索能命中
+GET {{baseUrl}}/backend/users?keyword=e2e-b1-user&page=1&size=10
+Authorization: {{adminToken}}
+
+> {%
+client.test("列表搜索命中", function () {
+    client.assert(response.body.code === 0, "code 应为 0: " + response.body.message);
+    client.assert(response.body.data.total >= 1, "应至少命中1个");
+    var hit = response.body.data.list.some(function (u) { return u.id === client.global.get("uid"); });
+    client.assert(hit, "应包含测试用户");
+});
+%}
+
+### 4. 用户详情
+GET {{baseUrl}}/backend/users/{{uid}}
+Authorization: {{adminToken}}
+
+> {%
+client.test("详情返回完整", function () {
+    client.assert(response.body.code === 0, "code 应为 0");
+    client.assert(response.body.data.id === client.global.get("uid"), "id 应一致");
+    client.assert(typeof response.body.data.balance === "number", "应有 balance");
+    client.global.set("balBefore", response.body.data.balance);
+});
+%}
+
+### 5. 调整金币 +100(写流水+记操作人)
+POST {{baseUrl}}/backend/users/{{uid}}/balance
+Authorization: {{adminToken}}
+Content-Type: application/json
+
+{ "target": "balance", "amount": 100, "remark": "E2E 加金币" }
+
+> {%
+client.test("加金币成功", function () {
+    client.assert(response.body.code === 0, "code 应为 0: " + response.body.message);
+});
+%}
+
+### 6. 余额流水 —— 最新一条应为刚才的调整
+GET {{baseUrl}}/backend/users/{{uid}}/balance-logs?page=1&size=5
+Authorization: {{adminToken}}
+
+> {%
+client.test("流水记录正确", function () {
+    client.assert(response.body.code === 0, "code 应为 0");
+    var top = response.body.data.list[0];
+    client.assert(top.scene === "admin_balance", "scene 应为 admin_balance: " + top.scene);
+    client.assert(top.amount === 100, "amount 应为 100");
+    client.assert(top.ref_id.indexOf("admin:") === 0, "ref_id 应记录操作人: " + top.ref_id);
+    client.assert(top.balance_after - top.balance_before === 100, "前后差应为 100");
+});
+%}
+
+### 7. 扣成负数 —— 应被拒
+POST {{baseUrl}}/backend/users/{{uid}}/balance
+Authorization: {{adminToken}}
+Content-Type: application/json
+
+{ "target": "balance", "amount": -99999999, "remark": "E2E 扣爆" }
+
+> {%
+client.test("扣成负数被拒", function () {
+    client.assert(response.body.code !== 0, "应报错: 调整后余额为负");
+});
+%}
+
+### 8. 调整积分 +50
+POST {{baseUrl}}/backend/users/{{uid}}/balance
+Authorization: {{adminToken}}
+Content-Type: application/json
+
+{ "target": "credit", "amount": 50, "remark": "E2E 加积分" }
+
+> {%
+client.test("加积分成功", function () {
+    client.assert(response.body.code === 0, "code 应为 0: " + response.body.message);
+});
+%}
+
+### 9. target 非法 —— 校验拦截
+POST {{baseUrl}}/backend/users/{{uid}}/balance
+Authorization: {{adminToken}}
+Content-Type: application/json
+
+{ "target": "gold", "amount": 10 }
+
+> {%
+client.test("target 非法被拒", function () {
+    client.assert(response.body.code !== 0, "应报错: target 仅支持 balance/credit");
+});
+%}
+
+### 10. 调整用户组
+POST {{baseUrl}}/backend/users/{{uid}}/group
+Authorization: {{adminToken}}
+Content-Type: application/json
+
+{ "group_id": 2, "group_name": "白银会员", "group_rate": 90, "group_end_time": 0 }
+
+> {%
+client.test("调组成功", function () {
+    client.assert(response.body.code === 0, "code 应为 0: " + response.body.message);
+});
+%}
+
+### 11. 禁用用户
+POST {{baseUrl}}/backend/users/{{uid}}/disable
+Authorization: {{adminToken}}
+Content-Type: application/json
+
+{ "op": "disable", "reason": "E2E 违规测试" }
+
+> {%
+client.test("禁用成功", function () {
+    client.assert(response.body.code === 0, "code 应为 0: " + response.body.message);
+});
+%}
+
+### 12. 详情确认 —— 已禁用 + 组已改
+GET {{baseUrl}}/backend/users/{{uid}}
+Authorization: {{adminToken}}
+
+> {%
+client.test("禁用与调组生效", function () {
+    client.assert(response.body.code === 0, "code 应为 0");
+    client.assert(response.body.data.is_disabled === 1, "应已禁用");
+    client.assert(response.body.data.error_msg === "E2E 违规测试", "禁用原因应记录");
+    client.assert(response.body.data.group_name === "白银会员", "组名应已更新");
+});
+%}
+
+### 13. 解禁用户(用例可重复跑的关键)
+POST {{baseUrl}}/backend/users/{{uid}}/disable
+Authorization: {{adminToken}}
+Content-Type: application/json
+
+{ "op": "enable" }
+
+> {%
+client.test("解禁成功", function () {
+    client.assert(response.body.code === 0, "code 应为 0: " + response.body.message);
+});
+%}
+
+### 14. 详情确认 —— 已解禁且原因清空
+GET {{baseUrl}}/backend/users/{{uid}}
+Authorization: {{adminToken}}
+
+> {%
+client.test("解禁生效", function () {
+    client.assert(response.body.code === 0, "code 应为 0");
+    client.assert(response.body.data.is_disabled === 0, "应已解禁");
+    client.assert(response.body.data.error_msg === "", "禁用原因应清空");
+});
+%}
+
+### 15. op 非法 —— 校验拦截
+POST {{baseUrl}}/backend/users/{{uid}}/disable
+Authorization: {{adminToken}}
+Content-Type: application/json
+
+{ "op": "kill" }
+
+> {%
+client.test("op 非法被拒", function () {
+    client.assert(response.body.code !== 0, "应报错: op 仅支持 disable/enable");
+});
+%}

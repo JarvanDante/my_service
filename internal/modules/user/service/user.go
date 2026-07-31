@@ -194,6 +194,96 @@ type MessageDTO struct {
 	CreatedAt string
 }
 
+// ---- B1 后台用户管理 ----
+
+// AdminUserItemDTO 后台用户列表项。
+type AdminUserItemDTO struct {
+	Id          int64
+	Username    string
+	Nickname    string
+	Phone       string
+	Channel     string
+	GroupId     int64
+	GroupName   string
+	Level       int
+	Balance     float64
+	Credit      float64
+	MoneyCount  float64
+	IsDisabled  int
+	RegisterAt  string
+	LastLoginAt string
+}
+
+// AdminUserListInput 后台用户列表入参。
+type AdminUserListInput struct {
+	Keyword   string
+	Channel   string
+	GroupId   int64
+	Status    int // 0全部 1正常 2禁用
+	StartDate int // YYYYMMDD
+	EndDate   int
+	Page      int
+	Size      int
+}
+
+// AdminUserListDTO 后台用户列表。
+type AdminUserListDTO struct {
+	List  []*AdminUserItemDTO
+	Total int
+	Page  int
+	Size  int
+}
+
+// AdminUserDetailDTO 后台用户详情(含状态/组/资产/轨迹)。
+type AdminUserDetailDTO struct {
+	AdminUserItemDTO
+	Sex          int
+	Signature    string
+	Img          string
+	Fans         int
+	Follow       int
+	ShareNum     int
+	ParentId     int64
+	ParentName   string
+	GroupRate    int
+	GroupEndTime int64
+	ErrorMsg     string
+	RegisterIp   string
+	LastIp       string
+	LoginNum     int
+}
+
+// AdminSetGroupInput 调整用户组入参。
+type AdminSetGroupInput struct {
+	UserId       int64
+	GroupId      int64
+	GroupName    string
+	GroupRate    int
+	GroupEndTime int64 // epoch 秒, 0 表示不限
+}
+
+// AdminAdjustBalanceInput 调整余额入参。
+type AdminAdjustBalanceInput struct {
+	UserId     int64
+	Target     string  // balance / credit
+	Amount     float64 // 正加负减, 不为 0
+	Remark     string
+	OperatorId int64 // 操作管理员
+}
+
+// BalanceLogDTO 余额流水。
+type BalanceLogDTO struct {
+	Id            int64
+	Direction     int
+	Scene         string
+	Amount        float64
+	BalanceBefore float64
+	BalanceAfter  float64
+	RefId         string
+	Remark        string
+	CreatedAt     string
+}
+
 type UserDTO struct {
 	ID     int64
 	Name   string
@@ -243,7 +333,13 @@ type IUser interface {
 	Messages(ctx context.Context, meId, peerId int64, page, size int) ([]*MessageDTO, int, error)
 	DelChat(ctx context.Context, meId, peerId int64) error
 	CustomerUrl(ctx context.Context) (string, error)
-	// 后台
+	// 后台(B1 用户管理)
 	GetUser(ctx context.Context, id int64) (*UserDTO, error)
 	DisableUser(ctx context.Context, id int64) error
+	AdminListUsers(ctx context.Context, in AdminUserListInput) (*AdminUserListDTO, error)
+	AdminUserDetail(ctx context.Context, id int64) (*AdminUserDetailDTO, error)
+	AdminSetDisabled(ctx context.Context, id int64, disable bool, reason string) error
+	AdminSetGroup(ctx context.Context, in AdminSetGroupInput) error
+	AdminAdjustBalance(ctx context.Context, in AdminAdjustBalanceInput) error
+	AdminBalanceLogs(ctx context.Context, userId int64, page, size int) ([]*BalanceLogDTO, int, error)
 }

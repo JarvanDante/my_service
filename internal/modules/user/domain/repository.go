@@ -9,6 +9,16 @@ import (
 	"github.com/JarvanDante/my_service/internal/model/entity"
 )
 
+// AdminUserFilter 后台用户列表筛选条件。
+type AdminUserFilter struct {
+	Keyword   string // 用户名/手机/昵称 模糊
+	Channel   string // 渠道
+	GroupId   int64  // 用户组
+	Status    int    // 0全部 1正常 2禁用
+	StartDate int    // 注册日起 YYYYMMDD
+	EndDate   int    // 注册日止 YYYYMMDD
+}
+
 type Repository interface {
 	FindById(ctx context.Context, id int64) (*entity.Users, error)
 	FindByDeviceId(ctx context.Context, deviceId string) (*entity.Users, error)
@@ -19,6 +29,12 @@ type Repository interface {
 	UpdatePhone(ctx context.Context, id int64, phone string) error
 	UpdateProfile(ctx context.Context, id int64, data g.Map) error
 	Disable(ctx context.Context, id int64, reason string) error
+	// 后台管理(B1)
+	AdminListUsers(ctx context.Context, f AdminUserFilter, page, size int) ([]*entity.Users, int, error)
+	SetDisabled(ctx context.Context, id int64, disabled int, reason string) error
+	UpdateGroup(ctx context.Context, id, groupId int64, groupName string, groupRate int, groupEndTime int64) error
+	AdminAdjustBalance(ctx context.Context, userId int64, target string, amount float64, refId, remark string) error
+	BalanceLogs(ctx context.Context, userId int64, page, size int) ([]*entity.UserBalanceLog, int, error)
 	// 社交
 	ExistsFollow(ctx context.Context, userId, homeId int64) (bool, error)
 	Follow(ctx context.Context, userId, homeId int64) error

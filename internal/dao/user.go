@@ -550,3 +550,113 @@ func (r *userRepo) DeleteConversation(ctx context.Context, userId, peerId int64)
 		Data(g.Map{"deleted": 1}).Update()
 	return err
 }
+
+// ==================== 后台管理(B1) ====================
+
+// AdminListUsers 后台用户列表(筛选+分页)。
+func (r *userRepo) AdminListUsers(ctx context.Context, f domain.AdminUserFilter, page, size int) ([]*entity.Users, int, error) {
+	m := g.Model("users").Ctx(ctx)
+	if f.Keyword != "" {
+		kw := "%" + f.Keyword + "%"
+		m = m.Where("(username ILIKE ? OR phone ILIKE ? OR nickname ILIKE ?)", kw, kw, kw)
+	}
+	if f.Channel != "" {
+		m = m.Where("channel_name", f.Channel)
+	}
+	if f.GroupId > 0 {
+		m = m.Where("group_id", f.GroupId)
+	}
+	switch f.Status {
+	case 1:
+		m = m.Where("is_disabled", 0)
+	case 2:
+		m = m.Where("is_disabled", 1)
+	}
+	if f.StartDate > 0 {
+		m = m.Where("register_date >= ?", f.StartDate)
+	}
+	if f.EndDate > 0 {
+		m = m.Where("register_date <= ?", f.EndDate)
+	}
+	total, err := m.Clone().Count()
+	if err != nil {
+		return nil, 0, err
+	}
+	var list []*entity.Users
+	err = m.Clone().OrderDesc("id").Page(page, size).Scan(&list)
+	return list, total, err
+}
+
+// SetDisabled 禁用(1)/解禁(0)。解禁时清空禁用原因。
+func (r *userRepo) SetDisabled(ctx context.Context, id int64, disabled int, reason string) error {
+	if disabled == 0 {
+		reason = ""
+	}
+	_, err := g.Model("users").Ctx(ctx).Where("id", id).Data(g.Map{
+		"is_disabled": disabled,
+		"error_msg":   reason,
+	}).Update()
+	return err
+}
+
+// UpdateGroup 调整用户组快照字段(组定义表 B4 再建)。
+func (r *userRepo) UpdateGroup(ctx context.Context, id, groupId int64, groupName string, groupRate int, groupEndTime int64) error {
+	_, err := g.Model("users").Ctx(ctx).Where("id", id).Data(g.Map{
+		"group_id":       groupId,
+		"group_name":     groupName,
+		"group_rate":     groupRate,
+		"group_end_time": groupEndTime,
+	}).Update()
+	return err
+}
+
+// AdminAdjustBalance 后台调整金币(balance)/积分(credit): 事务+行锁, 记录前后值流水。
+func (r *userRepo) AdminAdjustBalance(ctx context.Context, userId int64, target string, amount float64, refId, remark string) error {
+	return g.DB().Transaction(ctx, func(ctx context.Context, tx gdb.TX) error {
+		var u *entity.Users
+		if err := tx.Model("users").Ctx(ctx).Where("id", userId).LockUpdate().Scan(&u); err != nil {
+			return err
+		}
+		if u == nil {
+			return gerror.New("用户不存在")
+		}
+		before := u.Balance
+		if target == "credit" {
+			before = u.Credit
+		}
+		after := before + amount
+		if after < 0 {
+			return gerror.New("调整后余额为负, 拒绝执行")
+		}
+		if _, err := tx.Model("users").Ctx(ctx).Where("id", userId).
+			Data(g.Map{target: after}).Update(); err != nil {
+			return err
+		}
+		direction, amt := 1, amount
+		if amount < 0 {
+			direction, amt = 2, -amount
+		}
+		scene := "admin_balance"
+		if target == "credit" {
+			scene = "admin_credit"
+		}
+		_, err := tx.Model("user_balance_log").Ctx(ctx).Data(g.Map{
+			"user_id": userId, "direction": direction, "scene": scene,
+			"amount": amt, "balance_before": before, "balance_after": after,
+			"ref_id": refId, "remark": remark,
+		}).Insert()
+		return err
+	})
+}
+
+// BalanceLogs 用户余额流水(倒序分页)。
+func (r *userRepo) BalanceLogs(ctx context.Context, userId int64, page, size int) ([]*entity.UserBalanceLog, int, error) {
+	m := g.Model("user_balance_log").Ctx(ctx).Where("user_id", userId)
+	total, err := m.Clone().Count()
+	if err != nil {
+		return nil, 0, err
+	}
+	var list []*entity.UserBalanceLog
+	err = m.Clone().OrderDesc("id").Page(page, size).Scan(&list)
+	return list, total, err
+}
