@@ -8,8 +8,23 @@ import (
 )
 
 type Repository interface {
+	// 认证
 	FindByUsername(ctx context.Context, username string) (*entity.AdminUser, error)
 	FindById(ctx context.Context, id int64) (*entity.AdminUser, error)
 	UpdateLoginInfo(ctx context.Context, id int64, ip string) error
+
+	// 角色
 	ListRoles(ctx context.Context) ([]*entity.AdminRole, error)
+	FindRoleById(ctx context.Context, id int64) (*entity.AdminRole, error)
+	FindRoleByCode(ctx context.Context, code string) (*entity.AdminRole, error)
+	CreateRole(ctx context.Context, r *entity.AdminRole) (int64, error)
+	UpdateRole(ctx context.Context, id int64, name, remark string, status int) error
+	DeleteRole(ctx context.Context, id int64) error
+	CountAdminsByRoleId(ctx context.Context, roleId int64) (int, error)
+
+	// 管理员账号
+	ListAdmins(ctx context.Context, page, size int) ([]*entity.AdminUser, int, error)
+	CreateAdmin(ctx context.Context, a *entity.AdminUser) (int64, error)
+	UpdateAdmin(ctx context.Context, id int64, nickname string, roleId int64, status int, password, salt string) error
+	DeleteAdmin(ctx context.Context, id int64) error
 }

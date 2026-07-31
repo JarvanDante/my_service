@@ -20,8 +20,15 @@ func RegisterAuthed(group *ghttp.RouterGroup, repo domain.Repository) {
 	group.Bind(ctrl.Logout, ctrl.Info)
 }
 
-// RegisterPermManage 需权限校验的接口(角色 / 权限管理)。
+// RegisterPermManage 需权限校验的接口(角色/权限 + 管理员账号管理)。
 func RegisterPermManage(group *ghttp.RouterGroup, repo domain.Repository) {
 	ctrl := backend.New(logic.New(repo))
-	group.Bind(ctrl.ListRoles, ctrl.ListPerms, ctrl.AddPerm, ctrl.RemovePerm)
+	group.Bind(
+		// 角色权限(Casbin)
+		ctrl.ListRoles, ctrl.ListPerms, ctrl.AddPerm, ctrl.RemovePerm,
+		// 角色管理
+		ctrl.CreateRole, ctrl.UpdateRole, ctrl.DeleteRole,
+		// 管理员账号管理
+		ctrl.ListAdmins, ctrl.CreateAdmin, ctrl.UpdateAdmin, ctrl.DeleteAdmin,
+	)
 }

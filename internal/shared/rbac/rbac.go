@@ -194,3 +194,13 @@ func Reload() error {
 	}
 	return e.LoadPolicy()
 }
+
+// RemoveRolePolicies 删除某角色的全部权限(删除角色时调用)。
+func RemoveRolePolicies(role string) error {
+	e, err := get()
+	if err != nil {
+		return err
+	}
+	_, err = e.RemoveFilteredPolicy(0, role)
+	return err
+}

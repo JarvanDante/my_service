@@ -1,0 +1,165 @@
+###############################################################################
+# 后台 B0.2 · 角色管理 + 管理员账号管理 真实端到端测试
+# 超管种子账号: admin / admin123 (superadmin, 权限中间件直接放行)
+# 用例可重复运行: 创建类用例对"已存在"容错, 末尾清理创建的数据
+###############################################################################
+
+@baseUrl = http://127.0.0.1:8000
+
+### 1. 超管登录 —— 保存 token 与自身 id
+POST {{baseUrl}}/backend/auth/login
+Content-Type: application/json
+
+{ "username": "admin", "password": "admin123" }
+
+> {%
+client.test("超管登录成功", function () {
+    client.assert(response.body.code === 0, "code 应为 0: " + response.body.message);
+});
+client.global.set("adminToken", response.body.data.token);
+client.global.set("selfId", response.body.data.admin.id);
+%}
+
+### 2. 创建角色 op(已存在则容错)
+POST {{baseUrl}}/backend/roles
+Authorization: {{adminToken}}
+Content-Type: application/json
+
+{ "name": "运营", "code": "op", "remark": "运营角色" }
+
+> {%
+client.test("创建角色 op", function () {
+    var ok = response.body.code === 0 || (response.body.message && response.body.message.indexOf("已存在") >= 0);
+    client.assert(ok, "应创建成功或已存在: " + response.body.message);
+});
+%}
+
+### 3. 角色列表 —— 找到 op 的 id
+GET {{baseUrl}}/backend/roles
+Authorization: {{adminToken}}
+
+> {%
+client.test("找到 op 角色", function () {
+    client.assert(response.body.code === 0, "code 应为 0");
+    var op = response.body.data.list.find(function (r) { return r.code === "op"; });
+    client.assert(op, "应存在 op 角色");
+    client.global.set("opId", op.id);
+});
+%}
+
+### 4. 创建管理员 u_e2e 绑定 op 角色(已存在则容错)
+POST {{baseUrl}}/backend/admins
+Authorization: {{adminToken}}
+Content-Type: application/json
+
+{ "username": "u_e2e", "password": "pw123456", "nickname": "测试运营", "role_id": {{opId}} }
+
+> {%
+client.test("创建管理员 u_e2e", function () {
+    var ok = response.body.code === 0 || (response.body.message && response.body.message.indexOf("已存在") >= 0);
+    client.assert(ok, "应创建成功或已存在: " + response.body.message);
+});
+%}
+
+### 5. 管理员列表 —— 找到 u_e2e 的 id
+GET {{baseUrl}}/backend/admins?page=1&size=50
+Authorization: {{adminToken}}
+
+> {%
+client.test("找到 u_e2e", function () {
+    client.assert(response.body.code === 0, "code 应为 0");
+    var u = response.body.data.list.find(function (a) { return a.username === "u_e2e"; });
+    client.assert(u, "应存在 u_e2e");
+    client.assert(u.role_name === "运营", "role_name 应回填为 运营");
+    client.global.set("newAdminId", u.id);
+});
+%}
+
+### 6. 删除角色 op —— 应被拒(该角色下仍有管理员)
+DELETE {{baseUrl}}/backend/roles/{{opId}}
+Authorization: {{adminToken}}
+
+> {%
+client.test("有管理员时删角色被拒", function () {
+    client.assert(response.body.code !== 0, "应报错: 该角色下仍有管理员");
+});
+%}
+
+### 7. 更新管理员 u_e2e(改昵称, 不改密码)
+PUT {{baseUrl}}/backend/admins/{{newAdminId}}
+Authorization: {{adminToken}}
+Content-Type: application/json
+
+{ "nickname": "运营改名", "role_id": {{opId}}, "status": 1 }
+
+> {%
+client.test("更新管理员成功", function () {
+    client.assert(response.body.code === 0, "code 应为 0: " + response.body.message);
+});
+%}
+
+### 8. 更新角色 op(改备注)
+PUT {{baseUrl}}/backend/roles/{{opId}}
+Authorization: {{adminToken}}
+Content-Type: application/json
+
+{ "name": "运营", "remark": "运营角色-已更新", "status": 1 }
+
+> {%
+client.test("更新角色成功", function () {
+    client.assert(response.body.code === 0, "code 应为 0: " + response.body.message);
+});
+%}
+
+### 9. 删除自己 —— 应被拒
+DELETE {{baseUrl}}/backend/admins/{{selfId}}
+Authorization: {{adminToken}}
+
+> {%
+client.test("不能删除当前登录账号", function () {
+    client.assert(response.body.code !== 0, "应报错: 不能删除当前登录账号");
+});
+%}
+
+### 10. 删除管理员 u_e2e —— 成功
+DELETE {{baseUrl}}/backend/admins/{{newAdminId}}
+Authorization: {{adminToken}}
+
+> {%
+client.test("删除管理员成功", function () {
+    client.assert(response.body.code === 0, "code 应为 0: " + response.body.message);
+});
+%}
+
+### 11. 删除角色 op —— 成功(此时无管理员绑定)
+DELETE {{baseUrl}}/backend/roles/{{opId}}
+Authorization: {{adminToken}}
+
+> {%
+client.test("删除角色成功", function () {
+    client.assert(response.body.code === 0, "code 应为 0: " + response.body.message);
+});
+%}
+
+### 12. 删除管理员但不传 id —— 应 400 提示缺少路径参数(而非误导的 405)
+DELETE {{baseUrl}}/backend/admins
+Authorization: {{adminToken}}
+
+> {%
+client.test("缺路径参数提示清晰", function () {
+    client.assert(response.body.code === 400, "code 应为 400: " + response.body.code);
+    client.assert(response.body.message.indexOf("缺少路径参数") >= 0, "应提示缺少路径参数: " + response.body.message);
+});
+%}
+
+### 13. 删除管理员 id=0 —— 应命中处理器并报「ID必须大于0」
+DELETE {{baseUrl}}/backend/admins/0
+Authorization: {{adminToken}}
+
+> {%
+client.test("非法 id 校验生效", function () {
+    client.assert(response.body.code !== 0, "id=0 应报错");
+    client.assert(response.body.message.indexOf("大于0") >= 0 || response.body.message.indexOf("必填") >= 0,
+        "应为校验消息: " + response.body.message);
+});
+%}
