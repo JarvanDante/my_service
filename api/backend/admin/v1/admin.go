@@ -17,8 +17,10 @@ type LoginReq struct {
 	Password string `json:"password" v:"required#密码必填"`
 }
 type LoginRes struct {
-	Token string    `json:"token"`
-	Admin AdminInfo `json:"admin"`
+	Token    string    `json:"token"`
+	Admin    AdminInfo `json:"admin"`
+	SiteCode string    `json:"site_code"`
+	SiteName string    `json:"site_name"`
 }
 
 // 退出(需登录)
@@ -33,4 +35,6 @@ type InfoReq struct {
 }
 type InfoRes struct {
 	AdminInfo
+	SiteCode string `json:"site_code"`
+	SiteName string `json:"site_name"`
 }

@@ -7,10 +7,12 @@ import (
 	"github.com/gogf/gf/v2/errors/gcode"
 	"github.com/gogf/gf/v2/errors/gerror"
 	"github.com/gogf/gf/v2/net/ghttp"
+	"github.com/gogf/gf/v2/os/genv"
 
 	v1 "github.com/JarvanDante/my_service/api/backend/admin/v1"
 	"github.com/JarvanDante/my_service/internal/modules/admin/service"
 	"github.com/JarvanDante/my_service/internal/shared/consts"
+	"github.com/JarvanDante/my_service/internal/shared/siteconf"
 )
 
 type Controller struct{ admin service.IAdmin }
@@ -32,7 +34,8 @@ func (c *Controller) Login(ctx context.Context, req *v1.LoginReq) (res *v1.Login
 	if err != nil {
 		return nil, err
 	}
-	return &v1.LoginRes{Token: dto.Token, Admin: toApi(dto.Admin)}, nil
+	code, name := siteMeta(ctx)
+	return &v1.LoginRes{Token: dto.Token, Admin: toApi(dto.Admin), SiteCode: code, SiteName: name}, nil
 }
 
 // Logout 需登录。
@@ -57,7 +60,8 @@ func (c *Controller) Info(ctx context.Context, req *v1.InfoReq) (res *v1.InfoRes
 	if err != nil {
 		return nil, err
 	}
-	return &v1.InfoRes{AdminInfo: toApi(dto)}, nil
+	code, name := siteMeta(ctx)
+	return &v1.InfoRes{AdminInfo: toApi(dto), SiteCode: code, SiteName: name}, nil
 }
 
 func toApi(d *service.AdminInfoDTO) v1.AdminInfo {
@@ -65,4 +69,12 @@ func toApi(d *service.AdminInfoDTO) v1.AdminInfo {
 		return v1.AdminInfo{}
 	}
 	return v1.AdminInfo{Id: d.Id, Username: d.Username, Nickname: d.Nickname, RoleId: d.RoleId}
+}
+
+// siteMeta 站点品牌: SITE_CODE 来自部署 env; 站点名优先 site_config 表(后台可改), 兜底配置文件。
+func siteMeta(ctx context.Context) (code, name string) {
+	code = genv.Get("SITE_CODE", "my").String()
+	def := "漫隐"
+	name = siteconf.Get(ctx, "site_name", def)
+	return
 }
