@@ -26,6 +26,7 @@ var BackendAPI = gcmd.Command{
 		s.SetAddr(cfgAddr(ctx, "backendapi.address", ":8002"))
 		s.Use(middleware.CORS, ghttp.MiddlewareHandlerResponse)
 		s.BindStatusHandler(404, middleware.NotFound)
+		s.BindHandler("/health", middleware.Health)
 		s.Group("/backend", func(group *ghttp.RouterGroup) {
 			// 公开: 管理员登录
 			adminmod.RegisterPublic(group, dao.NewAdminRepo())

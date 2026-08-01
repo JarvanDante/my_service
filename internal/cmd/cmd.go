@@ -36,6 +36,7 @@ var Main = gcmd.Command{
 		s := g.Server()
 		s.Use(middleware.CORS, ghttp.MiddlewareHandlerResponse)
 		s.BindStatusHandler(404, middleware.NotFound)
+		s.BindHandler("/health", middleware.Health)
 
 		s.Group("/front", func(group *ghttp.RouterGroup) {
 			group.Middleware(middleware.RateLimit)

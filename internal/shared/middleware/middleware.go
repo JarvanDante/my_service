@@ -4,7 +4,9 @@ package middleware
 import (
 	"github.com/gogf/gf/v2/errors/gcode"
 	"github.com/gogf/gf/v2/errors/gerror"
+	"github.com/gogf/gf/v2/frame/g"
 	"github.com/gogf/gf/v2/net/ghttp"
+	"github.com/gogf/gf/v2/os/genv"
 
 	"github.com/JarvanDante/my_service/internal/shared/consts"
 	"github.com/JarvanDante/my_service/internal/shared/kit"
@@ -34,4 +36,12 @@ func Auth(r *ghttp.Request) {
 func RateLimit(r *ghttp.Request) {
 	// TODO: 基于 Redis 的令牌桶 / 滑动窗口
 	r.Middleware.Next()
+}
+
+// Health 公开健康检查端点(网关/LB/总后台探活)。
+func Health(r *ghttp.Request) {
+	r.Response.WriteJson(g.Map{
+		"status": "ok",
+		"site":   genv.Get("SITE_CODE", "my").String(),
+	})
 }

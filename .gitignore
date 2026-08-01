@@ -17,3 +17,4 @@ main
 # 本地配置(含密钥, 勿提交)
 manifest/config/config.local.yaml
 .env
+temp/

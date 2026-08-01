@@ -21,6 +21,7 @@ var FrontAPI = gcmd.Command{
 		s.SetAddr(cfgAddr(ctx, "frontapi.address", ":8001"))
 		s.Use(middleware.CORS, ghttp.MiddlewareHandlerResponse)
 		s.BindStatusHandler(404, middleware.NotFound)
+		s.BindHandler("/health", middleware.Health)
 		s.Group("/front", func(group *ghttp.RouterGroup) {
 			group.Middleware(middleware.RateLimit)
 			usermod.RegisterFront(group, dao.NewUserRepo())
