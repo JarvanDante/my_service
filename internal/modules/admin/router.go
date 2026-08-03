@@ -25,7 +25,7 @@ func RegisterPermManage(group *ghttp.RouterGroup, repo domain.Repository) {
 	ctrl := backend.New(logic.New(repo))
 	group.Bind(
 		// 角色权限(Casbin)
-		ctrl.ListRoles, ctrl.ListPerms, ctrl.AddPerm, ctrl.RemovePerm,
+		ctrl.ListRoles, ctrl.PermTree, ctrl.PermCreate, ctrl.PermUpdate, ctrl.PermDelete,
 		// 角色管理
 		ctrl.CreateRole, ctrl.UpdateRole, ctrl.DeleteRole,
 		// 管理员账号管理

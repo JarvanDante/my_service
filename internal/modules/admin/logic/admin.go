@@ -12,7 +12,6 @@ import (
 	"github.com/JarvanDante/my_service/internal/modules/admin/domain"
 	"github.com/JarvanDante/my_service/internal/modules/admin/service"
 	"github.com/JarvanDante/my_service/internal/shared/kit"
-	"github.com/JarvanDante/my_service/internal/shared/rbac"
 )
 
 const superAdminCode = "superadmin"
@@ -75,41 +74,10 @@ func (s *sAdmin) ListRoles(ctx context.Context) ([]*service.RoleDTO, error) {
 	out := make([]*service.RoleDTO, 0, len(roles))
 	for _, r := range roles {
 		out = append(out, &service.RoleDTO{
-			Id: r.Id, Name: r.Name, Code: r.Code, Remark: r.Remark, Status: r.Status,
+			Id: r.Id, Name: r.Name, Code: r.Code, Remark: r.Remark, Status: r.Status, Permissions: r.Permissions,
 		})
 	}
 	return out, nil
-}
-
-func (s *sAdmin) ListPerms(ctx context.Context, roleCode string) ([]*service.PermDTO, error) {
-	if roleCode == "" {
-		return nil, gerror.New("角色码不能为空")
-	}
-	rows := rbac.PermsForRole(roleCode)
-	out := make([]*service.PermDTO, 0, len(rows))
-	for _, r := range rows {
-		out = append(out, &service.PermDTO{Path: r[0], Method: r[1]})
-	}
-	return out, nil
-}
-
-func (s *sAdmin) AddPerm(ctx context.Context, roleCode, path, method string) error {
-	if roleCode == "" || path == "" || method == "" {
-		return gerror.New("角色码/路径/方法均不能为空")
-	}
-	if roleCode == superAdminCode {
-		return gerror.New("超级管理员无需配置权限")
-	}
-	_, err := rbac.AddPolicy(roleCode, path, method)
-	return err
-}
-
-func (s *sAdmin) RemovePerm(ctx context.Context, roleCode, path, method string) error {
-	if roleCode == "" || path == "" || method == "" {
-		return gerror.New("角色码/路径/方法均不能为空")
-	}
-	_, err := rbac.RemovePolicy(roleCode, path, method)
-	return err
 }
 
 // ---------- 角色管理 ----------
@@ -128,7 +96,7 @@ func (s *sAdmin) CreateRole(ctx context.Context, in service.RoleCreateInput) (in
 	if exist != nil {
 		return 0, gerror.New("角色码已存在")
 	}
-	return s.repo.CreateRole(ctx, &entity.AdminRole{Name: in.Name, Code: in.Code, Remark: in.Remark})
+	return s.repo.CreateRole(ctx, &entity.AdminRole{Name: in.Name, Code: in.Code, Remark: in.Remark, Permissions: in.Permissions})
 }
 
 func (s *sAdmin) UpdateRole(ctx context.Context, in service.RoleUpdateInput) error {
@@ -145,7 +113,7 @@ func (s *sAdmin) UpdateRole(ctx context.Context, in service.RoleUpdateInput) err
 	if role.Code == superAdminCode {
 		return gerror.New("超级管理员角色不可修改")
 	}
-	return s.repo.UpdateRole(ctx, in.Id, in.Name, in.Remark, in.Status)
+	return s.repo.UpdateRole(ctx, in.Id, in.Name, in.Remark, in.Status, in.Permissions)
 }
 
 func (s *sAdmin) DeleteRole(ctx context.Context, id int64) error {
@@ -169,11 +137,7 @@ func (s *sAdmin) DeleteRole(ctx context.Context, id int64) error {
 	if cnt > 0 {
 		return gerror.New("该角色下仍有管理员, 不能删除")
 	}
-	if err = s.repo.DeleteRole(ctx, id); err != nil {
-		return err
-	}
-	// 一并清理该角色的 Casbin 策略
-	return rbac.RemoveRolePolicies(role.Code)
+	return s.repo.DeleteRole(ctx, id)
 }
 
 // ---------- 管理员账号管理 ----------

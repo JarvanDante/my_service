@@ -26,29 +26,77 @@ type LoginDTO struct {
 // ---------- 角色 / 权限 ----------
 
 type RoleDTO struct {
-	Id     int64
-	Name   string
-	Code   string
-	Remark string
-	Status int
-}
-
-type PermDTO struct {
-	Path   string
-	Method string
+	Id          int64
+	Name        string
+	Code        string
+	Remark      string
+	Status      int
+	Permissions string // 勾选的权限id列表, 逗号分隔
 }
 
 type RoleCreateInput struct {
-	Name   string
-	Code   string
-	Remark string
+	Name        string
+	Code        string
+	Remark      string
+	Permissions string
 }
 
 type RoleUpdateInput struct {
-	Id     int64
-	Name   string
-	Remark string
-	Status int
+	Id          int64
+	Name        string
+	Remark      string
+	Status      int
+	Permissions string
+}
+
+// ---------- RBAC 菜单+接口权限树 ----------
+
+type PermissionDTO struct {
+	Id         int64
+	ParentId   int64
+	Name       string
+	RouteUrl   string
+	Component  string
+	Method     string
+	Icon       string
+	IsMenu     int
+	HideInMenu int
+	AffixTab   int
+	ActivePath string
+	Sort       int
+	Status     int
+	Children   []*PermissionDTO
+}
+
+type PermissionInput struct {
+	Id         int64
+	ParentId   int64
+	Name       string
+	RouteUrl   string
+	Component  string
+	Method     string
+	Icon       string
+	IsMenu     int
+	HideInMenu int
+	AffixTab   int
+	ActivePath string
+	Sort       int
+	Status     int
+}
+
+// MenuNodeDTO 对应前端 vben 路由节点(/auth/menus 返回)。
+type MenuNodeDTO struct {
+	Name       string
+	Path       string
+	Component  string
+	Redirect   string
+	Title      string
+	Icon       string
+	Order      int
+	AffixTab   bool
+	HideInMenu bool
+	ActivePath string
+	Children   []*MenuNodeDTO
 }
 
 // ---------- 管理员账号 ----------
@@ -91,11 +139,15 @@ type IAdmin interface {
 	Logout(ctx context.Context, adminId int64) error
 	Info(ctx context.Context, adminId int64) (*AdminInfoDTO, error)
 
-	// 角色权限(Casbin)
+	// 角色
 	ListRoles(ctx context.Context) ([]*RoleDTO, error)
-	ListPerms(ctx context.Context, roleCode string) ([]*PermDTO, error)
-	AddPerm(ctx context.Context, roleCode, path, method string) error
-	RemovePerm(ctx context.Context, roleCode, path, method string) error
+
+	// 权限树 + 菜单
+	ListPermissions(ctx context.Context) ([]*PermissionDTO, error)
+	CreatePermission(ctx context.Context, in PermissionInput) (int64, error)
+	UpdatePermission(ctx context.Context, in PermissionInput) error
+	DeletePermission(ctx context.Context, id int64) error
+	MenusForAdmin(ctx context.Context, adminId int64) ([]*MenuNodeDTO, error)
 
 	// 角色管理
 	CreateRole(ctx context.Context, in RoleCreateInput) (int64, error)

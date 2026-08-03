@@ -58,10 +58,11 @@ func (r *adminRepo) FindRoleByCode(ctx context.Context, code string) (*entity.Ad
 
 func (r *adminRepo) CreateRole(ctx context.Context, role *entity.AdminRole) (int64, error) {
 	res, err := g.Model("admin_role").Ctx(ctx).Data(g.Map{
-		"name":   role.Name,
-		"code":   role.Code,
-		"remark": role.Remark,
-		"status": 1,
+		"name":        role.Name,
+		"code":        role.Code,
+		"remark":      role.Remark,
+		"status":      1,
+		"permissions": role.Permissions,
 	}).Insert()
 	if err != nil {
 		return 0, err
@@ -69,12 +70,13 @@ func (r *adminRepo) CreateRole(ctx context.Context, role *entity.AdminRole) (int
 	return res.LastInsertId()
 }
 
-func (r *adminRepo) UpdateRole(ctx context.Context, id int64, name, remark string, status int) error {
+func (r *adminRepo) UpdateRole(ctx context.Context, id int64, name, remark string, status int, permissions string) error {
 	_, err := g.Model("admin_role").Ctx(ctx).Where("id", id).Data(g.Map{
-		"name":       name,
-		"remark":     remark,
-		"status":     status,
-		"updated_at": gtime.Now(),
+		"name":        name,
+		"remark":      remark,
+		"status":      status,
+		"permissions": permissions,
+		"updated_at":  gtime.Now(),
 	}).Update()
 	return err
 }

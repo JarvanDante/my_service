@@ -11,7 +11,7 @@ import (
 // ---------- 角色管理 ----------
 
 func (c *Controller) CreateRole(ctx context.Context, req *v1.RoleCreateReq) (res *v1.RoleCreateRes, err error) {
-	id, err := c.admin.CreateRole(ctx, service.RoleCreateInput{Name: req.Name, Code: req.Code, Remark: req.Remark})
+	id, err := c.admin.CreateRole(ctx, service.RoleCreateInput{Name: req.Name, Code: req.Code, Remark: req.Remark, Permissions: req.Permissions})
 	if err != nil {
 		return nil, err
 	}
@@ -19,7 +19,7 @@ func (c *Controller) CreateRole(ctx context.Context, req *v1.RoleCreateReq) (res
 }
 
 func (c *Controller) UpdateRole(ctx context.Context, req *v1.RoleUpdateReq) (res *v1.RoleUpdateRes, err error) {
-	if err = c.admin.UpdateRole(ctx, service.RoleUpdateInput{Id: req.Id, Name: req.Name, Remark: req.Remark, Status: req.Status}); err != nil {
+	if err = c.admin.UpdateRole(ctx, service.RoleUpdateInput{Id: req.Id, Name: req.Name, Remark: req.Remark, Status: req.Status, Permissions: req.Permissions}); err != nil {
 		return nil, err
 	}
 	return &v1.RoleUpdateRes{}, nil
