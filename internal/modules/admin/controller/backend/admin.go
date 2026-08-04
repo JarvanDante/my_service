@@ -6,6 +6,7 @@ import (
 
 	"github.com/gogf/gf/v2/errors/gcode"
 	"github.com/gogf/gf/v2/errors/gerror"
+	"github.com/gogf/gf/v2/frame/g"
 	"github.com/gogf/gf/v2/net/ghttp"
 	"github.com/gogf/gf/v2/os/genv"
 
@@ -71,10 +72,18 @@ func toApi(d *service.AdminInfoDTO) v1.AdminInfo {
 	return v1.AdminInfo{Id: d.Id, Username: d.Username, Nickname: d.Nickname, RoleId: d.RoleId}
 }
 
-// siteMeta 站点品牌: SITE_CODE 来自部署 env; 站点名优先 site_config 表(后台可改), 兜底配置文件。
+// siteMeta 站点品牌:
+//
+//	SITE_CODE ← 部署 env;
+//	站点名优先级: site_config 表 > Nacos/本地配置 site_name > 默认「后台」。
 func siteMeta(ctx context.Context) (code, name string) {
 	code = genv.Get("SITE_CODE", "my").String()
-	def := "漫隐"
+	def := "后台"
+	if v, err := g.Cfg().Get(ctx, "site_name"); err == nil {
+		if s := v.String(); s != "" {
+			def = s
+		}
+	}
 	name = siteconf.Get(ctx, "site_name", def)
 	return
 }
