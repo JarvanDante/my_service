@@ -47,3 +47,27 @@ redis:
 kafka:
   brokers: ["127.0.0.1:9092"]
   groupId: "my_service"
+
+# 对象存储(本地 Docker MinIO API 映射 19000)
+minio:
+  endpoint:   "127.0.0.1:19000"
+  accessKey:  "minioadmin"
+  secretKey:  "minioadmin123"
+  bucket:     "my-media"
+  useSSL:     false
+  publicURL:  "http://127.0.0.1:19000"
+  publicRead: true
+
+upload:
+  image:
+    mime: ["image/jpeg", "image/jpg", "image/png", "image/gif", "image/webp"]
+    maxSize: 5120
+  cover:
+    mime: ["image/jpeg", "image/jpg", "image/png", "image/gif", "image/webp"]
+    maxSize: 5120
+  avatar:
+    mime: ["image/jpeg", "image/jpg", "image/png", "image/webp"]
+    maxSize: 2048
+  video:
+    mime: ["video/mp4", "video/quicktime", "video/x-matroska", "video/webm"]
+    maxSize: 2097152

@@ -10,6 +10,7 @@ import (
 	"github.com/JarvanDante/my_service/internal/dao"
 	adminmod "github.com/JarvanDante/my_service/internal/modules/admin"
 	finmod "github.com/JarvanDante/my_service/internal/modules/finance"
+	mediamod "github.com/JarvanDante/my_service/internal/modules/media"
 	promomod "github.com/JarvanDante/my_service/internal/modules/promo"
 	statsmod "github.com/JarvanDante/my_service/internal/modules/stats"
 	sysmod "github.com/JarvanDante/my_service/internal/modules/system"
@@ -46,6 +47,7 @@ var BackendAPI = gcmd.Command{
 				promomod.RegisterBackend(perm, dao.NewPromoRepo())
 				sysmod.RegisterBackend(perm, dao.NewSystemRepo())
 				statsmod.RegisterBackend(perm, dao.NewStatsRepo())
+				mediamod.RegisterBackend(perm, dao.NewMediaRepo())
 			})
 		})
 		s.Run()
