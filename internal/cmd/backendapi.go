@@ -15,6 +15,7 @@ import (
 	statsmod "github.com/JarvanDante/my_service/internal/modules/stats"
 	sysmod "github.com/JarvanDante/my_service/internal/modules/system"
 	usermod "github.com/JarvanDante/my_service/internal/modules/user"
+	videomod "github.com/JarvanDante/my_service/internal/modules/video"
 	"github.com/JarvanDante/my_service/internal/shared/middleware"
 )
 
@@ -48,6 +49,7 @@ var BackendAPI = gcmd.Command{
 				sysmod.RegisterBackend(perm, dao.NewSystemRepo())
 				statsmod.RegisterBackend(perm, dao.NewStatsRepo())
 				mediamod.RegisterBackend(perm, dao.NewMediaRepo())
+				videomod.RegisterBackend(perm, dao.NewVideoRepo())
 			})
 		})
 		s.Run()

@@ -18,6 +18,7 @@ import (
 	statsmod "github.com/JarvanDante/my_service/internal/modules/stats"
 	sysmod "github.com/JarvanDante/my_service/internal/modules/system"
 	usermod "github.com/JarvanDante/my_service/internal/modules/user"
+	videomod "github.com/JarvanDante/my_service/internal/modules/video"
 )
 
 // cfgAddr 读监听地址, 缺省回退默认。
@@ -63,6 +64,7 @@ var Main = gcmd.Command{
 				sysmod.RegisterBackend(perm, dao.NewSystemRepo())
 				statsmod.RegisterBackend(perm, dao.NewStatsRepo())
 				mediamod.RegisterBackend(perm, dao.NewMediaRepo())
+				videomod.RegisterBackend(perm, dao.NewVideoRepo())
 			})
 		})
 		s.Group("/manage", func(group *ghttp.RouterGroup) {

@@ -35,7 +35,8 @@ var purposeDefaults = map[string]struct {
 }
 
 func (s *sMedia) Upload(ctx context.Context, in service.UploadInput) (*service.UploadDTO, error) {
-	if in.File == nil {
+	// File 非 nil 但内嵌 FileHeader 为 nil 时, 直接读 Filename 会 panic
+	if in.File == nil || in.File.FileHeader == nil {
 		return nil, gerror.NewCode(gcode.CodeInvalidParameter, "文件必填")
 	}
 	purpose := strings.ToLower(strings.TrimSpace(in.Purpose))
@@ -52,7 +53,11 @@ func (s *sMedia) Upload(ctx context.Context, in service.UploadInput) (*service.U
 		return nil, gerror.NewCode(gcode.CodeInvalidParameter, "文件大小无效")
 	}
 
-	contentType := detectContentType(filename, in.File.Header.Get("Content-Type"))
+	headerType := ""
+	if in.File.Header != nil {
+		headerType = in.File.Header.Get("Content-Type")
+	}
+	contentType := detectContentType(filename, headerType)
 	if err := s.validateMime(ctx, purpose, contentType); err != nil {
 		return nil, err
 	}
