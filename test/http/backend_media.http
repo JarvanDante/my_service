@@ -1,0 +1,48 @@
+###############################################################################
+# 后台 P0 · 媒体上传(MinIO)
+# 用法: 先跑登录拿到 adminToken; 再选本地文件路径替换下面的 < 行
+###############################################################################
+
+@baseUrl = http://127.0.0.1:8000
+
+### 1. 管理员登录
+POST {{baseUrl}}/backend/auth/login
+Content-Type: application/json
+
+{ "username": "admin", "password": "admin123" }
+
+> {%
+client.global.set("adminToken", response.body.data.token);
+%}
+
+### 2. 上传封面图(purpose=cover|image|avatar)
+POST {{baseUrl}}/backend/media/upload
+Authorization: {{adminToken}}
+Content-Type: multipart/form-data; boundary=----MediaBoundary
+
+------MediaBoundary
+Content-Disposition: form-data; name="purpose"
+
+cover
+------MediaBoundary
+Content-Disposition: form-data; name="file"; filename="cover.jpg"
+Content-Type: image/jpeg
+
+< /tmp/cover.jpg
+------MediaBoundary--
+
+### 3. 上传视频源片(purpose=video)
+POST {{baseUrl}}/backend/media/upload
+Authorization: {{adminToken}}
+Content-Type: multipart/form-data; boundary=----MediaBoundary
+
+------MediaBoundary
+Content-Disposition: form-data; name="purpose"
+
+video
+------MediaBoundary
+Content-Disposition: form-data; name="file"; filename="demo.mp4"
+Content-Type: video/mp4
+
+< /tmp/demo.mp4
+------MediaBoundary--
