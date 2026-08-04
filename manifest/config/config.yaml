@@ -57,3 +57,6 @@ upload:
   video:
     mime: ["video/mp4", "video/quicktime", "video/x-matroska", "video/webm"]
     maxSize: 2097152
+  multipart:
+    partSize: 8388608   # 默认分片 8MiB(非末片须 ≥ 5MiB)
+    presignExpire: 7200 # 预签名有效秒数

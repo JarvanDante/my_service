@@ -12,5 +12,12 @@ import (
 // RegisterBackend 后台上传接口(挂权限组)。
 func RegisterBackend(group *ghttp.RouterGroup, repo domain.Repository) {
 	ctrl := backend.New(logic.New(repo))
-	group.Bind(ctrl.Upload)
+	group.Bind(
+		ctrl.Upload,
+		ctrl.MultipartInit,
+		ctrl.MultipartPresign,
+		ctrl.MultipartParts,
+		ctrl.MultipartComplete,
+		ctrl.MultipartAbort,
+	)
 }

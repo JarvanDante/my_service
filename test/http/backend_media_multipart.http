@@ -1,0 +1,65 @@
+###############################################################################
+# 后台 · MinIO 分片上传(预签名直传)
+# 流程: init → parts(可选) → presign → PUT 各片到 MinIO → complete
+###############################################################################
+
+@baseUrl = http://127.0.0.1:8000
+
+### 0. 登录
+POST {{baseUrl}}/backend/auth/login
+Content-Type: application/json
+
+{ "username": "admin", "password": "admin123" }
+
+> {%
+client.global.set("adminToken", response.body.data.token);
+%}
+
+### 1. 初始化分片(把 size 换成真实文件字节数)
+POST {{baseUrl}}/backend/media/multipart/init
+Authorization: {{adminToken}}
+Content-Type: application/json
+
+{
+  "filename": "demo.mp4",
+  "purpose": "video",
+  "content_type": "video/mp4",
+  "size": 4404019
+}
+
+> {%
+client.global.set("mpUploadId", response.body.data.upload_id);
+client.global.set("mpPartCount", response.body.data.part_count);
+%}
+
+### 2. 查询已传分片(断点续传)
+GET {{baseUrl}}/backend/media/multipart/parts?upload_id={{mpUploadId}}
+Authorization: {{adminToken}}
+
+### 3. 预签名第 1 片(可批量传 part_numbers)
+POST {{baseUrl}}/backend/media/multipart/presign
+Authorization: {{adminToken}}
+Content-Type: application/json
+
+{
+  "upload_id": "{{mpUploadId}}",
+  "part_numbers": [1]
+}
+
+### 4. 合并完成(parts 可空: 服务端自动 ListParts)
+POST {{baseUrl}}/backend/media/multipart/complete
+Authorization: {{adminToken}}
+Content-Type: application/json
+
+{
+  "upload_id": "{{mpUploadId}}"
+}
+
+### 5. 取消(未完成时)
+POST {{baseUrl}}/backend/media/multipart/abort
+Authorization: {{adminToken}}
+Content-Type: application/json
+
+{
+  "upload_id": "{{mpUploadId}}"
+}

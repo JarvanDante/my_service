@@ -1,10 +1,5 @@
-# ===== my_service 站点配置 =====
-# 贴进 Nacos: 配置管理 → 创建配置
-#   Data ID = my.yaml
-#   Group   = DEFAULT_GROUP
-#   格式    = YAML
-#   命名空间 = 选 dev(或 public/test)
-# 多商户时: 每个站点一条这样的配置, database.link 指向各自的库。
+# ===== my 站点配置 =====
+site_name: 漫隐
 
 server:
   address:     ":8000"
@@ -36,7 +31,7 @@ customer:
 # 本站点数据库(多商户时改成各自的库)
 database:
   default:
-    link:  "pgsql:postgres:654321@tcp(127.0.0.1:5432)/my_service?sslmode=disable"
+    link:  "pgsql:postgres:654321@tcp(127.0.0.1:5432)/my?sslmode=disable"
     debug: true
 
 redis:
@@ -46,7 +41,7 @@ redis:
 
 kafka:
   brokers: ["127.0.0.1:9092"]
-  groupId: "my_service"
+  groupId: "my"
 
 # 对象存储(本地 Docker MinIO API 映射 19000)
 minio:
@@ -71,3 +66,6 @@ upload:
   video:
     mime: ["video/mp4", "video/quicktime", "video/x-matroska", "video/webm"]
     maxSize: 2097152
+  multipart:
+    partSize: 8388608
+    presignExpire: 7200
