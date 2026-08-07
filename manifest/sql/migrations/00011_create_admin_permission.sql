@@ -1,5 +1,6 @@
 -- B-RBAC: 子后台菜单驱动 RBAC。admin_permission 统一存「菜单+接口权限」树;
 -- admin_role.permissions 存角色勾选的权限 id 列表(逗号分隔)。取代 casbin。
+-- 菜单层级: 一级目录(无 component) + 二级页面菜单 + 其下接口权限。
 -- 全显式 id + 末尾 setval; 可重复执行。
 -- +goose Up
 CREATE TABLE IF NOT EXISTS admin_permission (
@@ -27,71 +28,76 @@ COMMENT ON COLUMN admin_role.permissions IS '该角色勾选的权限id列表,�
 
 DELETE FROM admin_permission;
 
--- 菜单(is_menu=1)
+-- 菜单(is_menu=1): 一级目录 component 为空; 二级为实际页面
 INSERT INTO admin_permission (id, parent_id, name, route_url, component, method, icon, is_menu, hide_in_menu, affix_tab, sort) VALUES
- (1, 0, '仪表盘',      '/dashboard',        '',                          '', 'lucide:layout-dashboard', 1,0,0,-1),
- (2, 1, '分析页',      '/analytics',        'dashboard/analytics/index', '', 'lucide:area-chart',       1,0,1,0),
- (3, 0, '用户管理',    '/user',             'user/index',                '', 'lucide:users',            1,0,0,10),
- (4, 0, '财务管理',    '/finance',          'finance/index',             '', 'lucide:wallet',           1,0,0,20),
- (5, 0, '兑换码',      '/promo',            'promo/index',               '', 'lucide:ticket',           1,0,0,30),
- (6, 0, '用户组与成长','/growth',           'growth/index',              '', 'lucide:trophy',           1,0,0,40),
- (7, 0, '运营管理',    '/ops',              'ops/index',                 '', 'lucide:megaphone',        1,0,0,50),
- (8, 0, '系统管理',    '/system',           '',                          '', 'lucide:settings',         1,0,0,90),
- (9, 8, '角色权限',    '/system/role',      'system/role',               '', 'lucide:shield-check',     1,0,0,1),
- (10,8, '管理员',      '/system/admin',     'system/admin',              '', 'lucide:users',            1,0,0,2),
- (11,8, '菜单权限',    '/system/permission','system/permission',         '', 'lucide:list-tree',        1,0,0,3);
+ (1, 0, '概览',         '/dashboard',     '',              '', 'lucide:layout-dashboard', 1,0,0,-1),
+ (2, 1, '分析页',       '/analytics',     'dashboard/analytics/index', '', 'lucide:area-chart', 1,0,1,0),
+ (3, 0, '用户管理',     '/user',          '',              '', 'lucide:users',            1,0,0,10),
+ (79,3,'用户列表',      '/user/list',     'user/index',    '', 'lucide:list',             1,0,0,1),
+ (4, 0, '财务管理',     '/finance',       '',              '', 'lucide:wallet',           1,0,0,20),
+ (80,4,'财务中心',      '/finance/list',  'finance/index', '', 'lucide:wallet',           1,0,0,1),
+ (5, 0, '兑换码',       '/promo',         '',              '', 'lucide:ticket',           1,0,0,30),
+ (81,5,'兑换码管理',    '/promo/list',    'promo/index',   '', 'lucide:ticket',           1,0,0,1),
+ (6, 0, '用户组与成长', '/growth',        '',              '', 'lucide:trophy',           1,0,0,40),
+ (82,6,'成长中心',      '/growth/list',   'growth/index',  '', 'lucide:trophy',           1,0,0,1),
+ (7, 0, '运营管理',     '/ops',           '',              '', 'lucide:megaphone',        1,0,0,50),
+ (83,7,'运营中心',      '/ops/list',      'ops/index',     '', 'lucide:megaphone',        1,0,0,1),
+ (8, 0, '系统管理',     '/system',        '',              '', 'lucide:settings',         1,0,0,90),
+ (9, 8, '角色权限',     '/system/role',   'system/role',   '', 'lucide:shield-check',     1,0,0,1),
+ (10,8,'管理员',        '/system/admin',  'system/admin',  '', 'lucide:users',            1,0,0,2),
+ (11,8,'菜单权限',      '/system/permission','system/permission','', 'lucide:list-tree',  1,0,0,3);
 
--- 接口权限(is_menu=0)
+-- 接口权限(is_menu=0) 挂在二级页面菜单下
 INSERT INTO admin_permission (id, parent_id, name, route_url, method, is_menu, sort) VALUES
  -- 分析页
  (12,2, '数据概览',   '/backend/stats/overview',       'GET', 0, 1),
  (13,2, '注册趋势',   '/backend/stats/user-trend',     'GET', 0, 2),
  (14,2, '充值趋势',   '/backend/stats/recharge-trend', 'GET', 0, 3),
  (15,2, '渠道分析',   '/backend/stats/channels',       'GET', 0, 4),
- -- 用户管理
- (16,3, '用户列表',   '/backend/users',                    'GET',  0, 1),
- (17,3, '用户详情',   '/backend/users/{id}',               'GET',  0, 2),
- (18,3, '禁用/解禁',  '/backend/users/{id}/disable',       'POST', 0, 3),
- (19,3, '调整用户组', '/backend/users/{id}/group',         'POST', 0, 4),
- (20,3, '调整余额',   '/backend/users/{id}/balance',       'POST', 0, 5),
- (21,3, '用户流水',   '/backend/users/{id}/balance-logs',  'GET',  0, 6),
- -- 财务管理
- (22,4, '充值套餐列表','/backend/recharge-packages',       'GET',    0, 1),
- (23,4, '新增充值套餐','/backend/recharge-packages',       'POST',   0, 2),
- (24,4, '编辑充值套餐','/backend/recharge-packages/{id}',  'PUT',    0, 3),
- (25,4, '删除充值套餐','/backend/recharge-packages/{id}',  'DELETE', 0, 4),
- (26,4, 'VIP套餐列表', '/backend/vip-packages',            'GET',    0, 5),
- (27,4, '新增VIP套餐', '/backend/vip-packages',            'POST',   0, 6),
- (28,4, '编辑VIP套餐', '/backend/vip-packages/{id}',       'PUT',    0, 7),
- (29,4, '删除VIP套餐', '/backend/vip-packages/{id}',       'DELETE', 0, 8),
- (30,4, '充值订单',    '/backend/recharge-orders',         'GET',    0, 9),
- (31,4, '全站流水',    '/backend/balance-logs',            'GET',    0, 10),
- -- 兑换码
- (32,5, '兑换码列表',  '/backend/codes',            'GET',  0, 1),
- (33,5, '批量生成',    '/backend/codes',            'POST', 0, 2),
- (34,5, '作废兑换码',  '/backend/codes/{id}/void',  'POST', 0, 3),
- (35,5, '兑换记录',    '/backend/code-logs',        'GET',  0, 4),
- -- 用户组与成长
- (36,6, '用户组列表',  '/backend/user-groups',      'GET',    0, 1),
- (37,6, '新增用户组',  '/backend/user-groups',      'POST',   0, 2),
- (38,6, '编辑用户组',  '/backend/user-groups/{id}', 'PUT',    0, 3),
- (39,6, '删除用户组',  '/backend/user-groups/{id}', 'DELETE', 0, 4),
- (40,6, '任务列表',    '/backend/tasks',            'GET',    0, 5),
- (41,6, '新增任务',    '/backend/tasks',            'POST',   0, 6),
- (42,6, '编辑任务',    '/backend/tasks/{id}',       'PUT',    0, 7),
- (43,6, '删除任务',    '/backend/tasks/{id}',       'DELETE', 0, 8),
- (44,6, '任务记录',    '/backend/task-logs',        'GET',    0, 9),
- (45,6, '签到统计',    '/backend/sign-stats',       'GET',    0, 10),
- -- 运营管理
- (46,7, '发布公告/推送','/backend/push',                    'POST', 0, 1),
- (47,7, '公告列表',    '/backend/notices',                  'GET',  0, 2),
- (48,7, '公告上下架',  '/backend/notices/{id}/status',      'PUT',  0, 3),
- (49,7, '客服链接查看','/backend/config/customer-url',      'GET',  0, 4),
- (50,7, '客服链接保存','/backend/config/customer-url',      'PUT',  0, 5),
- (51,7, '消息监控',    '/backend/messages',                 'GET',  0, 6),
- (52,7, '关注关系',    '/backend/follows',                  'GET',  0, 7),
- (53,7, '分享记录',    '/backend/share-logs',               'GET',  0, 8),
- (54,7, '分享统计',    '/backend/share-stats',              'GET',  0, 9),
+ -- 用户列表
+ (16,79,'用户列表',   '/backend/users',                    'GET',  0, 1),
+ (17,79,'用户详情',   '/backend/users/{id}',               'GET',  0, 2),
+ (18,79,'禁用/解禁',  '/backend/users/{id}/disable',       'POST', 0, 3),
+ (19,79,'调整用户组', '/backend/users/{id}/group',         'POST', 0, 4),
+ (20,79,'调整余额',   '/backend/users/{id}/balance',       'POST', 0, 5),
+ (21,79,'用户流水',   '/backend/users/{id}/balance-logs',  'GET',  0, 6),
+ -- 财务中心
+ (22,80,'充值套餐列表','/backend/recharge-packages',       'GET',    0, 1),
+ (23,80,'新增充值套餐','/backend/recharge-packages',       'POST',   0, 2),
+ (24,80,'编辑充值套餐','/backend/recharge-packages/{id}',  'PUT',    0, 3),
+ (25,80,'删除充值套餐','/backend/recharge-packages/{id}',  'DELETE', 0, 4),
+ (26,80,'VIP套餐列表', '/backend/vip-packages',            'GET',    0, 5),
+ (27,80,'新增VIP套餐', '/backend/vip-packages',            'POST',   0, 6),
+ (28,80,'编辑VIP套餐', '/backend/vip-packages/{id}',       'PUT',    0, 7),
+ (29,80,'删除VIP套餐', '/backend/vip-packages/{id}',       'DELETE', 0, 8),
+ (30,80,'充值订单',    '/backend/recharge-orders',         'GET',    0, 9),
+ (31,80,'全站流水',    '/backend/balance-logs',            'GET',    0, 10),
+ -- 兑换码管理
+ (32,81,'兑换码列表',  '/backend/codes',            'GET',  0, 1),
+ (33,81,'批量生成',    '/backend/codes',            'POST', 0, 2),
+ (34,81,'作废兑换码',  '/backend/codes/{id}/void',  'POST', 0, 3),
+ (35,81,'兑换记录',    '/backend/code-logs',        'GET',  0, 4),
+ -- 成长中心
+ (36,82,'用户组列表',  '/backend/user-groups',      'GET',    0, 1),
+ (37,82,'新增用户组',  '/backend/user-groups',      'POST',   0, 2),
+ (38,82,'编辑用户组',  '/backend/user-groups/{id}', 'PUT',    0, 3),
+ (39,82,'删除用户组',  '/backend/user-groups/{id}', 'DELETE', 0, 4),
+ (40,82,'任务列表',    '/backend/tasks',            'GET',    0, 5),
+ (41,82,'新增任务',    '/backend/tasks',            'POST',   0, 6),
+ (42,82,'编辑任务',    '/backend/tasks/{id}',       'PUT',    0, 7),
+ (43,82,'删除任务',    '/backend/tasks/{id}',       'DELETE', 0, 8),
+ (44,82,'任务记录',    '/backend/task-logs',        'GET',    0, 9),
+ (45,82,'签到统计',    '/backend/sign-stats',       'GET',    0, 10),
+ -- 运营中心
+ (46,83,'发布公告/推送','/backend/push',                    'POST', 0, 1),
+ (47,83,'公告列表',    '/backend/notices',                  'GET',  0, 2),
+ (48,83,'公告上下架',  '/backend/notices/{id}/status',      'PUT',  0, 3),
+ (49,83,'客服链接查看','/backend/config/customer-url',      'GET',  0, 4),
+ (50,83,'客服链接保存','/backend/config/customer-url',      'PUT',  0, 5),
+ (51,83,'消息监控',    '/backend/messages',                 'GET',  0, 6),
+ (52,83,'关注关系',    '/backend/follows',                  'GET',  0, 7),
+ (53,83,'分享记录',    '/backend/share-logs',               'GET',  0, 8),
+ (54,83,'分享统计',    '/backend/share-stats',              'GET',  0, 9),
  -- 角色权限
  (55,9, '角色列表',    '/backend/roles',        'GET',    0, 1),
  (56,9, '新增角色',    '/backend/roles',        'POST',   0, 2),

@@ -109,23 +109,56 @@ func (s *sAdmin) MenusForAdmin(ctx context.Context, adminId int64) ([]*service.M
 		return nil, err
 	}
 
-	var rows []*entity.AdminPermission
-	if role != nil && role.Code == superAdminCode {
-		rows, err = s.repo.ListPermissions(ctx)
-	} else if role != nil {
-		rows, err = s.repo.FindPermissionsByIds(ctx, parseIds(role.Permissions))
-	}
+	all, err := s.repo.ListPermissions(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	menus := make([]*entity.AdminPermission, 0, len(rows))
-	for _, p := range rows {
-		if p.IsMenu == 1 && p.Status == 1 {
-			menus = append(menus, p)
+	var menus []*entity.AdminPermission
+	if role != nil && role.Code == superAdminCode {
+		for _, p := range all {
+			if p.IsMenu == 1 && p.Status == 1 {
+				menus = append(menus, p)
+			}
 		}
+	} else if role != nil {
+		// 勾选接口权限时也要带上祖先菜单, 否则侧栏为空/缺父级
+		menus = menusForRole(all, parseIds(role.Permissions))
 	}
 	return buildMenuTree(menus), nil
+}
+
+// menusForRole 根据角色勾选的权限 id, 展开祖先后筛出启用菜单节点。
+func menusForRole(all []*entity.AdminPermission, selected []int64) []*entity.AdminPermission {
+	if len(selected) == 0 {
+		return nil
+	}
+	byID := make(map[int64]*entity.AdminPermission, len(all))
+	for _, p := range all {
+		byID[p.Id] = p
+	}
+	keep := make(map[int64]struct{}, len(selected)*2)
+	for _, id := range selected {
+		for cur := id; cur > 0; {
+			if _, ok := keep[cur]; ok {
+				break
+			}
+			p, ok := byID[cur]
+			if !ok {
+				break
+			}
+			keep[cur] = struct{}{}
+			cur = p.ParentId
+		}
+	}
+	out := make([]*entity.AdminPermission, 0, len(keep))
+	for id := range keep {
+		p := byID[id]
+		if p != nil && p.IsMenu == 1 && p.Status == 1 {
+			out = append(out, p)
+		}
+	}
+	return out
 }
 
 func buildMenuTree(menus []*entity.AdminPermission) []*service.MenuNodeDTO {
@@ -155,8 +188,9 @@ func buildMenuTree(menus []*entity.AdminPermission) []*service.MenuNodeDTO {
 			roots = append(roots, node)
 		}
 	}
+	// 纯目录(自身无 component)才重定向到首个子菜单
 	for _, n := range nodeMap {
-		if len(n.Children) > 0 {
+		if len(n.Children) > 0 && n.Component == "" {
 			n.Redirect = n.Children[0].Path
 		}
 	}
