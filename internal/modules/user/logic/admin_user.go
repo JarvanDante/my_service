@@ -3,9 +3,13 @@ package logic
 
 import (
 	"context"
+	"crypto/md5"
+	"encoding/hex"
 	"fmt"
+	"sync"
 
 	"github.com/gogf/gf/v2/errors/gerror"
+	"github.com/gogf/gf/v2/frame/g"
 
 	"github.com/JarvanDante/my_service/internal/model/entity"
 	"github.com/JarvanDante/my_service/internal/modules/user/domain"
@@ -20,15 +24,19 @@ func (s *sUser) AdminListUsers(ctx context.Context, in service.AdminUserListInpu
 		in.Size = 20
 	}
 	list, total, err := s.repo.AdminListUsers(ctx, domain.AdminUserFilter{
-		Keyword: in.Keyword, Channel: in.Channel, GroupId: in.GroupId,
-		Status: in.Status, StartDate: in.StartDate, EndDate: in.EndDate,
+		Keyword: in.Keyword, UserId: in.UserId, Username: in.Username, Phone: in.Phone,
+		ParentId: in.ParentId, Channel: in.Channel, GroupId: in.GroupId,
+		IsUp: in.IsUp, IsValid: in.IsValid, HasBuy: in.HasBuy, Status: in.Status,
+		DeviceType: in.DeviceType, StartDate: in.StartDate, EndDate: in.EndDate,
+		MinLoginNum: in.MinLoginNum, MaxLoginNum: in.MaxLoginNum,
 	}, in.Page, in.Size)
 	if err != nil {
 		return nil, err
 	}
+	appidCache := map[int64]string{}
 	items := make([]*service.AdminUserItemDTO, 0, len(list))
 	for _, u := range list {
-		items = append(items, toAdminItem(u))
+		items = append(items, toAdminItem(ctx, u, appidCache))
 	}
 	return &service.AdminUserListDTO{List: items, Total: total, Page: in.Page, Size: in.Size}, nil
 }
@@ -42,21 +50,11 @@ func (s *sUser) AdminUserDetail(ctx context.Context, id int64) (*service.AdminUs
 		return nil, gerror.New("用户不存在")
 	}
 	d := &service.AdminUserDetailDTO{
-		AdminUserItemDTO: *toAdminItem(u),
-		Sex:              u.Sex,
+		AdminUserItemDTO: *toAdminItem(ctx, u, map[int64]string{}),
 		Signature:        u.Signature,
-		Img:              u.Img,
 		Fans:             u.Fans,
 		Follow:           u.Follow,
-		ShareNum:         u.ShareNum,
-		ParentId:         u.ParentId,
-		ParentName:       u.ParentName,
-		GroupRate:        u.GroupRate,
-		GroupEndTime:     u.GroupEndTime,
 		ErrorMsg:         u.ErrorMsg,
-		RegisterIp:       u.RegisterIp,
-		LastIp:           u.LastIp,
-		LoginNum:         u.LoginNum,
 	}
 	return d, nil
 }
@@ -155,12 +153,62 @@ func (s *sUser) AdminBalanceLogs(ctx context.Context, userId int64, page, size i
 	return out, total, nil
 }
 
-func toAdminItem(u *entity.Users) *service.AdminUserItemDTO {
+func toAdminItem(ctx context.Context, u *entity.Users, appidCache map[int64]string) *service.AdminUserItemDTO {
 	return &service.AdminUserItemDTO{
 		Id: u.Id, Username: u.Username, Nickname: u.Nickname, Phone: u.Phone,
-		Channel: u.ChannelName, GroupId: u.GroupId, GroupName: u.GroupName,
-		Level: u.Level, Balance: u.Balance, Credit: u.Credit, MoneyCount: u.MoneyCount,
+		Sex: u.Sex, Tag: u.Tag, Img: u.Img,
+		AccountSlat: buildAccountSlat(ctx, u.Username, u.SiteId, appidCache),
+		Balance:     u.Balance, GiftCount: u.GiftCount, Credit: u.Credit, MoneyCount: u.MoneyCount,
+		IsUp: u.IsUp, IsValid: u.IsValid, HasBuy: u.HasBuy, Level: u.Level,
+		GroupId: u.GroupId, GroupName: u.GroupName, GroupRate: u.GroupRate,
+		GroupStartTime: u.GroupStartTime, GroupEndTime: u.GroupEndTime,
+		ParentId: u.ParentId, ParentName: u.ParentName, Channel: u.ChannelName,
+		DeviceType: u.DeviceType, DeviceExt: u.DeviceExt, DeviceVersion: u.DeviceVersion,
+		MovieFeeRate: u.MovieFeeRate, PostFeeRate: u.PostFeeRate, ShareNum: u.ShareNum,
 		IsDisabled: u.IsDisabled,
-		RegisterAt: fmtTime(u.RegisterAt), LastLoginAt: fmtTime(u.LastLoginAt),
+		RegisterAt: fmtTime(u.RegisterAt), RegisterIp: u.RegisterIp, RegisterArea: u.RegisterArea,
+		LastLoginAt: fmtTime(u.LastLoginAt), LastIp: u.LastIp, LoginNum: u.LoginNum,
 	}
+}
+
+// buildAccountSlat 与公司后台一致: username==>md5(username_appid)。
+func buildAccountSlat(ctx context.Context, username string, siteId int64, cache map[int64]string) string {
+	if username == "" {
+		return ""
+	}
+	appid := siteAppid(ctx, siteId, cache)
+	sum := md5.Sum([]byte(username + "_" + appid))
+	return username + "==>" + hex.EncodeToString(sum[:])
+}
+
+var defaultAppidOnce sync.Once
+var defaultAppid string
+
+func siteAppid(ctx context.Context, siteId int64, cache map[int64]string) string {
+	if siteId <= 0 {
+		siteId = 1
+	}
+	if cache != nil {
+		if v, ok := cache[siteId]; ok {
+			return v
+		}
+	}
+	v, err := g.Model("site").Ctx(ctx).Where("id", siteId).Value("appid")
+	appid := ""
+	if err == nil && v != nil {
+		appid = v.String()
+	}
+	if appid == "" {
+		defaultAppidOnce.Do(func() {
+			dv, _ := g.Model("site").Ctx(ctx).OrderAsc("id").Value("appid")
+			if dv != nil {
+				defaultAppid = dv.String()
+			}
+		})
+		appid = defaultAppid
+	}
+	if cache != nil {
+		cache[siteId] = appid
+	}
+	return appid
 }

@@ -36,6 +36,10 @@ type Users struct {
 	HasBuy         int         `json:"hasBuy"         orm:"has_buy"          description:""` //
 	Rights         string      `json:"rights"         orm:"rights"           description:""` //
 	WithdrawInfo   string      `json:"withdrawInfo"   orm:"withdraw_info"    description:""` //
+	IsUp           int         `json:"isUp"           orm:"is_up"            description:""` //
+	IsValid        int         `json:"isValid"        orm:"is_valid"         description:""` //
+	MovieFeeRate   int         `json:"movieFeeRate"   orm:"movie_fee_rate"   description:""` //
+	PostFeeRate    int         `json:"postFeeRate"    orm:"post_fee_rate"    description:""` //
 	GroupId        int64       `json:"groupId"        orm:"group_id"         description:""` //
 	GroupName      string      `json:"groupName"      orm:"group_name"       description:""` //
 	GroupRate      int         `json:"groupRate"      orm:"group_rate"       description:""` //

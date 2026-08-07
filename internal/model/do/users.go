@@ -38,6 +38,10 @@ type Users struct {
 	HasBuy         any         //
 	Rights         any         //
 	WithdrawInfo   any         //
+	IsUp           any         //
+	IsValid        any         //
+	MovieFeeRate   any         //
+	PostFeeRate    any         //
 	GroupId        any         //
 	GroupName      any         //
 	GroupRate      any         //

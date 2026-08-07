@@ -47,6 +47,10 @@ type UsersColumns struct {
 	HasBuy         string //
 	Rights         string //
 	WithdrawInfo   string //
+	IsUp           string //
+	IsValid        string //
+	MovieFeeRate   string //
+	PostFeeRate    string //
 	GroupId        string //
 	GroupName      string //
 	GroupRate      string //
@@ -107,6 +111,10 @@ var usersColumns = UsersColumns{
 	HasBuy:         "has_buy",
 	Rights:         "rights",
 	WithdrawInfo:   "withdraw_info",
+	IsUp:           "is_up",
+	IsValid:        "is_valid",
+	MovieFeeRate:   "movie_fee_rate",
+	PostFeeRate:    "post_fee_rate",
 	GroupId:        "group_id",
 	GroupName:      "group_name",
 	GroupRate:      "group_rate",

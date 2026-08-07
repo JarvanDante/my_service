@@ -29,8 +29,11 @@ func operatorId(ctx context.Context) (int64, error) {
 // List 用户列表。
 func (c *Controller) List(ctx context.Context, req *v1.ListReq) (res *v1.ListRes, err error) {
 	dto, err := c.user.AdminListUsers(ctx, service.AdminUserListInput{
-		Keyword: req.Keyword, Channel: req.Channel, GroupId: req.GroupId,
-		Status: req.Status, StartDate: req.StartDate, EndDate: req.EndDate,
+		Keyword: req.Keyword, UserId: req.UserId, Username: req.Username, Phone: req.Phone,
+		ParentId: req.ParentId, Channel: req.Channel, GroupId: req.GroupId,
+		IsUp: req.IsUp, IsValid: req.IsValid, HasBuy: req.HasBuy, Status: req.Status,
+		DeviceType: req.DeviceType, StartDate: req.StartDate, EndDate: req.EndDate,
+		MinLoginNum: req.MinLoginNum, MaxLoginNum: req.MaxLoginNum,
 		Page: req.Page, Size: req.Size,
 	})
 	if err != nil {
@@ -51,11 +54,10 @@ func (c *Controller) Detail(ctx context.Context, req *v1.DetailReq) (res *v1.Det
 	}
 	return &v1.DetailRes{
 		AdminUserItem: toItem(&d.AdminUserItemDTO),
-		Sex:           d.Sex, Signature: d.Signature, Img: d.Img,
-		Fans: d.Fans, Follow: d.Follow, ShareNum: d.ShareNum,
-		ParentId: d.ParentId, ParentName: d.ParentName,
-		GroupRate: d.GroupRate, GroupEndTime: d.GroupEndTime,
-		ErrorMsg: d.ErrorMsg, RegisterIp: d.RegisterIp, LastIp: d.LastIp, LoginNum: d.LoginNum,
+		Signature:     d.Signature,
+		Fans:          d.Fans,
+		Follow:        d.Follow,
+		ErrorMsg:      d.ErrorMsg,
 	}, nil
 }
 
@@ -120,8 +122,16 @@ func (c *Controller) BalanceLogs(ctx context.Context, req *v1.BalanceLogsReq) (r
 func toItem(u *service.AdminUserItemDTO) v1.AdminUserItem {
 	return v1.AdminUserItem{
 		Id: u.Id, Username: u.Username, Nickname: u.Nickname, Phone: u.Phone,
-		Channel: u.Channel, GroupId: u.GroupId, GroupName: u.GroupName,
-		Level: u.Level, Balance: u.Balance, Credit: u.Credit, MoneyCount: u.MoneyCount,
-		IsDisabled: u.IsDisabled, RegisterAt: u.RegisterAt, LastLoginAt: u.LastLoginAt,
+		Sex: u.Sex, Tag: u.Tag, Img: u.Img, AccountSlat: u.AccountSlat,
+		Balance: u.Balance, GiftCount: u.GiftCount, Credit: u.Credit, MoneyCount: u.MoneyCount,
+		IsUp: u.IsUp, IsValid: u.IsValid, HasBuy: u.HasBuy, Level: u.Level,
+		GroupId: u.GroupId, GroupName: u.GroupName, GroupRate: u.GroupRate,
+		GroupStartTime: u.GroupStartTime, GroupEndTime: u.GroupEndTime,
+		ParentId: u.ParentId, ParentName: u.ParentName, Channel: u.Channel,
+		DeviceType: u.DeviceType, DeviceExt: u.DeviceExt, DeviceVersion: u.DeviceVersion,
+		MovieFeeRate: u.MovieFeeRate, PostFeeRate: u.PostFeeRate, ShareNum: u.ShareNum,
+		IsDisabled: u.IsDisabled,
+		RegisterAt: u.RegisterAt, RegisterIp: u.RegisterIp, RegisterArea: u.RegisterArea,
+		LastLoginAt: u.LastLoginAt, LastIp: u.LastIp, LoginNum: u.LoginNum,
 	}
 }

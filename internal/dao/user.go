@@ -556,15 +556,48 @@ func (r *userRepo) DeleteConversation(ctx context.Context, userId, peerId int64)
 // AdminListUsers 后台用户列表(筛选+分页)。
 func (r *userRepo) AdminListUsers(ctx context.Context, f domain.AdminUserFilter, page, size int) ([]*entity.Users, int, error) {
 	m := g.Model("users").Ctx(ctx)
+	if f.UserId > 0 {
+		m = m.Where("id", f.UserId)
+	}
 	if f.Keyword != "" {
 		kw := "%" + f.Keyword + "%"
 		m = m.Where("(username ILIKE ? OR phone ILIKE ? OR nickname ILIKE ?)", kw, kw, kw)
 	}
+	if f.Username != "" {
+		m = m.Where("username ILIKE ?", "%"+f.Username+"%")
+	}
+	if f.Phone != "" {
+		m = m.Where("phone ILIKE ?", "%"+f.Phone+"%")
+	}
+	if f.ParentId > 0 {
+		m = m.Where("parent_id", f.ParentId)
+	}
 	if f.Channel != "" {
-		m = m.Where("channel_name", f.Channel)
+		m = m.Where("channel_name ILIKE ?", "%"+f.Channel+"%")
 	}
 	if f.GroupId > 0 {
 		m = m.Where("group_id", f.GroupId)
+	}
+	if f.DeviceType != "" {
+		m = m.Where("device_type", f.DeviceType)
+	}
+	switch f.IsUp {
+	case 1:
+		m = m.Where("is_up", 1)
+	case 2:
+		m = m.Where("is_up", 0)
+	}
+	switch f.IsValid {
+	case 1:
+		m = m.Where("is_valid", 1)
+	case 2:
+		m = m.Where("is_valid", 0)
+	}
+	switch f.HasBuy {
+	case 1:
+		m = m.Where("has_buy", 1)
+	case 2:
+		m = m.Where("has_buy", 0)
 	}
 	switch f.Status {
 	case 1:
@@ -577,6 +610,12 @@ func (r *userRepo) AdminListUsers(ctx context.Context, f domain.AdminUserFilter,
 	}
 	if f.EndDate > 0 {
 		m = m.Where("register_date <= ?", f.EndDate)
+	}
+	if f.MinLoginNum > 0 {
+		m = m.Where("login_num >= ?", f.MinLoginNum)
+	}
+	if f.MaxLoginNum > 0 {
+		m = m.Where("login_num <= ?", f.MaxLoginNum)
 	}
 	total, err := m.Clone().Count()
 	if err != nil {

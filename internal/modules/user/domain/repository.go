@@ -11,12 +11,22 @@ import (
 
 // AdminUserFilter 后台用户列表筛选条件。
 type AdminUserFilter struct {
-	Keyword   string // 用户名/手机/昵称 模糊
-	Channel   string // 渠道
-	GroupId   int64  // 用户组
-	Status    int    // 0全部 1正常 2禁用
-	StartDate int    // 注册日起 YYYYMMDD
-	EndDate   int    // 注册日止 YYYYMMDD
+	Keyword     string // 用户名/手机/昵称 模糊
+	UserId      int64  // 精确用户ID
+	Username    string // 用户名
+	Phone       string // 手机号
+	ParentId    int64  // 上级ID
+	Channel     string // 渠道
+	GroupId     int64  // 用户组
+	IsUp        int    // 0全部 1是 2否
+	IsValid     int    // 0全部 1是 2否
+	HasBuy      int    // 0全部 1是 2否
+	Status      int    // 0全部 1正常 2禁用
+	DeviceType  string // 设备类型
+	StartDate   int    // 注册日起 YYYYMMDD
+	EndDate     int    // 注册日止 YYYYMMDD
+	MinLoginNum int    // 登录次数下限
+	MaxLoginNum int    // 登录次数上限
 }
 
 // TaskLogFilter 任务记录筛选(B5)。

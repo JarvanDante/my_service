@@ -198,32 +198,65 @@ type MessageDTO struct {
 
 // AdminUserItemDTO 后台用户列表项。
 type AdminUserItemDTO struct {
-	Id          int64
-	Username    string
-	Nickname    string
-	Phone       string
-	Channel     string
-	GroupId     int64
-	GroupName   string
-	Level       int
-	Balance     float64
-	Credit      float64
-	MoneyCount  float64
-	IsDisabled  int
-	RegisterAt  string
-	LastLoginAt string
+	Id             int64
+	Username       string
+	Nickname       string
+	Phone          string
+	Sex            int
+	Tag            string
+	Img            string
+	AccountSlat    string
+	Balance        float64
+	GiftCount      float64
+	Credit         float64
+	MoneyCount     float64
+	IsUp           int
+	IsValid        int
+	HasBuy         int
+	Level          int
+	GroupId        int64
+	GroupName      string
+	GroupRate      int
+	GroupStartTime int64
+	GroupEndTime   int64
+	ParentId       int64
+	ParentName     string
+	Channel        string
+	DeviceType     string
+	DeviceExt      string
+	DeviceVersion  string
+	MovieFeeRate   int
+	PostFeeRate    int
+	ShareNum       int
+	IsDisabled     int
+	RegisterAt     string
+	RegisterIp     string
+	RegisterArea   string
+	LastLoginAt    string
+	LastIp         string
+	LoginNum       int
 }
 
 // AdminUserListInput 后台用户列表入参。
 type AdminUserListInput struct {
-	Keyword   string
-	Channel   string
-	GroupId   int64
-	Status    int // 0全部 1正常 2禁用
-	StartDate int // YYYYMMDD
-	EndDate   int
-	Page      int
-	Size      int
+	Keyword     string
+	UserId      int64
+	Username    string
+	Phone       string
+	ParentId    int64
+	Channel     string
+	GroupId     int64
+	IsUp        int // 0全部 1是 2否
+	IsValid     int
+	HasBuy      int
+	Status      int // 0全部 1正常 2禁用
+	DeviceType  string
+	StartDate   int // YYYYMMDD
+	EndDate     int
+	MinLoginNum int
+	MaxLoginNum int
+	Page        int
+	Size        int
 }
 
 // AdminUserListDTO 后台用户列表。
@@ -237,20 +270,10 @@ type AdminUserListDTO struct {
 // AdminUserDetailDTO 后台用户详情(含状态/组/资产/轨迹)。
 type AdminUserDetailDTO struct {
 	AdminUserItemDTO
-	Sex          int
-	Signature    string
-	Img          string
-	Fans         int
-	Follow       int
-	ShareNum     int
-	ParentId     int64
-	ParentName   string
-	GroupRate    int
-	GroupEndTime int64
-	ErrorMsg     string
-	RegisterIp   string
-	LastIp       string
-	LoginNum     int
+	Signature string
+	Fans      int
+	Follow    int
+	ErrorMsg  string
 }
 
 // AdminSetGroupInput 调整用户组入参。
