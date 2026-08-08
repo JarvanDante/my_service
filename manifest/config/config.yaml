@@ -16,6 +16,21 @@ logger:
   level:  "all"
   stdout: true
 
+# 本站点信息(与 Nacos 模板对齐; 本地无 Nacos 时生效)
+site:
+  id:       1
+  code:     "my"
+  currency: "CNY"
+  timezone: "Asia/Shanghai"
+
+# 响应扩展字段白名单(字段差异)。详见 docs/site-features-nacos.md
+response:
+  comics_list_extra:
+    - topic_follow
+    - update_date_label
+  comics_detail_extra:
+    - topic_follow
+
 # PostgreSQL(后台/总后台可指向只读副本, 进一步隔离对前台库的压力)
 database:
   default:

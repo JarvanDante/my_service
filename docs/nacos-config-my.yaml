@@ -24,6 +24,15 @@ site:
   currency: "CNY"
   timezone: "Asia/Shanghai"
 
+# 响应扩展字段白名单(字段差异)。代码: siteconf.ExtraFields / PickExt / HasExtra
+# 公共字段走固定 DTO; 下列字段进 item.ext
+response:
+  comics_list_extra:
+    - topic_follow
+    - update_date_label
+  comics_detail_extra:
+    - topic_follow
+
 # 客服链接(/front/user/customer-url 读取)
 customer:
   url: "https://example.com/kefu"
