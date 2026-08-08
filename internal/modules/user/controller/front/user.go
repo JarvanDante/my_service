@@ -11,6 +11,7 @@ import (
 	v1 "github.com/JarvanDante/my_service/api/front/user/v1"
 	"github.com/JarvanDante/my_service/internal/modules/user/service"
 	"github.com/JarvanDante/my_service/internal/shared/consts"
+	"github.com/JarvanDante/my_service/internal/shared/siteconf"
 )
 
 type Controller struct{ user service.IUser }
@@ -38,7 +39,7 @@ func (c *Controller) Login(ctx context.Context, req *v1.LoginReq) (res *v1.Login
 	if err != nil {
 		return nil, err
 	}
-	return &v1.LoginRes{Token: dto.Token, User: toApiUser(dto.User)}, nil
+	return &v1.LoginRes{Token: dto.Token, User: toApiUser(ctx, dto.User)}, nil
 }
 
 // Info 需登录。
@@ -51,7 +52,7 @@ func (c *Controller) Info(ctx context.Context, req *v1.InfoReq) (res *v1.InfoRes
 	if err != nil {
 		return nil, err
 	}
-	return &v1.InfoRes{UserInfo: toApiUser(dto)}, nil
+	return &v1.InfoRes{UserInfo: toApiUser(ctx, dto)}, nil
 }
 
 // Logout 退出登录。
@@ -567,7 +568,7 @@ func (c *Controller) CustomerUrl(ctx context.Context, req *v1.CustomerUrlReq) (r
 	return &v1.CustomerUrlRes{Url: url}, nil
 }
 
-func toApiUser(d *service.UserInfoDTO) v1.UserInfo {
+func toApiUser(ctx context.Context, d *service.UserInfoDTO) v1.UserInfo {
 	if d == nil {
 		return v1.UserInfo{}
 	}
@@ -576,5 +577,12 @@ func toApiUser(d *service.UserInfoDTO) v1.UserInfo {
 		Img: d.Img, Signature: d.Signature, Sex: d.Sex, Level: d.Level,
 		Balance: d.Balance, Credit: d.Credit, GroupName: d.GroupName,
 		Fans: d.Fans, Follow: d.Follow,
+		// 站点差异字段: 仅返回 Nacos response.user_info_extra 白名单内的 key
+		Ext: siteconf.PickExt(ctx, "user_info", map[string]interface{}{
+			"bg_img":         d.BgImg,
+			"share_num":      d.ShareNum,
+			"channel_name":   d.ChannelName,
+			"group_end_time": d.GroupEndTime,
+		}),
 	}
 }

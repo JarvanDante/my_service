@@ -24,12 +24,13 @@ site:
   timezone: "Asia/Shanghai"
 
 # 响应扩展字段白名单(字段差异)。详见 docs/site-features-nacos.md
+# /front/user/info → response.user_info_extra → data.ext
 response:
-  comics_list_extra:
-    - topic_follow
-    - update_date_label
-  comics_detail_extra:
-    - topic_follow
+  user_info_extra:
+    - bg_img
+    - share_num
+    - channel_name
+    # - group_end_time   # 需要时取消注释即可出现在 ext
 
 # PostgreSQL(后台/总后台可指向只读副本, 进一步隔离对前台库的压力)
 database:

@@ -108,19 +108,23 @@ func (s *sUser) DisableUser(ctx context.Context, id int64) error {
 
 func toUserInfo(u *entity.Users) *service.UserInfoDTO {
 	return &service.UserInfoDTO{
-		Id:        u.Id,
-		Username:  u.Username,
-		Nickname:  u.Nickname,
-		Phone:     u.Phone,
-		Img:       u.Img,
-		Signature: u.Signature,
-		Sex:       u.Sex,
-		Level:     u.Level,
-		Balance:   u.Balance,
-		Credit:    u.Credit,
-		GroupName: u.GroupName,
-		Fans:      u.Fans,
-		Follow:    u.Follow,
+		Id:           u.Id,
+		Username:     u.Username,
+		Nickname:     u.Nickname,
+		Phone:        u.Phone,
+		Img:          u.Img,
+		Signature:    u.Signature,
+		Sex:          u.Sex,
+		Level:        u.Level,
+		Balance:      u.Balance,
+		Credit:       u.Credit,
+		GroupName:    u.GroupName,
+		Fans:         u.Fans,
+		Follow:       u.Follow,
+		BgImg:        u.BgImg,
+		ShareNum:     u.ShareNum,
+		ChannelName:  u.ChannelName,
+		GroupEndTime: u.GroupEndTime,
 	}
 }
 

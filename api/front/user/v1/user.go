@@ -17,6 +17,8 @@ type UserInfo struct {
 	GroupName string  `json:"group_name"`
 	Fans      int     `json:"fans"`
 	Follow    int     `json:"follow"`
+	// Ext 站点差异字段(由 Nacos response.user_info_extra 白名单控制)
+	Ext map[string]interface{} `json:"ext,omitempty"`
 }
 
 // 设备登录(公开)

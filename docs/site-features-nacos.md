@@ -11,34 +11,39 @@
 | 本地 | `manifest/config/config.yaml` |
 | 模板 | `docs/nacos-config-my.yaml` |
 
-## 字段差异：`response.*_extra` + `ext`
+## 样板：`GET /front/user/info`
 
 ```yaml
 response:
-  comics_list_extra:
-    - topic_follow
-    - update_date_label
-  comics_detail_extra:
-    - topic_follow
+  user_info_extra:
+    - bg_img
+    - share_num
+    - channel_name
+    # - group_end_time
 ```
 
-代码：
+返回示例（公共字段不变，差异在 `ext`）：
 
-```go
-import "github.com/JarvanDante/my_service/internal/shared/siteconf"
-
-type Item struct {
-    ID    int64                  `json:"id"`
-    Title string                 `json:"title"`
-    Ext   map[string]interface{} `json:"ext,omitempty"`
+```json
+{
+  "code": 0,
+  "data": {
+    "id": 2,
+    "username": "device_64",
+    "nickname": "用户864648",
+    "balance": 0,
+    "ext": {
+      "bg_img": "",
+      "share_num": 0,
+      "channel_name": ""
+    }
+  }
 }
-
-item.Ext = siteconf.PickExt(ctx, "comics_list", map[string]interface{}{
-    "topic_follow":      row.TopicFollow,
-    "update_date_label": row.UpdateDateLabel,
-    "internal_only":     row.Secret, // 未在白名单则不会进 ext
-})
 ```
+
+实现位置：`controller/front/user.go` → `toApiUser` → `siteconf.PickExt(ctx, "user_info", ...)`。
+
+改 Nacos / 本地 `response.user_info_extra` 即可增减 `ext` 字段，无需改接口路径。
 
 | API | 作用 |
 |-----|------|

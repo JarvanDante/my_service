@@ -25,13 +25,13 @@ site:
   timezone: "Asia/Shanghai"
 
 # 响应扩展字段白名单(字段差异)。代码: siteconf.ExtraFields / PickExt / HasExtra
-# 公共字段走固定 DTO; 下列字段进 item.ext
+# /front/user/info 公共字段固定; 下列字段进 data.ext
 response:
-  comics_list_extra:
-    - topic_follow
-    - update_date_label
-  comics_detail_extra:
-    - topic_follow
+  user_info_extra:
+    - bg_img
+    - share_num
+    - channel_name
+    # - group_end_time
 
 # 客服链接(/front/user/customer-url 读取)
 customer:

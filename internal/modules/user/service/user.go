@@ -25,6 +25,11 @@ type UserInfoDTO struct {
 	GroupName string
 	Fans      int
 	Follow    int
+	// 以下供站点差异字段(ext)候选, 是否返回由 Nacos response.user_info_extra 决定
+	BgImg        string
+	ShareNum     int
+	ChannelName  string
+	GroupEndTime int64
 }
 
 // PublicUserDTO 对外公开信息(看他人时用, 不含手机/余额)。
