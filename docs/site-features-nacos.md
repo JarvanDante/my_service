@@ -59,3 +59,8 @@ response:
 |------|------|
 | 扩展字段名单、基础设施 | **Nacos YAML** |
 | 运营可改的文案/链接等 KV | `site_config` 表（现有 `siteconf.Get/Set`） |
+
+## 与 PaaS 的边界
+
+Nacos 只做**站点配置通道**；支付/广告等平台能力走 PaaS（`app_key` 调用），不要再把三方业务配置整包下发到各站 YAML。  
+详见总后台仓库：`my_manage_service/docs/nacos-vs-paas.md`。
