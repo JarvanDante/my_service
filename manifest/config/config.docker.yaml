@@ -1,0 +1,71 @@
+# Docker 容器内配置（mydocker / jarven）
+# 一体化入口监听 :8000（含 /front /backend /manage）；总后台控制面请用 my_manage_service:8003
+
+server:
+  address:     ":8000"
+  openapiPath: "/api.json"
+  swaggerPath: "/swagger"
+
+frontapi:
+  address: ":8001"
+backendapi:
+  address: ":8002"
+manageapi:
+  address: ":8003"
+
+logger:
+  level:  "all"
+  stdout: true
+
+site:
+  id:       1
+  code:     "my"
+  currency: "CNY"
+  timezone: "Asia/Shanghai"
+
+response:
+  user_info_extra:
+    - bg_img
+    - share_num
+    - channel_name
+
+database:
+  default:
+    link:  "pgsql:postgres:654321@tcp(postgres:5432)/my_service?sslmode=disable"
+    debug: true
+
+redis:
+  default:
+    address: "redis:6379"
+    db:      0
+
+kafka:
+  brokers: ["kafka:29092"]
+  groupId: "my_service"
+
+minio:
+  # 预签名/直链给浏览器：走宿主机映射
+  endpoint:   "host.docker.internal:19000"
+  accessKey:  "minioadmin"
+  secretKey:  "minioadmin123"
+  bucket:     "my-media"
+  useSSL:     false
+  publicURL:  "http://127.0.0.1:19000"
+  publicRead: true
+
+upload:
+  image:
+    mime: ["image/jpeg", "image/jpg", "image/png", "image/gif", "image/webp"]
+    maxSize: 5120
+  cover:
+    mime: ["image/jpeg", "image/jpg", "image/png", "image/gif", "image/webp"]
+    maxSize: 5120
+  avatar:
+    mime: ["image/jpeg", "image/jpg", "image/png", "image/webp"]
+    maxSize: 2048
+  video:
+    mime: ["video/mp4", "video/quicktime", "video/x-matroska", "video/webm"]
+    maxSize: 2097152
+  multipart:
+    partSize: 8388608
+    presignExpire: 7200

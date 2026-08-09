@@ -63,3 +63,16 @@ hack/config.yaml        gf gen 多模块生成配置
 ```bash
 go mod tidy && make all
 ```
+
+## Docker 服务（mydocker）
+
+一体化入口（`main.go`）挂到 `:8000`：
+
+```bash
+make docker-up
+make docker-logs
+make docker-rebuild
+```
+
+配置：`manifest/config/config.docker.yaml`。探活：`curl http://127.0.0.1:8000/health`  
+控制面总后台请用 `my_manage_service:8003`，勿与本容器内 `/manage` 门面混淆。
