@@ -31,7 +31,7 @@ response:
 
 database:
   default:
-    link:  "pgsql:postgres:654321@tcp(postgres:5432)/my_service?sslmode=disable"
+    link:  "pgsql:postgres:654321@tcp(postgres:5432)/my?sslmode=disable"
     debug: true
 
 redis:
