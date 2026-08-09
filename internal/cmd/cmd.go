@@ -67,10 +67,6 @@ var Main = gcmd.Command{
 				videomod.RegisterBackend(perm, dao.NewVideoRepo())
 			})
 		})
-		s.Group("/manage", func(group *ghttp.RouterGroup) {
-			group.Middleware(middleware.Auth)
-			usermod.RegisterManage(group, dao.NewUserRepo())
-		})
 
 		registerCronJobs(ctx)
 		s.Run()

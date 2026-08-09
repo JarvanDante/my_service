@@ -1,7 +1,8 @@
 # my_service · 漫隐 API
 
 GoFrame 模块化单体(Module-First)+ 多二进制入口。业务代码一份共享,
-前台/后台/总后台/定时任务各编译为独立二进制、独立进程,互不影响资源。
+前台/后台/定时任务各编译为独立二进制、独立进程,互不影响资源。
+平台总后台在独立仓库 `my_manage_service`（默认 :8003），本仓库不再提供 `/manage`。
 
 ## 二进制与端口
 
@@ -9,9 +10,8 @@ GoFrame 模块化单体(Module-First)+ 多二进制入口。业务代码一份�
 |---|---|---|---|---|
 | frontapi   | app/frontapi   | /front   | 8001 | 面向 C 端, 限流 |
 | backendapi | app/backendapi | /backend | 8002 | 运营/管理, 鉴权 |
-| manageapi   | app/manageapi   | /manage   | 8003 | 平台超管(总后台), 鉴权 |
 | cron       | app/cron       | 无        | 无    | 定时任务, 与 API 隔离 |
-| (dev)      | main.go        | 全部      | 8000 | 本地一体化, 单进程调试 |
+| (dev)      | main.go        | /front+/backend | 8000 | 本地一体化, 单进程调试 |
 
 ## 构建 / 运行
 
@@ -26,12 +26,12 @@ go run ./app/frontapi   # 或单独跑某个入口
 
 ```
 app/<bin>/main.go       各二进制入口(薄, 只调 internal/cmd)
-internal/cmd/           各入口启动装配: frontapi/backendapi/manageapi/cron + cmd.go(dev)
-api/{front,backend,manage}/<模块>/v1/   ★接口契约按门面拆★
+internal/cmd/           各入口启动装配: frontapi/backendapi/cron + cmd.go(dev)
+api/{front,backend}/<模块>/v1/   ★接口契约按门面拆★
 internal/modules/<模块>/
-  controller/{front,backend,manage}/    ★控制器按门面拆★
+  controller/{front,backend}/    ★控制器按门面拆★
   service|logic|domain/                ★业务共享, 一份★
-  router.go             RegisterFront/Backend/Admin
+  router.go             RegisterFront/Backend
 internal/dao|model/     统一数据访问与模型(共享)
 internal/shared/        中间件(CORS/Auth/RateLimit)/错误码/工具
 internal/event|mq/      模块间事件 / Kafka
@@ -41,8 +41,8 @@ hack/config.yaml        gf gen 多模块生成配置
 
 ## 隔离要点
 
-- 四个进程独立: 后台批量/导出等重操作不占用前台 API 的 CPU/协程, 可分机部署、独立扩缩容。
-- 后台/总后台可在 config 指向**只读副本库**, 避免拖慢前台主库。
+- 进程独立: 后台批量/导出等重操作不占用前台 API 的 CPU/协程, 可分机部署、独立扩缩容。
+- 后台可在 config 指向**只读副本库**, 避免拖慢前台主库。
 - 各门面独立中间件: 前台限流, 后台鉴权。
 
 ## 框架隔离铁律
@@ -75,4 +75,4 @@ make docker-rebuild
 ```
 
 配置：`manifest/config/config.docker.yaml`。探活：`curl http://127.0.0.1:8000/health`  
-控制面总后台请用 `my_manage_service:8003`，勿与本容器内 `/manage` 门面混淆。
+控制面总后台请用 `my_manage_service:8003`。

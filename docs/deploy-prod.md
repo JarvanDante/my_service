@@ -31,7 +31,7 @@ ENV GOPROXY=https://goproxy.cn,direct
 COPY go.mod go.sum ./
 RUN go mod download
 COPY . .
-# 构建前台二进制(其余 backendapi/manageapi/cron 各构建一个镜像或同镜像多入口)
+# 构建前台二进制(其余 backendapi/cron 各构建一个镜像或同镜像多入口；总后台见 my_manage_service)
 RUN go build -o /app/frontapi ./app/frontapi
 
 # ---- run ----
@@ -45,7 +45,7 @@ EXPOSE 8001
 ENTRYPOINT ["/app/frontapi"]
 ```
 
-> 四个二进制(front/backend/manage/cron)可以各打一个镜像,或同一镜像用不同 ENTRYPOINT/启动参数。
+> 三个二进制(front/backend/cron)可以各打一个镜像,或同一镜像用不同 ENTRYPOINT/启动参数。总后台见 `my_manage_service`。
 
 ## 四、一站一部署 docker-compose 示例
 

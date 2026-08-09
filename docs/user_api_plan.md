@@ -1,8 +1,8 @@
 # User 模块 · 接口开发计划
 
 > 参照 `mh51-php`(Hyperf + MongoDB)的 `UserController` 动作,迁移到 my_service
-> (GoFrame 模块化单体 + 多门面)。前台走 `/front`(限流),后台走 `/backend`(鉴权),
-> 总后台走 `/manage`(鉴权)。业务逻辑一份共享,门面只是接口面。
+> (GoFrame 模块化单体 + 多门面)。前台走 `/front`(限流),后台走 `/backend`(鉴权)。
+> 平台总后台已迁至 `my_manage_service`。业务逻辑一份共享,门面只是接口面。
 
 ## 数据表(已生成)
 
@@ -102,15 +102,6 @@
 | GET  | /backend/user-codes | 兑换码列表 |
 | POST | /backend/user-codes | 生成兑换码 |
 | GET  | /backend/user-tasks | 任务配置 |
-
-## 总后台 /manage(平台超管)
-| 方法 | 路径 | 说明 |
-|---|---|---|
-| GET  | /manage/users | 跨渠道用户总览 |
-| POST | /manage/users/{id}/reset | 高危操作(重置/清算) |
-| GET  | /manage/user-groups | 用户组/等级体系配置 |
-
----
 
 ## 落地顺序建议
 

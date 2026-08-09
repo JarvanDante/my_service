@@ -2,16 +2,14 @@ APP := my_service
 BIN := bin
 MYDOCKER := /Users/wangdante/D/mydocker
 
-.PHONY: all front backend manage cron dev tidy clean docker-up docker-down docker-logs docker-rebuild
+.PHONY: all front backend cron dev tidy clean docker-up docker-down docker-logs docker-rebuild
 
-all: front backend manage cron   ## 构建全部四个二进制
+all: front backend cron         ## 构建全部三个二进制（总后台见 my_manage_service）
 
 front:                          ## 前台 API
 	go build -o $(BIN)/frontapi   ./app/frontapi
 backend:                        ## 后台 API
 	go build -o $(BIN)/backendapi ./app/backendapi
-manage:                         ## 总后台 API（站点侧 manage 门面；控制面见 my_manage_service）
-	go build -o $(BIN)/manageapi  ./app/manageapi
 cron:                           ## 定时任务
 	go build -o $(BIN)/cron       ./app/cron
 

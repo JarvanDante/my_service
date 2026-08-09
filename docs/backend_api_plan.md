@@ -1,7 +1,7 @@
 # 后台(运营管理)API 开发计划
 
 > 前台(`/front`)已完成 P1~P7。本文规划**后台**接口。
-> 门面:`/backend` = 运营后台,`/manage` = 平台超管(更高权限的子集)。
+> 门面:`/backend` = 运营后台。平台超管(`/manage`)已迁至 `my_manage_service`。
 > 鉴权**独立于前台**:后台用独立的管理员登录 + Token + Casbin 权限,不复用前台用户 Token。
 > 标注:✅ 用现成表 / 🆕 需新建表。
 
@@ -17,8 +17,8 @@
   - `POST /backend/auth/login` 管理员登录(账号密码 → 后台 token)
   - `POST /backend/auth/logout` 退出
   - `GET  /backend/auth/info` 当前管理员信息 + 权限
-  - `GET/POST/PUT/DELETE /manage/admins` 管理员管理(总后台)
-  - `GET/POST/PUT/DELETE /manage/roles` 角色 & 权限分配(总后台)
+  - `GET/POST/PUT/DELETE /backend/admins` 管理员管理
+  - `GET/POST/PUT/DELETE /backend/roles` 角色 & 权限分配
 - 中间件:`AdminAuth`(独立 token) + Casbin RBAC 校验 + 操作日志记录
 - 说明:当前前后台共用一套用户 token,这一步把后台拆成独立管理员体系。
 
@@ -98,7 +98,7 @@
 
 1. **先做 B0 → B1 → B2**:门立起来 + 用户管理 + 财务,后台就能支撑日常运营了。
 2. 其余(B3~B8)按运营节奏排。
-3. **鉴权拆分**:给后台单独的 `AdminAuth` 中间件(解析后台 token + Casbin),不要复用前台 `Auth`。`/manage` 是 `/backend` 的高权限子集(管理员管理、系统配置、高危操作)。
+3. **鉴权拆分**:给后台单独的 `AdminAuth` 中间件(解析后台 token + Casbin),不要复用前台 `Auth`。平台超管见 `my_manage_service`。
 4. **复用已有 service**:禁用用户、调组/调余额等,直接复用 `modules/user` 的 service;新的管理类(套餐、兑换码、管理员)建议新建 `modules/admin` 模块,别再全堆进 user。
 5. 每个后台接口延续 module-first 分层:`api/backend/... → controller/backend → service → logic → dao`。
 

@@ -1,5 +1,5 @@
 # Docker 容器内配置（mydocker / jarven）
-# 一体化入口监听 :8000（含 /front /backend /manage）；总后台控制面请用 my_manage_service:8003
+# 一体化入口监听 :8000（含 /front /backend）；总后台控制面请用 my_manage_service:8003
 
 server:
   address:     ":8000"
@@ -10,8 +10,6 @@ frontapi:
   address: ":8001"
 backendapi:
   address: ":8002"
-manageapi:
-  address: ":8003"
 
 logger:
   level:  "all"

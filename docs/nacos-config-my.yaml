@@ -10,8 +10,6 @@ frontapi:
   address: ":8001"
 backendapi:
   address: ":8002"
-manageapi:
-  address: ":8003"
 
 logger:
   level:  "all"

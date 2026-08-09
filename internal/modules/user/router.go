@@ -6,7 +6,6 @@ import (
 
 	"github.com/JarvanDante/my_service/internal/modules/user/controller/backend"
 	"github.com/JarvanDante/my_service/internal/modules/user/controller/front"
-	"github.com/JarvanDante/my_service/internal/modules/user/controller/manage"
 	"github.com/JarvanDante/my_service/internal/modules/user/domain"
 	"github.com/JarvanDante/my_service/internal/modules/user/logic"
 	"github.com/JarvanDante/my_service/internal/shared/middleware"
@@ -36,9 +35,4 @@ func RegisterFront(group *ghttp.RouterGroup, repo domain.Repository) {
 // RegisterBackend 后台路由(整体需鉴权, 由入口挂 Auth)。
 func RegisterBackend(group *ghttp.RouterGroup, repo domain.Repository) {
 	group.Bind(backend.New(logic.New(repo)))
-}
-
-// RegisterManage 总后台路由。
-func RegisterManage(group *ghttp.RouterGroup, repo domain.Repository) {
-	group.Bind(manage.New(logic.New(repo)))
 }

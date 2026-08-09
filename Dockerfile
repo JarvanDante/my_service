@@ -1,4 +1,4 @@
-# 构建：本地一体化入口（front+backend+manage 同进程，便于开发）
+# 构建：本地一体化入口（front+backend 同进程，便于开发）
 FROM golang:1.23-bookworm AS builder
 WORKDIR /src
 COPY go.mod go.sum ./
