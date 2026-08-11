@@ -18,7 +18,7 @@ func RegisterFront(group *ghttp.RouterGroup, repo domain.Repository) {
 	group.Bind(ctrl.Login)
 	// 需登录接口
 	group.Group("/", func(auth *ghttp.RouterGroup) {
-		auth.Middleware(middleware.Auth)
+		auth.Middleware(middleware.Auth, middleware.UserRateLimit)
 		auth.Bind(
 			ctrl.Info, ctrl.Logout, ctrl.Refresh, ctrl.BindPhone,
 			ctrl.Home, ctrl.Update, ctrl.Images, ctrl.Find,

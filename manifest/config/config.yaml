@@ -74,3 +74,11 @@ upload:
   multipart:
     partSize: 8388608   # 默认分片 8MiB(非末片须 ≥ 5MiB)
     presignExpire: 7200 # 预签名有效秒数
+
+# 前台限流(Redis 固定窗口)。ip_* 登录前按客户端IP; user_* 登录后按用户ID。
+# 阈值按站点真实流量调; 正常用户远达不到, 批量刷接口会触发 429。
+front_ratelimit:
+  ip_per_min: 300
+  ip_per_hour: 5000
+  user_per_min: 120
+  user_per_hour: 1500
