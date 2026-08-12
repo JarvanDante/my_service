@@ -12,6 +12,7 @@ import (
 	promomod "github.com/JarvanDante/my_service/internal/modules/promo"
 	statsmod "github.com/JarvanDante/my_service/internal/modules/stats"
 	sysmod "github.com/JarvanDante/my_service/internal/modules/system"
+	tagmod "github.com/JarvanDante/my_service/internal/modules/tag"
 	usermod "github.com/JarvanDante/my_service/internal/modules/user"
 	videomod "github.com/JarvanDante/my_service/internal/modules/video"
 	"github.com/JarvanDante/my_service/internal/shared/middleware"
@@ -26,6 +27,7 @@ func mountFront(s *ghttp.Server) {
 		usermod.RegisterFront(group, dao.NewUserRepo())
 		checkinmod.RegisterFront(group)
 		feedbackmod.RegisterFront(group)
+		tagmod.RegisterFront(group)
 	})
 
 	// ---- v2(将来大改时启用; 老的 v1 继续并存)----
@@ -59,6 +61,7 @@ func mountBackend(s *ghttp.Server) {
 			mediamod.RegisterBackend(perm, dao.NewMediaRepo())
 			videomod.RegisterBackend(perm, dao.NewVideoRepo())
 			feedbackmod.RegisterBackend(perm)
+			tagmod.RegisterBackend(perm)
 		})
 	})
 }

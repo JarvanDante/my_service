@@ -1,0 +1,163 @@
+###############################################################################
+# 标签 Tag · 真实端到端测试(前台按类型浏览 + 后台 CRUD)
+# 前置: 迁移 00021 已建表(tag), 含样板数据(site_id=1)
+# tianbi 原为按内容类型分散多集合读取, 这里统一为单表 + content_type
+###############################################################################
+
+@baseUrl = http://127.0.0.1:8000
+
+### 1. 前台按内容类型拉取标签(影片=1) —— 公开, 无需登录
+POST {{baseUrl}}/front/v1/tag/repo/list
+Content-Type: application/json
+
+{ "type": 1 }
+
+> {%
+client.test("影片标签列表", function () {
+    client.assert(response.body.code === 0, "code 应为 0: " + response.body.message);
+    client.assert(response.body.data.list.length >= 1, "至少一个影片标签(样板数据)");
+    client.assert(response.body.data.list[0].name !== undefined, "应含 name 字段");
+});
+%}
+
+### 2. 前台拉取漫画标签(4)
+POST {{baseUrl}}/front/v1/tag/repo/list
+Content-Type: application/json
+
+{ "type": 4 }
+
+> {%
+client.test("漫画标签列表", function () {
+    client.assert(response.body.code === 0, "code 应为 0: " + response.body.message);
+    client.assert(response.body.data.list.length >= 1, "至少一个漫画标签");
+});
+%}
+
+### 3. 非法内容类型 —— 参数校验失败
+POST {{baseUrl}}/front/v1/tag/repo/list
+Content-Type: application/json
+
+{ "type": 99 }
+
+> {%
+client.test("非法类型被拒", function () {
+    client.assert(response.body.code !== 0, "type=99 应校验失败");
+});
+%}
+
+### 4. 后台登录 —— 保存 adminToken
+POST {{baseUrl}}/backend/auth/login
+Content-Type: application/json
+
+{ "username": "admin", "password": "admin123" }
+
+> {%
+client.test("超管登录成功", function () {
+    client.assert(response.body.code === 0, "code 应为 0: " + response.body.message);
+});
+client.global.set("adminToken", response.body.data.token);
+%}
+
+### 5. 后台新增标签(影片) —— 保存 id
+POST {{baseUrl}}/backend/tag
+Authorization: {{adminToken}}
+Content-Type: application/json
+
+{ "content_type": 1, "name": "e2e临时标签", "rank": 200, "status": 1 }
+
+> {%
+client.test("新增成功", function () {
+    client.assert(response.body.code === 0, "code 应为 0: " + response.body.message);
+    client.assert(response.body.data.id > 0, "应返回标签 id");
+});
+client.global.set("tagId", response.body.data.id);
+%}
+
+### 6. 新增重名 —— 应被唯一约束拦截
+POST {{baseUrl}}/backend/tag
+Authorization: {{adminToken}}
+Content-Type: application/json
+
+{ "content_type": 1, "name": "e2e临时标签", "rank": 1, "status": 1 }
+
+> {%
+client.test("重名被拒", function () {
+    client.assert(response.body.code !== 0, "同类型重名应被拒");
+});
+%}
+
+### 7. 前台应能查到新增的高 rank 标签(排在最前)
+POST {{baseUrl}}/front/v1/tag/repo/list
+Content-Type: application/json
+
+{ "type": 1 }
+
+> {%
+client.test("新标签按 rank 置顶", function () {
+    client.assert(response.body.code === 0, "code 应为 0");
+    var hit = response.body.data.list.some(function (r) { return r.id == client.global.get("tagId"); });
+    client.assert(hit, "应含刚新增的标签");
+    client.assert(response.body.data.list[0].id == client.global.get("tagId"), "rank=200 应排第一");
+});
+%}
+
+### 8. 后台更新标签(改名 + 禁用)
+PUT {{baseUrl}}/backend/tag/{{tagId}}
+Authorization: {{adminToken}}
+Content-Type: application/json
+
+{ "name": "e2e改名标签", "rank": 5, "status": 0 }
+
+> {%
+client.test("更新成功", function () {
+    client.assert(response.body.code === 0, "code 应为 0: " + response.body.message);
+});
+%}
+
+### 9. 禁用后前台不应再返回该标签
+POST {{baseUrl}}/front/v1/tag/repo/list
+Content-Type: application/json
+
+{ "type": 1 }
+
+> {%
+client.test("禁用标签前台不可见", function () {
+    client.assert(response.body.code === 0, "code 应为 0");
+    var hit = response.body.data.list.some(function (r) { return r.id == client.global.get("tagId"); });
+    client.assert(!hit, "status=0 的标签不应出现在前台");
+});
+%}
+
+### 10. 后台列表(按影片筛选) —— 应含被禁用的那条
+GET {{baseUrl}}/backend/tag?content_type=1&status=0&page=1&size=20
+Authorization: {{adminToken}}
+
+> {%
+client.test("后台可见禁用标签", function () {
+    client.assert(response.body.code === 0, "code 应为 0: " + response.body.message);
+    var hit = response.body.data.list.some(function (r) { return r.id == client.global.get("tagId") && r.status === 0; });
+    client.assert(hit, "后台应查到禁用的标签");
+});
+%}
+
+### 11. 后台删除标签(清理)
+DELETE {{baseUrl}}/backend/tag/{{tagId}}
+Authorization: {{adminToken}}
+
+> {%
+client.test("删除成功", function () {
+    client.assert(response.body.code === 0, "code 应为 0: " + response.body.message);
+});
+%}
+
+### 12. 删除后后台列表不应再有
+GET {{baseUrl}}/backend/tag?content_type=1&status=-1&page=1&size=50
+Authorization: {{adminToken}}
+
+> {%
+client.test("已删除不可见", function () {
+    client.assert(response.body.code === 0, "code 应为 0");
+    var hit = response.body.data.list.some(function (r) { return r.id == client.global.get("tagId"); });
+    client.assert(!hit, "删除后不应再出现");
+});
+%}
