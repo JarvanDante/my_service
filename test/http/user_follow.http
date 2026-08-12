@@ -9,7 +9,7 @@
 @baseUrl = http://127.0.0.1:8000
 
 ### 1. 登录用户 A
-POST {{baseUrl}}/front/user/login
+POST {{baseUrl}}/front/v1/user/login
 Content-Type: application/json
 
 { "device_id": "e2e-follow-A", "device_type": "ios" }
@@ -23,7 +23,7 @@ client.global.set("uidA", response.body.data.user.id);
 %}
 
 ### 2. 登录用户 B
-POST {{baseUrl}}/front/user/login
+POST {{baseUrl}}/front/v1/user/login
 Content-Type: application/json
 
 { "device_id": "e2e-follow-B", "device_type": "ios" }
@@ -37,7 +37,7 @@ client.global.set("uidB", response.body.data.user.id);
 %}
 
 ### 3. A 关注 B —— 应变为已关注
-POST {{baseUrl}}/front/user/follow
+POST {{baseUrl}}/front/v1/user/follow
 Authorization: {{tokenA}}
 Content-Type: application/json
 
@@ -51,7 +51,7 @@ client.test("A 关注 B 成功", function () {
 %}
 
 ### 4. A 看 B 的主页 —— is_followed 应为 true
-GET {{baseUrl}}/front/user/home/{{uidB}}
+GET {{baseUrl}}/front/v1/user/home/{{uidB}}
 Authorization: {{tokenA}}
 
 > {%
@@ -62,7 +62,7 @@ client.test("主页显示已关注", function () {
 %}
 
 ### 5. A 的关注列表 —— 应包含 B
-GET {{baseUrl}}/front/user/follows?page=1&size=15
+GET {{baseUrl}}/front/v1/user/follows?page=1&size=15
 Authorization: {{tokenA}}
 
 > {%
@@ -75,7 +75,7 @@ client.test("关注列表含 B", function () {
 %}
 
 ### 6. B 的粉丝列表 —— 应包含 A
-GET {{baseUrl}}/front/user/fans?page=1&size=15
+GET {{baseUrl}}/front/v1/user/fans?page=1&size=15
 Authorization: {{tokenB}}
 
 > {%
@@ -88,7 +88,7 @@ client.test("粉丝列表含 A", function () {
 %}
 
 ### 7. A 再次 follow B —— 切换为取关
-POST {{baseUrl}}/front/user/follow
+POST {{baseUrl}}/front/v1/user/follow
 Authorization: {{tokenA}}
 Content-Type: application/json
 
@@ -102,7 +102,7 @@ client.test("再次调用变为取关", function () {
 %}
 
 ### 8. A 再看 B 主页 —— is_followed 应为 false
-GET {{baseUrl}}/front/user/home/{{uidB}}
+GET {{baseUrl}}/front/v1/user/home/{{uidB}}
 Authorization: {{tokenA}}
 
 > {%
@@ -112,7 +112,7 @@ client.test("取关后主页未关注", function () {
 %}
 
 ### 9. 关注自己 —— 应报错
-POST {{baseUrl}}/front/user/follow
+POST {{baseUrl}}/front/v1/user/follow
 Authorization: {{tokenA}}
 Content-Type: application/json
 

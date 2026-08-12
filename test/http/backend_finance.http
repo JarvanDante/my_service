@@ -73,7 +73,7 @@ client.global.set("vipPkgId", response.body.data.id);
 %}
 
 ### 6. 前台设备登录 —— 造/取测试用户
-POST {{baseUrl}}/front/user/login
+POST {{baseUrl}}/front/v1/user/login
 Content-Type: application/json
 
 { "device_id": "e2e-b2-user", "device_type": "ios", "device_version": "1.0" }
@@ -88,7 +88,7 @@ client.global.set("balBefore", response.body.data.user.balance);
 %}
 
 ### 7. 前台下单(P6 接口, 创建待支付订单)
-POST {{baseUrl}}/front/user/recharge/do
+POST {{baseUrl}}/front/v1/user/recharge/do
 Authorization: {{userToken}}
 Content-Type: application/json
 

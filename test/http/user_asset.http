@@ -9,7 +9,7 @@
 @baseUrl = http://127.0.0.1:8000
 
 ### 1. 登录
-POST {{baseUrl}}/front/user/login
+POST {{baseUrl}}/front/v1/user/login
 Content-Type: application/json
 
 { "device_id": "e2e-asset-A", "device_type": "ios" }
@@ -20,7 +20,7 @@ client.global.set("token", response.body.data.token);
 %}
 
 ### 2. 充值套餐 —— 有数据
-GET {{baseUrl}}/front/user/recharge
+GET {{baseUrl}}/front/v1/user/recharge
 Authorization: {{token}}
 
 > {%
@@ -32,7 +32,7 @@ client.global.set("rpid", response.body.data.list[0].id);
 %}
 
 ### 3. 发起充值 —— 创建订单成功
-POST {{baseUrl}}/front/user/recharge/do
+POST {{baseUrl}}/front/v1/user/recharge/do
 Authorization: {{token}}
 Content-Type: application/json
 
@@ -46,7 +46,7 @@ client.test("发起充值", function () {
 %}
 
 ### 4. VIP 套餐 —— 有数据
-GET {{baseUrl}}/front/user/vip
+GET {{baseUrl}}/front/v1/user/vip
 Authorization: {{token}}
 
 > {%
@@ -58,7 +58,7 @@ client.global.set("vpid", response.body.data.list[0].id);
 %}
 
 ### 5. VIP 记录 —— 返回数组
-GET {{baseUrl}}/front/user/vip/logs?page=1&size=15
+GET {{baseUrl}}/front/v1/user/vip/logs?page=1&size=15
 Authorization: {{token}}
 
 > {%
@@ -69,7 +69,7 @@ client.test("VIP记录为数组", function () {
 %}
 
 ### 6. 兑换信息 —— 成功
-GET {{baseUrl}}/front/user/exchange
+GET {{baseUrl}}/front/v1/user/exchange
 Authorization: {{token}}
 
 > {%
@@ -80,7 +80,7 @@ client.test("兑换信息", function () {
 %}
 
 ### 7. 开通VIP(余额不足) —— 应报错
-POST {{baseUrl}}/front/user/vip/do
+POST {{baseUrl}}/front/v1/user/vip/do
 Authorization: {{token}}
 Content-Type: application/json
 
@@ -93,7 +93,7 @@ client.test("余额不足开通失败", function () {
 %}
 
 ### 8. 兑换金币(积分不足) —— 应报错
-POST {{baseUrl}}/front/user/exchange/do
+POST {{baseUrl}}/front/v1/user/exchange/do
 Authorization: {{token}}
 Content-Type: application/json
 

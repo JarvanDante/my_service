@@ -61,7 +61,7 @@ client.test("后台列表包含新任务", function () {
 %}
 
 ### 5. 前台设备登录
-POST {{baseUrl}}/front/user/login
+POST {{baseUrl}}/front/v1/user/login
 Content-Type: application/json
 
 { "device_id": "e2e-b5-user", "device_type": "ios", "device_version": "1.0" }
@@ -75,7 +75,7 @@ client.global.set("userToken", response.body.data.token);
 %}
 
 ### 6. 前台任务列表可见新任务(status=1)
-GET {{baseUrl}}/front/user/tasks
+GET {{baseUrl}}/front/v1/user/tasks
 Authorization: {{userToken}}
 
 > {%
@@ -87,7 +87,7 @@ client.test("前台可见新任务", function () {
 %}
 
 ### 7. 前台完成任务 —— 奖励应为配置的 20(B5 升级点)
-POST {{baseUrl}}/front/user/task/do
+POST {{baseUrl}}/front/v1/user/task/do
 Authorization: {{userToken}}
 Content-Type: application/json
 
@@ -127,7 +127,7 @@ client.test("下线成功", function () {
 %}
 
 ### 10. 前台再做已下线任务 —— 应被拒
-POST {{baseUrl}}/front/user/task/do
+POST {{baseUrl}}/front/v1/user/task/do
 Authorization: {{userToken}}
 Content-Type: application/json
 
@@ -140,7 +140,7 @@ client.test("下线任务被拦截", function () {
 %}
 
 ### 11. 前台任务列表不再显示下线任务
-GET {{baseUrl}}/front/user/tasks
+GET {{baseUrl}}/front/v1/user/tasks
 Authorization: {{userToken}}
 
 > {%
@@ -152,7 +152,7 @@ client.test("前台不可见下线任务", function () {
 %}
 
 ### 12. 前台签到(重复运行时可能已签, 两种都算过)
-POST {{baseUrl}}/front/user/sign
+POST {{baseUrl}}/front/v1/user/sign
 Authorization: {{userToken}}
 
 > {%

@@ -18,7 +18,7 @@ client.global.set("adminToken", response.body.data.token);
 %}
 
 ### 2. 前台登录 —— 保证今日至少1个活跃用户
-POST {{baseUrl}}/front/user/login
+POST {{baseUrl}}/front/v1/user/login
 Content-Type: application/json
 
 { "device_id": "e2e-b8-user", "device_type": "ios", "device_version": "1.0" }

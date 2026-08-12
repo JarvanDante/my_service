@@ -6,6 +6,7 @@ import (
 	"github.com/JarvanDante/my_service/internal/dao"
 	adminmod "github.com/JarvanDante/my_service/internal/modules/admin"
 	checkinmod "github.com/JarvanDante/my_service/internal/modules/checkin"
+	feedbackmod "github.com/JarvanDante/my_service/internal/modules/feedback"
 	finmod "github.com/JarvanDante/my_service/internal/modules/finance"
 	mediamod "github.com/JarvanDante/my_service/internal/modules/media"
 	promomod "github.com/JarvanDante/my_service/internal/modules/promo"
@@ -24,6 +25,7 @@ func mountFront(s *ghttp.Server) {
 		group.Middleware(middleware.RateLimit)
 		usermod.RegisterFront(group, dao.NewUserRepo())
 		checkinmod.RegisterFront(group)
+		feedbackmod.RegisterFront(group)
 	})
 
 	// ---- v2(将来大改时启用; 老的 v1 继续并存)----
@@ -56,6 +58,7 @@ func mountBackend(s *ghttp.Server) {
 			statsmod.RegisterBackend(perm, dao.NewStatsRepo())
 			mediamod.RegisterBackend(perm, dao.NewMediaRepo())
 			videomod.RegisterBackend(perm, dao.NewVideoRepo())
+			feedbackmod.RegisterBackend(perm)
 		})
 	})
 }

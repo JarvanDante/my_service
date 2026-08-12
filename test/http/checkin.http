@@ -1,0 +1,67 @@
+###############################################################################
+# 前台 Checkin 签到 · 真实端到端测试(打到运行中的服务)
+# 用法: gf run main.go 起服务(:8000), GoLand「Run all requests in file」
+# 前置: 迁移 00019 已建表(checkin_reward/user_checkin)
+###############################################################################
+
+@baseUrl = http://127.0.0.1:8000
+
+### 1. 前台登录 —— 保存 token
+POST {{baseUrl}}/front/v1/user/login
+Content-Type: application/json
+
+{ "device_id": "e2e-checkin-001", "device_type": "ios", "device_version": "1.0" }
+
+> {%
+client.test("登录成功", function () {
+    client.assert(response.body.code === 0, "code 应为 0: " + response.body.message);
+    client.assert(response.body.data.token !== "", "未返回 token");
+});
+client.global.set("token", response.body.data.token);
+%}
+
+### 2. 签到 —— 首次或当日已签, today_checked 恒为 true
+POST {{baseUrl}}/front/v1/checkin/click
+Authorization: {{token}}
+
+> {%
+client.test("签到返回正常", function () {
+    client.assert(response.body.code === 0, "code 应为 0: " + response.body.message);
+    client.assert(response.body.data.today_checked === true, "today_checked 应为 true");
+    client.assert(response.body.data.continuously_days >= 1, "连续天数应 >= 1");
+});
+%}
+
+### 3. 重复签到 —— 仍 code 0, 提示已签到
+POST {{baseUrl}}/front/v1/checkin/click
+Authorization: {{token}}
+
+> {%
+client.test("重复签到被识别", function () {
+    client.assert(response.body.code === 0, "code 应为 0");
+    client.assert(response.body.data.today_checked === true, "today_checked 应为 true");
+    client.assert(response.body.data.message.indexOf("已经签到") >= 0, "应提示已经签到");
+});
+%}
+
+### 4. 签到规则与记录 —— 返回阶梯 + 连续天数 + 记录
+POST {{baseUrl}}/front/v1/checkin/prize
+Authorization: {{token}}
+
+> {%
+client.test("规则与记录", function () {
+    client.assert(response.body.code === 0, "code 应为 0");
+    client.assert(response.body.data.rewards.length >= 1, "阶梯配置应 >= 1 条");
+    client.assert(response.body.data.today_checked === true, "今日已签");
+    client.assert(response.body.data.records.length >= 1, "应有签到记录");
+});
+%}
+
+### 5. 未登录签到 —— 应被拒
+POST {{baseUrl}}/front/v1/checkin/click
+
+> {%
+client.test("无 token 被拒", function () {
+    client.assert(response.body.code !== 0, "无 token 时 code 不应为 0");
+});
+%}

@@ -19,7 +19,7 @@ client.global.set("adminToken", response.body.data.token);
 %}
 
 ### 2. 前台登录用户 A
-POST {{baseUrl}}/front/user/login
+POST {{baseUrl}}/front/v1/user/login
 Content-Type: application/json
 
 { "device_id": "e2e-b7-a", "device_type": "ios", "device_version": "1.0" }
@@ -32,7 +32,7 @@ client.global.set("uidA", response.body.data.user.id);
 %}
 
 ### 3. 前台登录用户 B
-POST {{baseUrl}}/front/user/login
+POST {{baseUrl}}/front/v1/user/login
 Content-Type: application/json
 
 { "device_id": "e2e-b7-b", "device_type": "ios", "device_version": "1.0" }
@@ -46,7 +46,7 @@ client.global.set("tokenB", response.body.data.token);
 %}
 
 ### 4. B 给 A 发私信(带时间戳保证内容唯一)
-POST {{baseUrl}}/front/user/chat/send
+POST {{baseUrl}}/front/v1/user/chat/send
 Authorization: {{tokenB}}
 Content-Type: application/json
 
@@ -98,7 +98,7 @@ client.global.set("cfgUrl", response.body.data.url);
 %}
 
 ### 8. 前台客服链接 —— 应即时生效(读库配置)
-GET {{baseUrl}}/front/user/customer-url
+GET {{baseUrl}}/front/v1/user/customer-url
 Authorization: {{tokenB}}
 
 > {%

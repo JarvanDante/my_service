@@ -19,7 +19,7 @@ client.global.set("adminToken", response.body.data.token);
 %}
 
 ### 2. 前台登录固定用户 A
-POST {{baseUrl}}/front/user/login
+POST {{baseUrl}}/front/v1/user/login
 Content-Type: application/json
 
 { "device_id": "e2e-b6-a", "device_type": "ios", "device_version": "1.0" }
@@ -33,7 +33,7 @@ client.global.set("unameA", response.body.data.user.username);
 %}
 
 ### 3. 前台登录新用户 B(时间戳设备号, 每次全新)
-POST {{baseUrl}}/front/user/login
+POST {{baseUrl}}/front/v1/user/login
 Content-Type: application/json
 
 { "device_id": "e2e-b6-b-{{$timestamp}}", "device_type": "ios", "device_version": "1.0" }
@@ -47,7 +47,7 @@ client.global.set("tokenB", response.body.data.token);
 %}
 
 ### 4. B 关注 A
-POST {{baseUrl}}/front/user/follow
+POST {{baseUrl}}/front/v1/user/follow
 Authorization: {{tokenB}}
 Content-Type: application/json
 
@@ -87,7 +87,7 @@ client.test("反向查询命中", function () {
 %}
 
 ### 7. B 绑定 A 为推荐人(拉新+1)
-POST {{baseUrl}}/front/user/bind-parent
+POST {{baseUrl}}/front/v1/user/bind-parent
 Authorization: {{tokenB}}
 Content-Type: application/json
 
@@ -100,7 +100,7 @@ client.test("绑定推荐人成功", function () {
 %}
 
 ### 8. B 分享上报(wechat 渠道)
-POST {{baseUrl}}/front/user/share/report
+POST {{baseUrl}}/front/v1/user/share/report
 Authorization: {{tokenB}}
 Content-Type: application/json
 

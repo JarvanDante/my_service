@@ -68,7 +68,7 @@ client.test("group 缺 object_id 被拒", function () {
 %}
 
 ### 5. 前台设备登录 —— 造/取测试用户
-POST {{baseUrl}}/front/user/login
+POST {{baseUrl}}/front/v1/user/login
 Content-Type: application/json
 
 { "device_id": "e2e-b3-user", "device_type": "ios", "device_version": "1.0" }
@@ -82,7 +82,7 @@ client.global.set("userToken", response.body.data.token);
 %}
 
 ### 6. 前台兑换 codeA(P4 接口)
-POST {{baseUrl}}/front/user/code/redeem
+POST {{baseUrl}}/front/v1/user/code/redeem
 Authorization: {{userToken}}
 Content-Type: application/json
 
@@ -142,7 +142,7 @@ client.test("重复作废被拒", function () {
 %}
 
 ### 11. 前台兑换已作废的 codeB —— 应被拒
-POST {{baseUrl}}/front/user/code/redeem
+POST {{baseUrl}}/front/v1/user/code/redeem
 Authorization: {{userToken}}
 Content-Type: application/json
 
@@ -155,7 +155,7 @@ client.test("作废码不可兑换", function () {
 %}
 
 ### 12. 前台重复兑换 codeA —— 应被拒(每人一次)
-POST {{baseUrl}}/front/user/code/redeem
+POST {{baseUrl}}/front/v1/user/code/redeem
 Authorization: {{userToken}}
 Content-Type: application/json
 

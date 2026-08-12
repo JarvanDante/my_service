@@ -8,7 +8,7 @@
 @baseUrl = http://127.0.0.1:8000
 
 ### 1. 登录
-POST {{baseUrl}}/front/user/login
+POST {{baseUrl}}/front/v1/user/login
 Content-Type: application/json
 
 { "device_id": "e2e-growth-A", "device_type": "ios" }
@@ -21,7 +21,7 @@ client.global.set("token", response.body.data.token);
 %}
 
 ### 2. 每日签到 —— 成功 或 已签到(可重复)
-POST {{baseUrl}}/front/user/sign
+POST {{baseUrl}}/front/v1/user/sign
 Authorization: {{token}}
 
 > {%
@@ -33,7 +33,7 @@ client.test("签到成功或已签到", function () {
 %}
 
 ### 3. 成长信息 —— 成功
-GET {{baseUrl}}/front/user/up
+GET {{baseUrl}}/front/v1/user/up
 Authorization: {{token}}
 
 > {%
@@ -45,7 +45,7 @@ client.test("成长信息", function () {
 %}
 
 ### 4. 任务列表 —— 返回数组
-GET {{baseUrl}}/front/user/tasks
+GET {{baseUrl}}/front/v1/user/tasks
 Authorization: {{token}}
 
 > {%
@@ -56,7 +56,7 @@ client.test("任务列表为数组", function () {
 %}
 
 ### 5. 任务记录 —— 返回数组
-GET {{baseUrl}}/front/user/task/logs?page=1&size=15
+GET {{baseUrl}}/front/v1/user/task/logs?page=1&size=15
 Authorization: {{token}}
 
 > {%
@@ -67,7 +67,7 @@ client.test("任务记录为数组", function () {
 %}
 
 ### 6. 完成任务(任务不存在) —— 应报错
-POST {{baseUrl}}/front/user/task/do
+POST {{baseUrl}}/front/v1/user/task/do
 Authorization: {{token}}
 Content-Type: application/json
 
@@ -84,7 +84,7 @@ client.test("无效任务被拒", function () {
 #   INSERT INTO user_task (name, type, description, max_num)
 #   VALUES ('每日分享', 'share', '分享得积分', 3);
 #   -- 记下返回的 id, 然后:
-#   POST {{baseUrl}}/front/user/task/do   body {"task_id": <上面的id>}
+#   POST {{baseUrl}}/front/v1/user/task/do   body {"task_id": <上面的id>}
 #   预期 code=0, data.done_today=1, data.reward=10; 再点 /front/user/tasks 看 done_today+1;
 #   同一天点超过 max_num 次后返回「今日该任务已完成」。
 ###############################################################################

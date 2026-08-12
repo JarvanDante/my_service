@@ -59,7 +59,7 @@ client.test("折扣越界被拒", function () {
 %}
 
 ### 5. 前台设备登录 —— 造/取测试用户
-POST {{baseUrl}}/front/user/login
+POST {{baseUrl}}/front/v1/user/login
 Content-Type: application/json
 
 { "device_id": "e2e-b4-user", "device_type": "ios", "device_version": "1.0" }

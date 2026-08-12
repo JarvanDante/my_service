@@ -20,7 +20,7 @@ client.global.set("adminToken", response.body.data.token);
 %}
 
 ### 2. 前台设备登录 —— 造/取一个测试用户
-POST {{baseUrl}}/front/user/login
+POST {{baseUrl}}/front/v1/user/login
 Content-Type: application/json
 
 { "device_id": "e2e-b1-user", "device_type": "ios", "device_version": "1.0" }

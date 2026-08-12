@@ -6,7 +6,7 @@
 @baseUrl = http://127.0.0.1:8000
 
 ### 1. 登录 A
-POST {{baseUrl}}/front/user/login
+POST {{baseUrl}}/front/v1/user/login
 Content-Type: application/json
 
 { "device_id": "e2e-chat-A", "device_type": "ios" }
@@ -18,7 +18,7 @@ client.global.set("uidA", response.body.data.user.id);
 %}
 
 ### 2. 登录 B
-POST {{baseUrl}}/front/user/login
+POST {{baseUrl}}/front/v1/user/login
 Content-Type: application/json
 
 { "device_id": "e2e-chat-B", "device_type": "ios" }
@@ -30,7 +30,7 @@ client.global.set("uidB", response.body.data.user.id);
 %}
 
 ### 3. A 发消息给 B —— 成功
-POST {{baseUrl}}/front/user/chat/send
+POST {{baseUrl}}/front/v1/user/chat/send
 Authorization: {{tokenA}}
 Content-Type: application/json
 
@@ -43,7 +43,7 @@ client.test("发消息成功", function () {
 %}
 
 ### 4. B 的会话列表 —— 含与 A 的会话且有未读
-GET {{baseUrl}}/front/user/chats?page=1&size=15
+GET {{baseUrl}}/front/v1/user/chats?page=1&size=15
 Authorization: {{tokenB}}
 
 > {%
@@ -56,7 +56,7 @@ client.test("B会话含A且未读>=1", function () {
 %}
 
 ### 5. B 查看与 A 的消息 —— 含 "hello e2e"(并标记已读)
-GET {{baseUrl}}/front/user/chat/messages?peer_id={{uidA}}&page=1&size=20
+GET {{baseUrl}}/front/v1/user/chat/messages?peer_id={{uidA}}&page=1&size=20
 Authorization: {{tokenB}}
 
 > {%
@@ -68,7 +68,7 @@ client.test("消息含hello", function () {
 %}
 
 ### 6. B 会话列表 —— 已读后未读清零
-GET {{baseUrl}}/front/user/chats?page=1&size=15
+GET {{baseUrl}}/front/v1/user/chats?page=1&size=15
 Authorization: {{tokenB}}
 
 > {%
@@ -79,7 +79,7 @@ client.test("已读后未读=0", function () {
 %}
 
 ### 7. A 的会话列表 —— 含与 B 的会话
-GET {{baseUrl}}/front/user/chats?page=1&size=15
+GET {{baseUrl}}/front/v1/user/chats?page=1&size=15
 Authorization: {{tokenA}}
 
 > {%
@@ -90,7 +90,7 @@ client.test("A会话含B", function () {
 %}
 
 ### 8. 给自己发消息 —— 应报错
-POST {{baseUrl}}/front/user/chat/send
+POST {{baseUrl}}/front/v1/user/chat/send
 Authorization: {{tokenA}}
 Content-Type: application/json
 
@@ -103,7 +103,7 @@ client.test("不能给自己发", function () {
 %}
 
 ### 9. B 删除与 A 的会话 —— 成功
-POST {{baseUrl}}/front/user/chat/del
+POST {{baseUrl}}/front/v1/user/chat/del
 Authorization: {{tokenB}}
 Content-Type: application/json
 
@@ -116,7 +116,7 @@ client.test("删会话成功", function () {
 %}
 
 ### 10. B 会话列表 —— 与 A 的会话已消失
-GET {{baseUrl}}/front/user/chats?page=1&size=15
+GET {{baseUrl}}/front/v1/user/chats?page=1&size=15
 Authorization: {{tokenB}}
 
 > {%
@@ -127,7 +127,7 @@ client.test("删后不再出现", function () {
 %}
 
 ### 11. 客服链接 —— 成功
-GET {{baseUrl}}/front/user/customer-url
+GET {{baseUrl}}/front/v1/user/customer-url
 Authorization: {{tokenB}}
 
 > {%

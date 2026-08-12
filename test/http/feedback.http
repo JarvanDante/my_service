@@ -1,0 +1,111 @@
+###############################################################################
+# 意见反馈 Feedback · 真实端到端测试(前台提交 + 后台处理)
+# 前置: 迁移 00020 已建表(feedback)
+# 注意: 前台提交有「1 分钟限 1 条」防刷, 距上次提交需 > 1 分钟第 2 步才会成功
+###############################################################################
+
+@baseUrl = http://127.0.0.1:8000
+
+### 1. 前台登录 —— 保存 token
+POST {{baseUrl}}/front/v1/user/login
+Content-Type: application/json
+
+{ "device_id": "e2e-feedback-001", "device_type": "ios", "device_version": "1.0" }
+
+> {%
+client.test("登录成功", function () {
+    client.assert(response.body.code === 0, "code 应为 0: " + response.body.message);
+});
+client.global.set("token", response.body.data.token);
+%}
+
+### 2. 提交反馈 —— 成功并保存 id(需距上次提交 > 1 分钟)
+POST {{baseUrl}}/front/v1/feedback/add
+Authorization: {{token}}
+Content-Type: application/json
+
+{ "type": 1, "problem_type": 2, "content": "e2e 测试反馈", "pics": ["http://x/a.jpg"], "media_id": 0 }
+
+> {%
+client.test("提交成功", function () {
+    client.assert(response.body.code === 0, "code 应为 0(若为太频繁, 等 1 分钟再跑): " + response.body.message);
+    client.assert(response.body.data.id > 0, "应返回反馈 id");
+});
+client.global.set("feedbackId", response.body.data.id);
+%}
+
+### 3. 立即再次提交 —— 应被防刷拦截(太频繁)
+POST {{baseUrl}}/front/v1/feedback/add
+Authorization: {{token}}
+Content-Type: application/json
+
+{ "type": 1, "content": "e2e 第二条(应被拦)" }
+
+> {%
+client.test("1分钟内重复被拦", function () {
+    client.assert(response.body.code !== 0, "1 分钟内第 2 条应被拒");
+    client.assert(response.body.message.indexOf("频繁") >= 0, "应提示太频繁");
+});
+%}
+
+### 4. 空内容 —— 参数校验失败
+POST {{baseUrl}}/front/v1/feedback/add
+Authorization: {{token}}
+Content-Type: application/json
+
+{ "type": 1, "content": "" }
+
+> {%
+client.test("空内容被拒", function () {
+    client.assert(response.body.code !== 0, "空内容应校验失败");
+});
+%}
+
+### 5. 后台登录 —— 保存 adminToken
+POST {{baseUrl}}/backend/auth/login
+Content-Type: application/json
+
+{ "username": "admin", "password": "admin123" }
+
+> {%
+client.test("超管登录成功", function () {
+    client.assert(response.body.code === 0, "code 应为 0: " + response.body.message);
+});
+client.global.set("adminToken", response.body.data.token);
+%}
+
+### 6. 后台反馈列表 —— 至少 1 条
+GET {{baseUrl}}/backend/feedback?page=1&size=20
+Authorization: {{adminToken}}
+
+> {%
+client.test("反馈列表", function () {
+    client.assert(response.body.code === 0, "code 应为 0: " + response.body.message);
+    client.assert(response.body.data.list.length >= 1, "至少一条反馈");
+});
+%}
+
+### 7. 处理反馈 —— 回复并置为已处理
+POST {{baseUrl}}/backend/feedback/{{feedbackId}}/handle
+Authorization: {{adminToken}}
+Content-Type: application/json
+
+{ "reply": "已收到, 感谢反馈", "status": 2 }
+
+> {%
+client.test("处理成功", function () {
+    client.assert(response.body.code === 0, "code 应为 0: " + response.body.message);
+});
+%}
+
+### 8. 按已处理筛选 —— 应能查到刚处理的
+GET {{baseUrl}}/backend/feedback?status=2&page=1&size=20
+Authorization: {{adminToken}}
+
+> {%
+client.test("已处理列表", function () {
+    client.assert(response.body.code === 0, "code 应为 0");
+    var hit = response.body.data.list.some(function (r) { return r.id == client.global.get("feedbackId") && r.status === 2; });
+    client.assert(hit, "应含刚处理的那条(status=2)");
+});
+%}

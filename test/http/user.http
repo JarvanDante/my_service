@@ -8,7 +8,7 @@
 @baseUrl = http://127.0.0.1:8000
 
 ### 1. 登录(公开) —— 成功并保存 token / uid
-POST {{baseUrl}}/front/user/login
+POST {{baseUrl}}/front/v1/user/login
 Content-Type: application/json
 
 {
@@ -27,7 +27,7 @@ client.global.set("uid", response.body.data.user.id);
 %}
 
 ### 2. 个人信息(带 token) —— 成功
-GET {{baseUrl}}/front/user/info
+GET {{baseUrl}}/front/v1/user/info
 Authorization: {{token}}
 
 > {%
@@ -38,7 +38,7 @@ client.test("拿到个人信息", function () {
 %}
 
 ### 3. 个人信息(不带 token) —— 应未授权
-GET {{baseUrl}}/front/user/info
+GET {{baseUrl}}/front/v1/user/info
 
 > {%
 client.test("无 token 被拒", function () {
@@ -47,7 +47,7 @@ client.test("无 token 被拒", function () {
 %}
 
 ### 4. 修改资料 —— 改昵称/签名/性别
-POST {{baseUrl}}/front/user/update
+POST {{baseUrl}}/front/v1/user/update
 Authorization: {{token}}
 Content-Type: application/json
 
@@ -64,7 +64,7 @@ client.test("改资料成功", function () {
 %}
 
 ### 5. 个人信息 —— 校验昵称已更新
-GET {{baseUrl}}/front/user/info
+GET {{baseUrl}}/front/v1/user/info
 Authorization: {{token}}
 
 > {%
@@ -75,7 +75,7 @@ client.test("昵称已更新", function () {
 %}
 
 ### 6. 他人主页(这里查自己的 id) —— 成功
-GET {{baseUrl}}/front/user/home/{{uid}}
+GET {{baseUrl}}/front/v1/user/home/{{uid}}
 Authorization: {{token}}
 
 > {%
@@ -87,7 +87,7 @@ client.test("主页返回公开信息", function () {
 %}
 
 ### 7. 按账号查找 —— 用 username 查, 应找到
-GET {{baseUrl}}/front/user/find?account=device_e2e-device-001
+GET {{baseUrl}}/front/v1/user/find?account=device_e2e-device-001
 Authorization: {{token}}
 
 > {%
@@ -99,7 +99,7 @@ client.test("按账号找到用户", function () {
 %}
 
 ### 8. 按账号查找 —— 不存在的账号
-GET {{baseUrl}}/front/user/find?account=不存在的账号xyz
+GET {{baseUrl}}/front/v1/user/find?account=不存在的账号xyz
 Authorization: {{token}}
 
 > {%
@@ -110,7 +110,7 @@ client.test("找不到返回 found=false", function () {
 %}
 
 ### 9. 用户图片 —— 成功(返回数组)
-GET {{baseUrl}}/front/user/images
+GET {{baseUrl}}/front/v1/user/images
 Authorization: {{token}}
 
 > {%
@@ -121,7 +121,7 @@ client.test("图片返回数组", function () {
 %}
 
 ### 10. 绑定手机 —— 成功
-POST {{baseUrl}}/front/user/bind-phone
+POST {{baseUrl}}/front/v1/user/bind-phone
 Authorization: {{token}}
 Content-Type: application/json
 
@@ -136,7 +136,7 @@ client.test("绑定手机成功", function () {
 %}
 
 ### 11. 个人信息 —— 校验手机号已更新
-GET {{baseUrl}}/front/user/info
+GET {{baseUrl}}/front/v1/user/info
 Authorization: {{token}}
 
 > {%
@@ -146,7 +146,7 @@ client.test("手机号已写入", function () {
 %}
 
 ### 12. 绑定手机(格式非法) —— 应被校验拦截
-POST {{baseUrl}}/front/user/bind-phone
+POST {{baseUrl}}/front/v1/user/bind-phone
 Authorization: {{token}}
 Content-Type: application/json
 
@@ -161,7 +161,7 @@ client.test("非法手机号被拦截", function () {
 %}
 
 ### 13. 修改资料(性别非法) —— 应被校验拦截
-POST {{baseUrl}}/front/user/update
+POST {{baseUrl}}/front/v1/user/update
 Authorization: {{token}}
 Content-Type: application/json
 
@@ -176,7 +176,7 @@ client.test("非法性别被拦截", function () {
 %}
 
 ### 14. 刷新 token —— 成功并替换全局 token(旧的失效)
-POST {{baseUrl}}/front/user/token/refresh
+POST {{baseUrl}}/front/v1/user/token/refresh
 Authorization: {{token}}
 
 > {%
@@ -191,7 +191,7 @@ client.global.set("token", newToken);
 %}
 
 ### 15. 个人信息(用新 token) —— 成功
-GET {{baseUrl}}/front/user/info
+GET {{baseUrl}}/front/v1/user/info
 Authorization: {{token}}
 
 > {%
@@ -201,7 +201,7 @@ client.test("新 token 可用", function () {
 %}
 
 ### 16. 错误请求方式(login 用 GET) —— 应提示 405
-GET {{baseUrl}}/front/user/login
+GET {{baseUrl}}/front/v1/user/login
 
 > {%
 client.test("请求方式判断", function () {
@@ -210,7 +210,7 @@ client.test("请求方式判断", function () {
 %}
 
 ### 17. 退出登录 —— 成功
-POST {{baseUrl}}/front/user/logout
+POST {{baseUrl}}/front/v1/user/logout
 Authorization: {{token}}
 
 > {%
@@ -220,7 +220,7 @@ client.test("退出成功", function () {
 %}
 
 ### 18. 退出后再访问 —— token 应已失效
-GET {{baseUrl}}/front/user/info
+GET {{baseUrl}}/front/v1/user/info
 Authorization: {{token}}
 
 > {%
