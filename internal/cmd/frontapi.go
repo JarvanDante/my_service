@@ -7,8 +7,6 @@ import (
 	"github.com/gogf/gf/v2/net/ghttp"
 	"github.com/gogf/gf/v2/os/gcmd"
 
-	"github.com/JarvanDante/my_service/internal/dao"
-	usermod "github.com/JarvanDante/my_service/internal/modules/user"
 	"github.com/JarvanDante/my_service/internal/shared/middleware"
 )
 
@@ -22,10 +20,7 @@ var FrontAPI = gcmd.Command{
 		s.Use(middleware.CORS, ghttp.MiddlewareHandlerResponse)
 		s.BindStatusHandler(404, middleware.NotFound)
 		s.BindHandler("/health", middleware.Health)
-		s.Group("/front", func(group *ghttp.RouterGroup) {
-			group.Middleware(middleware.RateLimit)
-			usermod.RegisterFront(group, dao.NewUserRepo())
-		})
+		mountFront(s)
 		s.Run()
 		return nil
 	},
