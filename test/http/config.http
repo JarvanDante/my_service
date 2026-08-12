@@ -1,0 +1,163 @@
+###############################################################################
+# 基础配置 Config · 真实端到端测试(前台全量读 + 后台 KV 管理)
+# 前置: 迁移 00023 已建表(app_config), 含样板数据(app_name 等 7 条)
+###############################################################################
+
+@baseUrl = http://127.0.0.1:8000
+
+### 1. 前台全量配置 —— 公开, 应含样板 key, 且值为原始类型
+GET {{baseUrl}}/front/v1/config/info
+
+> {%
+client.test("全量配置", function () {
+    client.assert(response.body.code === 0, "code 应为 0: " + response.body.message);
+    var c = response.body.data.configs;
+    client.assert(c.app_name === "漫隐", "app_name 应为字符串 漫隐");
+    client.assert(c.force_update === false, "force_update 应为布尔 false");
+    client.assert(c.is_open_comment === true, "is_open_comment 应为布尔 true");
+});
+%}
+
+### 2. 按分组拉取 —— 只含 switch 组
+GET {{baseUrl}}/front/v1/config/info?grp=switch
+
+> {%
+client.test("分组过滤", function () {
+    client.assert(response.body.code === 0, "code 应为 0");
+    var c = response.body.data.configs;
+    client.assert(c.is_open_comment !== undefined, "应含 switch 组的 key");
+    client.assert(c.app_name === undefined, "不应含 base 组的 key");
+});
+%}
+
+### 3. 健康检查
+GET {{baseUrl}}/front/v1/config/check
+
+> {%
+client.test("健康检查", function () {
+    client.assert(response.body.code === 0, "code 应为 0");
+});
+%}
+
+### 4. 后台登录 —— 保存 adminToken
+POST {{baseUrl}}/backend/auth/login
+Content-Type: application/json
+
+{ "username": "admin", "password": "admin123" }
+
+> {%
+client.test("超管登录成功", function () {
+    client.assert(response.body.code === 0, "code 应为 0: " + response.body.message);
+});
+client.global.set("adminToken", response.body.data.token);
+%}
+
+### 5. 新增配置(JSON 对象值) —— 保存 id
+POST {{baseUrl}}/backend/config
+Authorization: {{adminToken}}
+Content-Type: application/json
+
+{ "grp": "e2e", "key": "e2e_obj", "value": "{\"a\":1,\"b\":true}", "remark": "e2e对象值", "status": 1 }
+
+> {%
+client.test("新增成功", function () {
+    client.assert(response.body.code === 0, "code 应为 0: " + response.body.message);
+    client.assert(response.body.data.id > 0, "应返回 id");
+});
+client.global.set("cfgId", response.body.data.id);
+%}
+
+### 6. 新增普通文本值 —— 应自动转 JSON 字符串存储
+POST {{baseUrl}}/backend/config
+Authorization: {{adminToken}}
+Content-Type: application/json
+
+{ "grp": "e2e", "key": "e2e_text", "value": "hello world", "remark": "e2e文本值", "status": 1 }
+
+> {%
+client.test("文本值新增成功", function () {
+    client.assert(response.body.code === 0, "code 应为 0: " + response.body.message);
+});
+client.global.set("cfgTextId", response.body.data.id);
+%}
+
+### 7. 重复 key —— 应被拦
+POST {{baseUrl}}/backend/config
+Authorization: {{adminToken}}
+Content-Type: application/json
+
+{ "grp": "e2e", "key": "e2e_obj", "value": "1", "status": 1 }
+
+> {%
+client.test("重复 key 被拦", function () {
+    client.assert(response.body.code !== 0, "重复 key 应被拒");
+});
+%}
+
+### 8. 前台验证新配置生效 —— 对象保持结构, 文本还原为字符串
+GET {{baseUrl}}/front/v1/config/info?grp=e2e
+
+> {%
+client.test("新配置前台可见且类型正确", function () {
+    client.assert(response.body.code === 0, "code 应为 0");
+    var c = response.body.data.configs;
+    client.assert(c.e2e_obj.a === 1 && c.e2e_obj.b === true, "对象值应保持结构");
+    client.assert(c.e2e_text === "hello world", "文本值应还原为字符串");
+});
+%}
+
+### 9. 更新配置(改值 + 禁用)
+PUT {{baseUrl}}/backend/config/{{cfgId}}
+Authorization: {{adminToken}}
+Content-Type: application/json
+
+{ "value": "42", "status": 0 }
+
+> {%
+client.test("更新成功", function () {
+    client.assert(response.body.code === 0, "code 应为 0: " + response.body.message);
+});
+%}
+
+### 10. 禁用后前台不下发
+GET {{baseUrl}}/front/v1/config/info?grp=e2e
+
+> {%
+client.test("禁用配置前台不可见", function () {
+    client.assert(response.body.code === 0, "code 应为 0");
+    var c = response.body.data.configs;
+    client.assert(c.e2e_obj === undefined, "禁用的 key 不应下发");
+    client.assert(c.e2e_text !== undefined, "未禁用的 key 仍应下发");
+});
+%}
+
+### 11. 后台列表(status 留空=全部, 按 e2e 组筛)
+GET {{baseUrl}}/backend/config?grp=e2e&page=1&size=20
+Authorization: {{adminToken}}
+
+> {%
+client.test("后台列表含禁用项", function () {
+    client.assert(response.body.code === 0, "code 应为 0: " + response.body.message);
+    client.assert(response.body.data.total === 2, "e2e 组应有 2 条(含禁用)");
+});
+%}
+
+### 12. 删除两条测试配置(清理)
+DELETE {{baseUrl}}/backend/config/{{cfgId}}
+Authorization: {{adminToken}}
+
+> {%
+client.test("删除成功", function () {
+    client.assert(response.body.code === 0, "code 应为 0");
+});
+%}
+
+### 13. 清理第二条
+DELETE {{baseUrl}}/backend/config/{{cfgTextId}}
+Authorization: {{adminToken}}
+
+> {%
+client.test("清理完成", function () {
+    client.assert(response.body.code === 0, "code 应为 0");
+});
+%}

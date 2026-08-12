@@ -1,0 +1,163 @@
+###############################################################################
+# 兑换码 RedeemCode · 真实端到端测试(后台建码 → 前台兑换 → 防重用/防超发)
+# 前置: 迁移 00022 已建表(redeem_code / redeem_code_record)
+# 注意: 步骤 5 动态建码(每次运行生成新码), 所以可反复运行不受"已使用"影响
+###############################################################################
+
+@baseUrl = http://127.0.0.1:8000
+
+### 1. 前台登录 —— 保存 token
+POST {{baseUrl}}/front/v1/user/login
+Content-Type: application/json
+
+{ "device_id": "e2e-redeem-001", "device_type": "ios", "device_version": "1.0" }
+
+> {%
+client.test("登录成功", function () {
+    client.assert(response.body.code === 0, "code 应为 0: " + response.body.message);
+});
+client.global.set("token", response.body.data.token);
+%}
+
+### 2. 未登录兑换 —— 应被拒
+POST {{baseUrl}}/front/v1/redeemcode/use
+Content-Type: application/json
+
+{ "code": "WELCOME100" }
+
+> {%
+client.test("未登录被拒", function () {
+    client.assert(response.body.code !== 0, "未登录应被拒");
+});
+%}
+
+### 3. 兑换不存在的码 —— 应报不存在
+POST {{baseUrl}}/front/v1/redeemcode/use
+Authorization: {{token}}
+Content-Type: application/json
+
+{ "code": "NOT-EXISTS-CODE" }
+
+> {%
+client.test("不存在的码被拒", function () {
+    client.assert(response.body.code !== 0, "不存在的码应被拒");
+});
+%}
+
+### 4. 后台登录 —— 保存 adminToken
+POST {{baseUrl}}/backend/auth/login
+Content-Type: application/json
+
+{ "username": "admin", "password": "admin123" }
+
+> {%
+client.test("超管登录成功", function () {
+    client.assert(response.body.code === 0, "code 应为 0: " + response.body.message);
+});
+client.global.set("adminToken", response.body.data.token);
+%}
+
+### 5. 后台建码(code 留空自动生成, 限用 1 次) —— 保存生成的码
+POST {{baseUrl}}/backend/redeemcode
+Authorization: {{adminToken}}
+Content-Type: application/json
+
+{ "name": "e2e测试码", "value": 88, "total_times": 1, "expired_at": "2027-12-31 23:59:59", "status": 1 }
+
+> {%
+client.test("建码成功", function () {
+    client.assert(response.body.code === 0, "code 应为 0: " + response.body.message);
+    client.assert(response.body.data.id > 0, "应返回 id");
+    client.assert(response.body.data.code.length === 12, "自动生成 12 位码");
+});
+client.global.set("rcId", response.body.data.id);
+client.global.set("rcCode", response.body.data.code);
+%}
+
+### 6. 前台兑换该码 —— 成功, 返回描述
+POST {{baseUrl}}/front/v1/redeemcode/use
+Authorization: {{token}}
+Content-Type: application/json
+
+{ "code": "{{rcCode}}" }
+
+> {%
+client.test("兑换成功", function () {
+    client.assert(response.body.code === 0, "code 应为 0: " + response.body.message);
+    client.assert(response.body.data.desc.indexOf("金币") >= 0, "应返回金币描述");
+});
+%}
+
+### 7. 同一用户再次兑换 —— 应被"已使用"拦截
+POST {{baseUrl}}/front/v1/redeemcode/use
+Authorization: {{token}}
+Content-Type: application/json
+
+{ "code": "{{rcCode}}" }
+
+> {%
+client.test("重复兑换被拦", function () {
+    client.assert(response.body.code !== 0, "同一用户重复兑换应被拒");
+    client.assert(response.body.message.indexOf("使用过") >= 0, "应提示已使用过");
+});
+%}
+
+### 8. 我的兑换记录 —— 应含刚兑换的码
+GET {{baseUrl}}/front/v1/redeemcode/list?page=1&size=20
+Authorization: {{token}}
+
+> {%
+client.test("我的兑换记录", function () {
+    client.assert(response.body.code === 0, "code 应为 0: " + response.body.message);
+    var hit = response.body.data.list.some(function (r) { return r.code == client.global.get("rcCode"); });
+    client.assert(hit, "应含刚兑换的码");
+});
+%}
+
+### 9. 后台兑换码列表(status 留空=全部) —— 该码 used_times=1 且已自动禁用
+GET {{baseUrl}}/backend/redeemcode?keyword={{rcCode}}&page=1&size=20
+Authorization: {{adminToken}}
+
+> {%
+client.test("次数用完自动禁用", function () {
+    client.assert(response.body.code === 0, "code 应为 0: " + response.body.message);
+    var row = response.body.data.list.filter(function (r) { return r.code == client.global.get("rcCode"); })[0];
+    client.assert(row !== undefined, "应能按码搜到");
+    client.assert(row.used_times === 1, "used_times 应为 1");
+    client.assert(row.status === 0, "1次用完应自动禁用(status=0)");
+});
+%}
+
+### 10. 已禁用(用完)的码再兑换 —— 应被拦
+POST {{baseUrl}}/front/v1/redeemcode/use
+Authorization: {{token}}
+Content-Type: application/json
+
+{ "code": "{{rcCode}}" }
+
+> {%
+client.test("用完的码被拦", function () {
+    client.assert(response.body.code !== 0, "次数用完应被拒");
+});
+%}
+
+### 11. 后台使用记录(按码筛选) —— 应有 1 条
+GET {{baseUrl}}/backend/redeemcode/records?code={{rcCode}}&page=1&size=20
+Authorization: {{adminToken}}
+
+> {%
+client.test("后台使用记录", function () {
+    client.assert(response.body.code === 0, "code 应为 0: " + response.body.message);
+    client.assert(response.body.data.total === 1, "该码应有 1 条使用记录");
+});
+%}
+
+### 12. 后台删除该测试码(清理)
+DELETE {{baseUrl}}/backend/redeemcode/{{rcId}}
+Authorization: {{adminToken}}
+
+> {%
+client.test("删除成功", function () {
+    client.assert(response.body.code === 0, "code 应为 0: " + response.body.message);
+});
+%}

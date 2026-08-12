@@ -1,0 +1,143 @@
+###############################################################################
+# 收藏/点赞 Collect · 真实端到端测试(操作/幂等/批量取消/列表)
+# 前置: 迁移 00025 已建表(user_collect); 纯前台模块, 无后台接口
+###############################################################################
+
+@baseUrl = http://127.0.0.1:8000
+
+### 1. 前台登录 —— 保存 token
+POST {{baseUrl}}/front/v1/user/login
+Content-Type: application/json
+
+{ "device_id": "e2e-collect-001", "device_type": "ios", "device_version": "1.0" }
+
+> {%
+client.test("登录成功", function () {
+    client.assert(response.body.code === 0, "code 应为 0: " + response.body.message);
+});
+client.global.set("token", response.body.data.token);
+%}
+
+### 2. 收藏视频 9001(单个 id)
+POST {{baseUrl}}/front/v1/collect/operate
+Authorization: {{token}}
+Content-Type: application/json
+
+{ "id": 9001, "media_type": 1, "flag": true, "type": 1 }
+
+> {%
+client.test("收藏成功", function () {
+    client.assert(response.body.code === 0, "code 应为 0: " + response.body.message);
+});
+%}
+
+### 3. 重复收藏同一视频 —— 幂等, 不报错
+POST {{baseUrl}}/front/v1/collect/operate
+Authorization: {{token}}
+Content-Type: application/json
+
+{ "id": 9001, "media_type": 1, "flag": true, "type": 1 }
+
+> {%
+client.test("重复收藏幂等", function () {
+    client.assert(response.body.code === 0, "重复收藏不应报错: " + response.body.message);
+});
+%}
+
+### 4. 批量收藏 9002/9003
+POST {{baseUrl}}/front/v1/collect/operate
+Authorization: {{token}}
+Content-Type: application/json
+
+{ "ids": [9002, 9003], "media_type": 1, "flag": true, "type": 1 }
+
+> {%
+client.test("批量收藏", function () {
+    client.assert(response.body.code === 0, "code 应为 0: " + response.body.message);
+});
+%}
+
+### 5. 点赞 9001(op_type=2, 与收藏互不影响)
+POST {{baseUrl}}/front/v1/collect/operate
+Authorization: {{token}}
+Content-Type: application/json
+
+{ "id": 9001, "media_type": 1, "flag": true, "type": 2 }
+
+> {%
+client.test("点赞成功", function () {
+    client.assert(response.body.code === 0, "code 应为 0: " + response.body.message);
+});
+%}
+
+### 6. 我的收藏列表 —— 应为 3 条(9001/9002/9003), 不含点赞
+GET {{baseUrl}}/front/v1/collect/list?type=1&media_type=1&page=1&size=20
+Authorization: {{token}}
+
+> {%
+client.test("收藏列表", function () {
+    client.assert(response.body.code === 0, "code 应为 0: " + response.body.message);
+    client.assert(response.body.data.total === 3, "收藏应为 3 条(幂等未重复), 实际: " + response.body.data.total);
+});
+%}
+
+### 7. 我的点赞列表 —— 应为 1 条
+GET {{baseUrl}}/front/v1/collect/list?type=2&media_type=1&page=1&size=20
+Authorization: {{token}}
+
+> {%
+client.test("点赞列表", function () {
+    client.assert(response.body.code === 0, "code 应为 0");
+    client.assert(response.body.data.total === 1, "点赞应为 1 条");
+});
+%}
+
+### 8. flag=false 取消收藏 9001
+POST {{baseUrl}}/front/v1/collect/operate
+Authorization: {{token}}
+Content-Type: application/json
+
+{ "id": 9001, "media_type": 1, "flag": false, "type": 1 }
+
+> {%
+client.test("取消收藏", function () {
+    client.assert(response.body.code === 0, "code 应为 0: " + response.body.message);
+});
+%}
+
+### 9. 批量删除收藏 9002/9003(清理)
+POST {{baseUrl}}/front/v1/collect/delete
+Authorization: {{token}}
+Content-Type: application/json
+
+{ "ids": [9002, 9003], "media_type": 1, "type": 1 }
+
+> {%
+client.test("批量取消", function () {
+    client.assert(response.body.code === 0, "code 应为 0: " + response.body.message);
+});
+%}
+
+### 10. 清理点赞 + 验证收藏清零
+POST {{baseUrl}}/front/v1/collect/delete
+Authorization: {{token}}
+Content-Type: application/json
+
+{ "ids": [9001], "media_type": 1, "type": 2 }
+
+> {%
+client.test("清理点赞", function () {
+    client.assert(response.body.code === 0, "code 应为 0");
+});
+%}
+
+### 11. 收藏列表应为空
+GET {{baseUrl}}/front/v1/collect/list?type=1&media_type=1&page=1&size=20
+Authorization: {{token}}
+
+> {%
+client.test("清理后为空", function () {
+    client.assert(response.body.code === 0, "code 应为 0");
+    client.assert(response.body.data.total === 0, "清理后收藏应为 0 条");
+});
+%}

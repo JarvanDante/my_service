@@ -5,11 +5,17 @@ import (
 
 	"github.com/JarvanDante/my_service/internal/dao"
 	adminmod "github.com/JarvanDante/my_service/internal/modules/admin"
+	appmod "github.com/JarvanDante/my_service/internal/modules/application"
 	checkinmod "github.com/JarvanDante/my_service/internal/modules/checkin"
+	collectmod "github.com/JarvanDante/my_service/internal/modules/collect"
+	configmod "github.com/JarvanDante/my_service/internal/modules/config"
 	feedbackmod "github.com/JarvanDante/my_service/internal/modules/feedback"
 	finmod "github.com/JarvanDante/my_service/internal/modules/finance"
 	mediamod "github.com/JarvanDante/my_service/internal/modules/media"
+	msgmod "github.com/JarvanDante/my_service/internal/modules/message"
+	opsmod "github.com/JarvanDante/my_service/internal/modules/ops"
 	promomod "github.com/JarvanDante/my_service/internal/modules/promo"
+	redeemmod "github.com/JarvanDante/my_service/internal/modules/redeemcode"
 	statsmod "github.com/JarvanDante/my_service/internal/modules/stats"
 	sysmod "github.com/JarvanDante/my_service/internal/modules/system"
 	tagmod "github.com/JarvanDante/my_service/internal/modules/tag"
@@ -28,6 +34,12 @@ func mountFront(s *ghttp.Server) {
 		checkinmod.RegisterFront(group)
 		feedbackmod.RegisterFront(group)
 		tagmod.RegisterFront(group)
+		redeemmod.RegisterFront(group)
+		configmod.RegisterFront(group)
+		appmod.RegisterFront(group)
+		collectmod.RegisterFront(group)
+		msgmod.RegisterFront(group)
+		opsmod.RegisterFront(group)
 	})
 
 	// ---- v2(将来大改时启用; 老的 v1 继续并存)----
@@ -62,6 +74,11 @@ func mountBackend(s *ghttp.Server) {
 			videomod.RegisterBackend(perm, dao.NewVideoRepo())
 			feedbackmod.RegisterBackend(perm)
 			tagmod.RegisterBackend(perm)
+			redeemmod.RegisterBackend(perm)
+			configmod.RegisterBackend(perm)
+			appmod.RegisterBackend(perm)
+			msgmod.RegisterBackend(perm)
+			opsmod.RegisterBackend(perm)
 		})
 	})
 }

@@ -1,0 +1,153 @@
+###############################################################################
+# 运营配置 Ops · 真实端到端测试(公告/跳转位/敏感词)
+# 前置: 迁移 00027 已建表(announcement/jumptab/filter_word), 各含 1 条样板
+###############################################################################
+
+@baseUrl = http://127.0.0.1:8000
+
+### 1. 前台公告 —— 公开, 应含样板"欢迎公告"
+POST {{baseUrl}}/front/v1/announcement/list
+Content-Type: application/json
+
+{ "sys_type": "app" }
+
+> {%
+client.test("公告列表", function () {
+    client.assert(response.body.code === 0, "code 应为 0: " + response.body.message);
+    client.assert(response.body.data.list.length >= 1, "至少 1 条有效公告");
+});
+%}
+
+### 2. 前台跳转位 —— 公开, 应含样板"每日签到"
+GET {{baseUrl}}/front/v1/jumptab/list?location=1
+
+> {%
+client.test("跳转位列表", function () {
+    client.assert(response.body.code === 0, "code 应为 0: " + response.body.message);
+    client.assert(response.body.data.list.length >= 1, "至少 1 个跳转位");
+});
+%}
+
+### 3. 后台登录
+POST {{baseUrl}}/backend/auth/login
+Content-Type: application/json
+
+{ "username": "admin", "password": "admin123" }
+
+> {%
+client.test("超管登录成功", function () {
+    client.assert(response.body.code === 0, "code 应为 0: " + response.body.message);
+});
+client.global.set("adminToken", response.body.data.token);
+%}
+
+### 4. 新增公告(已过期的) —— 前台不应下发
+POST {{baseUrl}}/backend/announcement
+Authorization: {{adminToken}}
+Content-Type: application/json
+
+{ "title": "e2e过期公告", "content": "已过期", "start_at": "2020-01-01 00:00:00", "end_at": "2020-12-31 23:59:59", "status": 1 }
+
+> {%
+client.test("新增过期公告", function () {
+    client.assert(response.body.code === 0, "code 应为 0: " + response.body.message);
+});
+client.global.set("annId", response.body.data.id);
+%}
+
+### 5. 前台验证 —— 过期公告不可见
+POST {{baseUrl}}/front/v1/announcement/list
+Content-Type: application/json
+
+{}
+
+> {%
+client.test("过期公告不下发", function () {
+    client.assert(response.body.code === 0, "code 应为 0");
+    var hit = response.body.data.list.some(function (r) { return r.id == client.global.get("annId"); });
+    client.assert(!hit, "过期公告不应出现在前台");
+});
+%}
+
+### 6. 新增跳转位(rank=999 应置顶)
+POST {{baseUrl}}/backend/jumptab
+Authorization: {{adminToken}}
+Content-Type: application/json
+
+{ "cn_name": "e2e跳转", "en_name": "E2E", "link": "/e2e", "location": 1, "rank": 999, "status": 1 }
+
+> {%
+client.test("新增跳转位", function () {
+    client.assert(response.body.code === 0, "code 应为 0: " + response.body.message);
+});
+client.global.set("jtId", response.body.data.id);
+%}
+
+### 7. 前台跳转位 —— 新的应排第一
+GET {{baseUrl}}/front/v1/jumptab/list?location=1
+
+> {%
+client.test("rank 置顶", function () {
+    client.assert(response.body.code === 0, "code 应为 0");
+    client.assert(response.body.data.list[0].id == client.global.get("jtId"), "rank=999 应排第一");
+});
+%}
+
+### 8. 批量添加敏感词(含重复) —— added 应为 2(第3个与样板重复跳过)
+POST {{baseUrl}}/backend/filterword
+Authorization: {{adminToken}}
+Content-Type: application/json
+
+{ "words": ["e2e敏感词A", "e2e敏感词B", "测试敏感词"] }
+
+> {%
+client.test("批量添加去重", function () {
+    client.assert(response.body.code === 0, "code 应为 0: " + response.body.message);
+    client.assert(response.body.data.added === 2, "重复词应跳过, 实际新增: " + response.body.data.added);
+});
+%}
+
+### 9. 敏感词列表(模糊搜 e2e) —— 应为 2 条
+GET {{baseUrl}}/backend/filterword?keyword=e2e&page=1&size=50
+Authorization: {{adminToken}}
+
+> {%
+client.test("敏感词搜索", function () {
+    client.assert(response.body.code === 0, "code 应为 0: " + response.body.message);
+    client.assert(response.body.data.total === 2, "e2e 词应为 2 条");
+});
+client.global.set("fwId", response.body.data.list[0].id);
+client.global.set("fwId2", response.body.data.list[1].id);
+%}
+
+### 10. 清理: 删公告
+DELETE {{baseUrl}}/backend/announcement/{{annId}}
+Authorization: {{adminToken}}
+
+> {%
+client.test("删公告", function () { client.assert(response.body.code === 0, "code 应为 0"); });
+%}
+
+### 11. 清理: 删跳转位
+DELETE {{baseUrl}}/backend/jumptab/{{jtId}}
+Authorization: {{adminToken}}
+
+> {%
+client.test("删跳转位", function () { client.assert(response.body.code === 0, "code 应为 0"); });
+%}
+
+### 12. 清理: 删敏感词 x2
+DELETE {{baseUrl}}/backend/filterword/{{fwId}}
+Authorization: {{adminToken}}
+
+> {%
+client.test("删敏感词1", function () { client.assert(response.body.code === 0, "code 应为 0"); });
+%}
+
+### 13. 清理: 删第二个敏感词
+DELETE {{baseUrl}}/backend/filterword/{{fwId2}}
+Authorization: {{adminToken}}
+
+> {%
+client.test("删敏感词2", function () { client.assert(response.body.code === 0, "code 应为 0"); });
+%}

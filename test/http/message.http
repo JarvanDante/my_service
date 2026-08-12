@@ -1,0 +1,168 @@
+###############################################################################
+# 系统消息 Message · 真实端到端测试(后台发布 → 前台列表/未读/已读)
+# 前置: 迁移 00026 已建表(sys_message / sys_message_read), 含 1 条全员样板消息
+###############################################################################
+
+@baseUrl = http://127.0.0.1:8000
+
+### 1. 前台登录 —— 保存 token
+POST {{baseUrl}}/front/v1/user/login
+Content-Type: application/json
+
+{ "device_id": "e2e-message-001", "device_type": "ios", "device_version": "1.0" }
+
+> {%
+client.test("登录成功", function () {
+    client.assert(response.body.code === 0, "code 应为 0: " + response.body.message);
+});
+client.global.set("token", response.body.data.token);
+%}
+
+### 2. 后台登录
+POST {{baseUrl}}/backend/auth/login
+Content-Type: application/json
+
+{ "username": "admin", "password": "admin123" }
+
+> {%
+client.test("超管登录成功", function () {
+    client.assert(response.body.code === 0, "code 应为 0: " + response.body.message);
+});
+client.global.set("adminToken", response.body.data.token);
+%}
+
+### 3. 后台发布全员消息 —— 保存 id
+POST {{baseUrl}}/backend/message
+Authorization: {{adminToken}}
+Content-Type: application/json
+
+{ "user_id": 0, "type": 1, "title": "e2e全员公告", "content": "端到端测试消息" }
+
+> {%
+client.test("发布成功", function () {
+    client.assert(response.body.code === 0, "code 应为 0: " + response.body.message);
+    client.assert(response.body.data.id > 0, "应返回 id");
+});
+client.global.set("msgId", response.body.data.id);
+%}
+
+### 4. 前台消息列表 —— 应含刚发布的, 且未读
+GET {{baseUrl}}/front/v1/message/list?page=1&size=20
+Authorization: {{token}}
+
+> {%
+client.test("列表含新消息且未读", function () {
+    client.assert(response.body.code === 0, "code 应为 0: " + response.body.message);
+    var row = response.body.data.list.filter(function (r) { return r.id == client.global.get("msgId"); })[0];
+    client.assert(row !== undefined, "应含刚发布的消息");
+    client.assert(row.is_read === false, "新消息应为未读");
+});
+%}
+
+### 5. 未读数 —— 至少 1
+GET {{baseUrl}}/front/v1/message/unread
+Authorization: {{token}}
+
+> {%
+client.test("未读数", function () {
+    client.assert(response.body.code === 0, "code 应为 0");
+    client.assert(response.body.data.count >= 1, "至少 1 条未读");
+});
+client.global.set("unreadBefore", response.body.data.count);
+%}
+
+### 6. 标记单条已读
+POST {{baseUrl}}/front/v1/message/read
+Authorization: {{token}}
+Content-Type: application/json
+
+{ "id": {{msgId}} }
+
+> {%
+client.test("标记已读", function () {
+    client.assert(response.body.code === 0, "code 应为 0: " + response.body.message);
+});
+%}
+
+### 7. 未读数应减 1, 列表中该条 is_read=true
+GET {{baseUrl}}/front/v1/message/unread
+Authorization: {{token}}
+
+> {%
+client.test("未读数减1", function () {
+    client.assert(response.body.code === 0, "code 应为 0");
+    client.assert(response.body.data.count == client.global.get("unreadBefore") - 1, "未读应减 1");
+});
+%}
+
+### 8. 重复标记已读 —— 幂等
+POST {{baseUrl}}/front/v1/message/read
+Authorization: {{token}}
+Content-Type: application/json
+
+{ "id": {{msgId}} }
+
+> {%
+client.test("重复标记幂等", function () {
+    client.assert(response.body.code === 0, "重复标记不应报错: " + response.body.message);
+});
+%}
+
+### 9. 全部已读
+POST {{baseUrl}}/front/v1/message/read
+Authorization: {{token}}
+Content-Type: application/json
+
+{ "all": true }
+
+> {%
+client.test("全部已读", function () {
+    client.assert(response.body.code === 0, "code 应为 0");
+});
+%}
+
+### 10. 未读数应为 0
+GET {{baseUrl}}/front/v1/message/unread
+Authorization: {{token}}
+
+> {%
+client.test("未读清零", function () {
+    client.assert(response.body.code === 0, "code 应为 0");
+    client.assert(response.body.data.count === 0, "全部已读后未读应为 0");
+});
+%}
+
+### 11. 后台撤回该消息
+PUT {{baseUrl}}/backend/message/{{msgId}}
+Authorization: {{adminToken}}
+Content-Type: application/json
+
+{ "status": 0 }
+
+> {%
+client.test("撤回成功", function () {
+    client.assert(response.body.code === 0, "code 应为 0: " + response.body.message);
+});
+%}
+
+### 12. 撤回后前台不可见
+GET {{baseUrl}}/front/v1/message/list?page=1&size=50
+Authorization: {{token}}
+
+> {%
+client.test("撤回消息前台不可见", function () {
+    client.assert(response.body.code === 0, "code 应为 0");
+    var hit = response.body.data.list.some(function (r) { return r.id == client.global.get("msgId"); });
+    client.assert(!hit, "撤回(status=0)不应出现在前台");
+});
+%}
+
+### 13. 后台删除(清理)
+DELETE {{baseUrl}}/backend/message/{{msgId}}
+Authorization: {{adminToken}}
+
+> {%
+client.test("删除成功", function () {
+    client.assert(response.body.code === 0, "code 应为 0: " + response.body.message);
+});
+%}

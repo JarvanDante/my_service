@@ -1,0 +1,114 @@
+###############################################################################
+# 推广应用 Application · 真实端到端测试(前台列表/点击 + 后台 CRUD)
+# 前置: 迁移 00024 已建表(application), 含样板数据 2 条
+###############################################################################
+
+@baseUrl = http://127.0.0.1:8000
+
+### 1. 前台应用列表 —— 公开, 至少 2 条样板
+GET {{baseUrl}}/front/v1/application/list
+
+> {%
+client.test("应用列表", function () {
+    client.assert(response.body.code === 0, "code 应为 0: " + response.body.message);
+    client.assert(response.body.data.list.length >= 2, "至少 2 条样板应用");
+});
+%}
+
+### 2. 按投放位置筛(loc=2) —— 只剩投放到位置2的
+GET {{baseUrl}}/front/v1/application/list?loc=2
+
+> {%
+client.test("按位置筛选", function () {
+    client.assert(response.body.code === 0, "code 应为 0");
+    var ok = response.body.data.list.every(function (r) { return r.locIds.indexOf(2) >= 0; });
+    client.assert(ok, "所有返回项都应含位置2");
+});
+%}
+
+### 3. 后台登录
+POST {{baseUrl}}/backend/auth/login
+Content-Type: application/json
+
+{ "username": "admin", "password": "admin123" }
+
+> {%
+client.test("超管登录成功", function () {
+    client.assert(response.body.code === 0, "code 应为 0: " + response.body.message);
+});
+client.global.set("adminToken", response.body.data.token);
+%}
+
+### 4. 后台新增应用 —— 保存 id
+POST {{baseUrl}}/backend/application
+Authorization: {{adminToken}}
+Content-Type: application/json
+
+{ "name": "e2e测试应用", "intro": "e2e", "download_url": "https://example.com/e2e.apk", "loc_ids": [9], "rank": 500, "status": 1 }
+
+> {%
+client.test("新增成功", function () {
+    client.assert(response.body.code === 0, "code 应为 0: " + response.body.message);
+    client.assert(response.body.data.id > 0, "应返回 id");
+});
+client.global.set("appId", response.body.data.id);
+%}
+
+### 5. 前台点击上报 x1
+POST {{baseUrl}}/front/v1/application/click
+Content-Type: application/json
+
+{ "id": {{appId}} }
+
+> {%
+client.test("点击上报", function () {
+    client.assert(response.body.code === 0, "code 应为 0: " + response.body.message);
+});
+%}
+
+### 6. 后台列表验证 —— rank=500 应排第一, down_total=1
+GET {{baseUrl}}/backend/application?keyword=e2e测试应用&page=1&size=20
+Authorization: {{adminToken}}
+
+> {%
+client.test("点击计数生效", function () {
+    client.assert(response.body.code === 0, "code 应为 0: " + response.body.message);
+    var row = response.body.data.list[0];
+    client.assert(row !== undefined && row.id == client.global.get("appId"), "应搜到新应用");
+    client.assert(row.down_total === 1, "down_total 应为 1");
+});
+%}
+
+### 7. 更新(下架)
+PUT {{baseUrl}}/backend/application/{{appId}}
+Authorization: {{adminToken}}
+Content-Type: application/json
+
+{ "rank": 500, "loc_ids": [9], "status": 0 }
+
+> {%
+client.test("下架成功", function () {
+    client.assert(response.body.code === 0, "code 应为 0: " + response.body.message);
+});
+%}
+
+### 8. 下架后前台不可见
+GET {{baseUrl}}/front/v1/application/list?loc=9
+
+> {%
+client.test("下架应用前台不可见", function () {
+    client.assert(response.body.code === 0, "code 应为 0");
+    var hit = response.body.data.list.some(function (r) { return r.id == client.global.get("appId"); });
+    client.assert(!hit, "status=0 不应出现在前台");
+});
+%}
+
+### 9. 删除(清理)
+DELETE {{baseUrl}}/backend/application/{{appId}}
+Authorization: {{adminToken}}
+
+> {%
+client.test("删除成功", function () {
+    client.assert(response.body.code === 0, "code 应为 0: " + response.body.message);
+});
+%}
