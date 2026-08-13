@@ -41,4 +41,40 @@ type Repository interface {
 	NewUsersByDay(ctx context.Context, startDate int) ([]DayCount, error)      // register_date >= startDate 分组
 	PaidOrdersByDay(ctx context.Context, startDay string) ([]DayAmount, error) // pay_at >= startDay 分组
 	ChannelStats(ctx context.Context) ([]ChannelStat, error)
+	// ---- 扩展维度(分析页图表化) ----
+	HourDist(ctx context.Context, startDay string) ([]HourCount, error)
+	DeviceStats(ctx context.Context) ([]DeviceStat, error)
+	ContentStats(ctx context.Context) ([]ContentStat, error)
+	BalanceScenes(ctx context.Context, startDay string) ([]BalanceScene, error)
+}
+
+// HourCount 按小时(0~23)计数。
+type HourCount struct {
+	Hour      int
+	Registers int
+	Orders    int
+}
+
+// DeviceStat 设备分布。
+type DeviceStat struct {
+	DeviceType string
+	Count      int
+}
+
+// ContentStat 单一内容类型的库存与消费概览。
+type ContentStat struct {
+	MediaType int
+	Online    int
+	Pending   int
+	Offline   int
+	Views     int64
+	Buys      int
+	BuyAmount float64
+}
+
+// BalanceScene 金币流水按场景聚合。
+type BalanceScene struct {
+	Scene   string
+	Income  float64
+	Expense float64
 }

@@ -67,3 +67,57 @@ func (c *Controller) ChannelStats(ctx context.Context, req *v1.ChannelStatsReq) 
 	}
 	return &v1.ChannelStatsRes{List: items}, nil
 }
+
+// ---------------- 扩展维度(分析页图表化) ----------------
+
+func (c *Controller) HourDist(ctx context.Context, req *v1.HourDistReq) (res *v1.HourDistRes, err error) {
+	list, err := c.stats.HourDist(ctx, req.Days)
+	if err != nil {
+		return nil, err
+	}
+	res = &v1.HourDistRes{List: make([]v1.HourDistItem, 0, len(list))}
+	for _, d := range list {
+		res.List = append(res.List, v1.HourDistItem{Hour: d.Hour, Registers: d.Registers, Orders: d.Orders})
+	}
+	return res, nil
+}
+
+func (c *Controller) DeviceStats(ctx context.Context, req *v1.DeviceStatsReq) (res *v1.DeviceStatsRes, err error) {
+	list, err := c.stats.DeviceStats(ctx)
+	if err != nil {
+		return nil, err
+	}
+	res = &v1.DeviceStatsRes{List: make([]v1.DeviceStatItem, 0, len(list))}
+	for _, d := range list {
+		res.List = append(res.List, v1.DeviceStatItem{DeviceType: d.DeviceType, Count: d.Count})
+	}
+	return res, nil
+}
+
+func (c *Controller) ContentStats(ctx context.Context, req *v1.ContentStatsReq) (res *v1.ContentStatsRes, err error) {
+	list, err := c.stats.ContentStats(ctx)
+	if err != nil {
+		return nil, err
+	}
+	res = &v1.ContentStatsRes{List: make([]v1.ContentStatItem, 0, len(list))}
+	for _, d := range list {
+		res.List = append(res.List, v1.ContentStatItem{
+			MediaType: d.MediaType, TypeName: d.TypeName,
+			Online: d.Online, Pending: d.Pending, Offline: d.Offline,
+			Views: d.Views, Buys: d.Buys, BuyAmount: d.BuyAmount,
+		})
+	}
+	return res, nil
+}
+
+func (c *Controller) BalanceScenes(ctx context.Context, req *v1.BalanceScenesReq) (res *v1.BalanceScenesRes, err error) {
+	list, err := c.stats.BalanceScenes(ctx, req.Days)
+	if err != nil {
+		return nil, err
+	}
+	res = &v1.BalanceScenesRes{List: make([]v1.BalanceSceneItem, 0, len(list))}
+	for _, d := range list {
+		res.List = append(res.List, v1.BalanceSceneItem{Scene: d.Scene, Income: d.Income, Expense: d.Expense})
+	}
+	return res, nil
+}

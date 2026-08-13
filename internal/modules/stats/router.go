@@ -12,5 +12,8 @@ import (
 // RegisterBackend 后台统计接口(挂权限组)。
 func RegisterBackend(group *ghttp.RouterGroup, repo domain.Repository) {
 	ctrl := backend.New(logic.New(repo))
-	group.Bind(ctrl.Overview, ctrl.UserTrend, ctrl.RechargeTrend, ctrl.ChannelStats)
+	group.Bind(
+		ctrl.Overview, ctrl.UserTrend, ctrl.RechargeTrend, ctrl.ChannelStats,
+		ctrl.HourDist, ctrl.DeviceStats, ctrl.ContentStats, ctrl.BalanceScenes,
+	)
 }

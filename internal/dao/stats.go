@@ -99,3 +99,131 @@ func (r *statsRepo) ChannelStats(ctx context.Context) ([]statsdomain.ChannelStat
 	}
 	return out, nil
 }
+
+// ---------------- 扩展维度(分析页图表化) ----------------
+
+// HourDist 近 N 天注册/支付按小时聚合。两类事件各自 group by 后在内存合并,
+// 比一条 FULL JOIN 直观, 数据量也就 24 行。
+func (r *statsRepo) HourDist(ctx context.Context, startDay string) ([]statsdomain.HourCount, error) {
+	regs, err := g.DB().GetAll(ctx, `
+		SELECT extract(hour FROM register_at)::int AS h, count(*) AS cnt
+		  FROM users WHERE register_at >= ?::timestamptz
+		 GROUP BY 1`, startDay)
+	if err != nil {
+		return nil, err
+	}
+	orders, err := g.DB().GetAll(ctx, `
+		SELECT extract(hour FROM pay_at)::int AS h, count(*) AS cnt
+		  FROM recharge_order WHERE status = 1 AND pay_at >= ?::timestamptz
+		 GROUP BY 1`, startDay)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]statsdomain.HourCount, 24)
+	for i := range out {
+		out[i].Hour = i
+	}
+	for _, row := range regs {
+		if h := row["h"].Int(); h >= 0 && h < 24 {
+			out[h].Registers = row["cnt"].Int()
+		}
+	}
+	for _, row := range orders {
+		if h := row["h"].Int(); h >= 0 && h < 24 {
+			out[h].Orders = row["cnt"].Int()
+		}
+	}
+	return out, nil
+}
+
+func (r *statsRepo) DeviceStats(ctx context.Context) ([]statsdomain.DeviceStat, error) {
+	all, err := g.DB().GetAll(ctx, `
+		SELECT coalesce(nullif(device_type, ''), '(未知)') AS dt, count(*) AS cnt
+		  FROM users GROUP BY 1 ORDER BY cnt DESC`)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]statsdomain.DeviceStat, 0, len(all))
+	for _, row := range all {
+		out = append(out, statsdomain.DeviceStat{DeviceType: row["dt"].String(), Count: row["cnt"].Int()})
+	}
+	return out, nil
+}
+
+// ContentStats 五类内容各查一次状态分布, 购买数据一次带出(按 media_type 分组)。
+// 状态编码: video/comics/novel/photo 用 0待 1上 2下; post 用 0待审 1通过 2拒绝 3软删(3 归入下架口径)。
+func (r *statsRepo) ContentStats(ctx context.Context) ([]statsdomain.ContentStat, error) {
+	type src struct {
+		mediaType int
+		table     string
+		viewCol   string // 没有观看数的表传空
+	}
+	srcs := []src{
+		{1, "video", ""}, // video 表没有 view_count 列
+		{2, "post", "view_count"},
+		{3, "comics", "view_count"},
+		{4, "novel", "view_count"},
+		{5, "photo_album", "view_count"},
+	}
+	out := make([]statsdomain.ContentStat, 0, len(srcs))
+	for _, s := range srcs {
+		viewExpr := "0"
+		if s.viewCol != "" {
+			viewExpr = "coalesce(sum(" + s.viewCol + "), 0)"
+		}
+		one, err := g.DB().GetOne(ctx, `
+			SELECT count(*) FILTER (WHERE status = 1) AS online,
+			       count(*) FILTER (WHERE status = 0) AS pending,
+			       count(*) FILTER (WHERE status >= 2) AS offline,
+			       `+viewExpr+` AS views
+			  FROM `+s.table)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, statsdomain.ContentStat{
+			MediaType: s.mediaType,
+			Online:    one["online"].Int(),
+			Pending:   one["pending"].Int(),
+			Offline:   one["offline"].Int(),
+			Views:     one["views"].Int64(),
+		})
+	}
+	buys, err := g.DB().GetAll(ctx, `
+		SELECT media_type, count(*) AS cnt, coalesce(sum(amount), 0) AS amt
+		  FROM content_purchase GROUP BY media_type`)
+	if err != nil {
+		return nil, err
+	}
+	for _, row := range buys {
+		mt := row["media_type"].Int()
+		for i := range out {
+			if out[i].MediaType == mt {
+				out[i].Buys = row["cnt"].Int()
+				out[i].BuyAmount = row["amt"].Float64()
+			}
+		}
+	}
+	return out, nil
+}
+
+func (r *statsRepo) BalanceScenes(ctx context.Context, startDay string) ([]statsdomain.BalanceScene, error) {
+	all, err := g.DB().GetAll(ctx, `
+		SELECT scene,
+		       coalesce(sum(amount) FILTER (WHERE direction = 1), 0) AS income,
+		       coalesce(sum(amount) FILTER (WHERE direction = 2), 0) AS expense
+		  FROM user_balance_log
+		 WHERE created_at >= ?::timestamptz
+		 GROUP BY scene ORDER BY greatest(
+		       coalesce(sum(amount) FILTER (WHERE direction = 1), 0),
+		       coalesce(sum(amount) FILTER (WHERE direction = 2), 0)) DESC`, startDay)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]statsdomain.BalanceScene, 0, len(all))
+	for _, row := range all {
+		out = append(out, statsdomain.BalanceScene{
+			Scene: row["scene"].String(), Income: row["income"].Float64(), Expense: row["expense"].Float64(),
+		})
+	}
+	return out, nil
+}

@@ -117,3 +117,94 @@ client.test("未登录被拒", function () {
     client.assert(response.body.code !== 0, "无 token 应报错");
 });
 %}
+
+###############################################################################
+# 扩展维度(分析页图表化): 时段/设备/内容库/金币构成
+###############################################################################
+
+### E1. 时段分布(近30天): 固定 24 行, hour 0~23 连续
+GET {{baseUrl}}/backend/stats/hour-dist?days=30
+Authorization: {{adminToken}}
+
+> {%
+client.test("时段分布", function () {
+    client.assert(response.body.code === 0, response.body.message);
+    var list = response.body.data.list;
+    client.assert(list.length === 24, "应固定返回 24 个小时, 实际 " + list.length);
+    client.assert(list[0].hour === 0 && list[23].hour === 23, "hour 应为 0~23 连续");
+    list.forEach(function (r) {
+        client.assert(r.registers >= 0 && r.orders >= 0, "计数不能为负");
+    });
+});
+%}
+
+### E2. days 超限应被拒(校验器 max:90)
+GET {{baseUrl}}/backend/stats/hour-dist?days=120
+Authorization: {{adminToken}}
+
+> {%
+client.test("days 上限校验", function () { client.assert(response.body.code !== 0, "days>90 应被拒"); });
+%}
+
+### E3. 设备分布: 计数与用户总数守恒
+GET {{baseUrl}}/backend/stats/devices
+Authorization: {{adminToken}}
+
+> {%
+client.test("设备分布", function () {
+    client.assert(response.body.code === 0, response.body.message);
+    var sum = response.body.data.list.reduce(function (s, r) { return s + r.count; }, 0);
+    client.global.set("deviceSum", sum);
+    client.assert(sum >= 0, "计数不能为负");
+});
+%}
+
+### E4. 概览的用户总数应等于设备分布合计(同一张 users 表两种切法, 必须对得上)
+GET {{baseUrl}}/backend/stats/overview
+Authorization: {{adminToken}}
+
+> {%
+client.test("设备分布与总数守恒", function () {
+    client.assert(response.body.code === 0, response.body.message);
+    client.assert(response.body.data.total_users === Number(client.global.get("deviceSum")),
+        "用户总数 " + response.body.data.total_users + " 应等于设备合计 " + client.global.get("deviceSum"));
+});
+%}
+
+### E5. 内容库概览: 五类齐全且类型名正确
+GET {{baseUrl}}/backend/stats/content
+Authorization: {{adminToken}}
+
+> {%
+client.test("内容库概览", function () {
+    client.assert(response.body.code === 0, response.body.message);
+    var list = response.body.data.list;
+    client.assert(list.length === 5, "应返回 5 类内容");
+    var names = list.map(function (r) { return r.type_name; }).join(",");
+    client.assert(names === "视频,帖子,漫画,小说,图集", "类型顺序/名称: " + names);
+    list.forEach(function (r) {
+        client.assert(r.online >= 0 && r.pending >= 0 && r.offline >= 0, "状态计数不能为负");
+        client.assert(r.buy_amount >= 0, "购买金额不能为负");
+    });
+});
+%}
+
+### E6. 金币流水构成: income/expense 均非负, 按峰值降序
+GET {{baseUrl}}/backend/stats/balance-scenes?days=30
+Authorization: {{adminToken}}
+
+> {%
+client.test("金币流水构成", function () {
+    client.assert(response.body.code === 0, response.body.message);
+    var list = response.body.data.list;
+    list.forEach(function (r) {
+        client.assert(r.income >= 0 && r.expense >= 0, "金额不能为负: " + r.scene);
+        client.assert(typeof r.scene === "string" && r.scene.length > 0, "scene 必须非空");
+    });
+    for (var i = 1; i < list.length; i++) {
+        var prev = Math.max(list[i-1].income, list[i-1].expense);
+        var cur = Math.max(list[i].income, list[i].expense);
+        client.assert(prev >= cur, "应按峰值金额降序");
+    }
+});
+%}

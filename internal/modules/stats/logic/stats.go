@@ -122,3 +122,87 @@ func (s *sStats) Channels(ctx context.Context) ([]service.ChannelStatDTO, error)
 	}
 	return out, nil
 }
+
+// ---------------- 扩展维度(分析页图表化) ----------------
+
+// startDayOf 近 N 天窗口的起始日(含当天), 传给 SQL 做 >= 比较。
+func startDayOf(days int) string {
+	return gtime.Now().AddDate(0, 0, -(days - 1)).Format("Y-m-d")
+}
+
+func (s *sStats) HourDist(ctx context.Context, days int) ([]service.HourDistItem, error) {
+	days, err := checkDays(days)
+	if err != nil {
+		return nil, err
+	}
+	rows, err := s.repo.HourDist(ctx, startDayOf(days))
+	if err != nil {
+		return nil, err
+	}
+	out := make([]service.HourDistItem, 0, len(rows))
+	for _, r := range rows {
+		out = append(out, service.HourDistItem{Hour: r.Hour, Registers: r.Registers, Orders: r.Orders})
+	}
+	return out, nil
+}
+
+func (s *sStats) DeviceStats(ctx context.Context) ([]service.DeviceStatDTO, error) {
+	rows, err := s.repo.DeviceStats(ctx)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]service.DeviceStatDTO, 0, len(rows))
+	for _, r := range rows {
+		out = append(out, service.DeviceStatDTO{DeviceType: r.DeviceType, Count: r.Count})
+	}
+	return out, nil
+}
+
+// mediaTypeName 与 paywall 的 media_type 全局编码保持一致。
+func mediaTypeName(t int) string {
+	switch t {
+	case 1:
+		return "视频"
+	case 2:
+		return "帖子"
+	case 3:
+		return "漫画"
+	case 4:
+		return "小说"
+	case 5:
+		return "图集"
+	}
+	return "未知"
+}
+
+func (s *sStats) ContentStats(ctx context.Context) ([]service.ContentStatDTO, error) {
+	rows, err := s.repo.ContentStats(ctx)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]service.ContentStatDTO, 0, len(rows))
+	for _, r := range rows {
+		out = append(out, service.ContentStatDTO{
+			MediaType: r.MediaType, TypeName: mediaTypeName(r.MediaType),
+			Online: r.Online, Pending: r.Pending, Offline: r.Offline,
+			Views: r.Views, Buys: r.Buys, BuyAmount: r.BuyAmount,
+		})
+	}
+	return out, nil
+}
+
+func (s *sStats) BalanceScenes(ctx context.Context, days int) ([]service.BalanceSceneDTO, error) {
+	days, err := checkDays(days)
+	if err != nil {
+		return nil, err
+	}
+	rows, err := s.repo.BalanceScenes(ctx, startDayOf(days))
+	if err != nil {
+		return nil, err
+	}
+	out := make([]service.BalanceSceneDTO, 0, len(rows))
+	for _, r := range rows {
+		out = append(out, service.BalanceSceneDTO{Scene: r.Scene, Income: r.Income, Expense: r.Expense})
+	}
+	return out, nil
+}

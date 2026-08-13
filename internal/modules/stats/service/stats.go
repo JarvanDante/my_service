@@ -37,4 +37,39 @@ type IStats interface {
 	UserTrend(ctx context.Context, days int) ([]UserTrendItem, error)
 	RechargeTrend(ctx context.Context, days int) ([]RechargeTrendItem, error)
 	Channels(ctx context.Context) ([]ChannelStatDTO, error)
+	// ---- 扩展维度(分析页图表化) ----
+	HourDist(ctx context.Context, days int) ([]HourDistItem, error)
+	DeviceStats(ctx context.Context) ([]DeviceStatDTO, error)
+	ContentStats(ctx context.Context) ([]ContentStatDTO, error)
+	BalanceScenes(ctx context.Context, days int) ([]BalanceSceneDTO, error)
+}
+
+// ---------------- 扩展维度 ----------------
+
+type HourDistItem struct {
+	Hour      int
+	Registers int
+	Orders    int
+}
+
+type DeviceStatDTO struct {
+	DeviceType string
+	Count      int
+}
+
+type ContentStatDTO struct {
+	MediaType int
+	TypeName  string
+	Online    int
+	Pending   int
+	Offline   int
+	Views     int64
+	Buys      int
+	BuyAmount float64
+}
+
+type BalanceSceneDTO struct {
+	Scene   string
+	Income  float64
+	Expense float64
 }
