@@ -1,0 +1,115 @@
+###############################################################################
+# 帖子 Post · e2e(发帖/审核/详情/软删) · 前置: 迁移 00029
+###############################################################################
+
+@baseUrl = http://127.0.0.1:8000
+
+### 1. 前台登录
+POST {{baseUrl}}/front/v1/user/login
+Content-Type: application/json
+
+{ "device_id": "e2e-post-001", "device_type": "ios", "device_version": "1.0" }
+
+> {%
+client.test("登录", function () { client.assert(response.body.code === 0, response.body.message); });
+client.global.set("token", response.body.data.token);
+%}
+
+### 2. 发帖(默认待审)
+POST {{baseUrl}}/front/v1/post/create
+Authorization: {{token}}
+Content-Type: application/json
+
+{ "title": "e2e测试帖", "content": "帖子内容", "pics": ["http://x/1.jpg"] }
+
+> {%
+client.test("发帖", function () {
+    client.assert(response.body.code === 0, response.body.message);
+});
+client.global.set("postId", response.body.data.id);
+%}
+
+### 3. 公开流不含待审帖
+GET {{baseUrl}}/front/v1/post/list?page=1&size=50
+
+> {%
+client.test("待审不入流", function () {
+    client.assert(response.body.code === 0, response.body.message);
+    var hit = response.body.data.list.some(function (r) { return r.id == client.global.get("postId"); });
+    client.assert(!hit, "待审帖不应出现在公开流");
+});
+%}
+
+### 4. 我的帖子可见(带审核态)
+GET {{baseUrl}}/front/v1/post/my?page=1&size=20
+Authorization: {{token}}
+
+> {%
+client.test("我的帖子", function () {
+    client.assert(response.body.code === 0, response.body.message);
+    var row = response.body.data.list.filter(function (r) { return r.id == client.global.get("postId"); })[0];
+    client.assert(row !== undefined && row.status === 0, "应见待审(status=0)");
+});
+%}
+
+### 5. 后台登录
+POST {{baseUrl}}/backend/auth/login
+Content-Type: application/json
+
+{ "username": "admin", "password": "admin123" }
+
+> {%
+client.test("后台登录", function () { client.assert(response.body.code === 0, response.body.message); });
+client.global.set("adminToken", response.body.data.token);
+%}
+
+### 6. 审核通过
+POST {{baseUrl}}/backend/post/{{postId}}/audit
+Authorization: {{adminToken}}
+Content-Type: application/json
+
+{ "pass": true }
+
+> {%
+client.test("审核通过", function () { client.assert(response.body.code === 0, response.body.message); });
+%}
+
+### 7. 重复审核应被拦(条件更新幂等)
+POST {{baseUrl}}/backend/post/{{postId}}/audit
+Authorization: {{adminToken}}
+Content-Type: application/json
+
+{ "pass": true }
+
+> {%
+client.test("重复审核被拦", function () { client.assert(response.body.code !== 0, "已审核过应拒绝"); });
+%}
+
+### 8. 公开流可见 + 详情浏览数+1
+GET {{baseUrl}}/front/v1/post/detail?id={{postId}}
+
+> {%
+client.test("详情", function () {
+    client.assert(response.body.code === 0, response.body.message);
+    client.assert(response.body.data.post.view_count >= 1, "浏览数应+1");
+});
+%}
+
+### 9. 作者软删
+POST {{baseUrl}}/front/v1/post/delete
+Authorization: {{token}}
+Content-Type: application/json
+
+{ "id": {{postId}} }
+
+> {%
+client.test("软删", function () { client.assert(response.body.code === 0, response.body.message); });
+%}
+
+### 10. 后台硬删清理
+DELETE {{baseUrl}}/backend/post/{{postId}}
+Authorization: {{adminToken}}
+
+> {%
+client.test("清理", function () { client.assert(response.body.code === 0, response.body.message); });
+%}

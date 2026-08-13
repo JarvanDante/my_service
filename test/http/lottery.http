@@ -1,0 +1,558 @@
+###############################################################################
+# 抽奖 Lottery · e2e · 前置: 迁移 00040
+# 覆盖: 活动信息(不下发 odds) / 余额不足被拒 / 调账后抽奖成功且金币被扣 / 中奖记录
+#       每日次数上限 / 实物奖填地址 + 重复填被拒 / 后台发货流转 / 活动与奖品 CRUD / 清理
+# 用例自己建一个 lottery_type=1 的测试活动(样板福利活动 lottery_type=2 保持原样),
+# 跑完连奖品一起删掉, 可重复执行。
+###############################################################################
+
+@baseUrl = http://127.0.0.1:8000
+
+### 1. 前台登录(每次跑用同一个设备号, 新用户余额为 0)
+POST {{baseUrl}}/front/v1/user/login
+Content-Type: application/json
+
+{ "device_id": "e2e-lottery-001", "device_type": "ios", "device_version": "1.0" }
+
+> {%
+client.test("前台登录", function () {
+    client.assert(response.body.code === 0, response.body.message);
+});
+client.global.set("token", response.body.data.token);
+client.global.set("uid", response.body.data.user.id);
+%}
+
+### 2. 后台登录
+POST {{baseUrl}}/backend/auth/login
+Content-Type: application/json
+
+{ "username": "admin", "password": "admin123" }
+
+> {%
+client.test("后台登录", function () { client.assert(response.body.code === 0, response.body.message); });
+client.global.set("adminToken", response.body.data.token);
+%}
+
+### 3. 样板福利活动信息(公开可读) —— 断言绝不下发 odds(概率是商业机密)
+GET {{baseUrl}}/front/v1/lottery/info?lottery_type=2
+
+> {%
+client.test("活动信息可读", function () {
+    client.assert(response.body.code === 0, response.body.message);
+    client.assert(response.body.data.name === "福利抽奖", "应是样板福利活动");
+    client.assert(response.body.data.prizes.length >= 5, "样板应有5个奖品");
+    client.assert(response.body.data.daily_free === 1, "每日免费次数应为1");
+});
+client.test("奖品不含 odds 字段", function () {
+    response.body.data.prizes.forEach(function (p) {
+        client.assert(!Object.prototype.hasOwnProperty.call(p, "odds"), "奖品不应下发 odds: " + p.name);
+        client.assert(p.odds === undefined, "奖品 odds 必须为空");
+    });
+});
+client.test("跑马灯字段存在(真实记录, 非造假)", function () {
+    client.assert(Array.isArray(response.body.data.marquee), "marquee 应为数组");
+});
+%}
+
+### 4. 记录基线: 该用户已有的会员日中奖记录数(用例可重复执行, 后续断言都用增量)
+GET {{baseUrl}}/front/v1/lottery/my?lottery_type=1&page=1&size=1
+Authorization: {{token}}
+
+> {%
+client.test("取记录基线", function () { client.assert(response.body.code === 0, response.body.message); });
+client.global.set("base", response.body.data.total);
+%}
+
+### 5. 后台建测试活动(会员日 lottery_type=1; 先把单价设成天价, 用来测余额不足)
+POST {{baseUrl}}/backend/lottery/activities
+Authorization: {{adminToken}}
+Content-Type: application/json
+
+{ "name": "e2e测试抽奖", "lottery_type": 1, "pay_type": 2, "cost_gold": 999999999,
+  "daily_free": 1, "daily_limit": 20, "notice": "e2e", "status": 1 }
+
+> {%
+client.test("建活动", function () {
+    client.assert(response.body.code === 0, response.body.message);
+    client.assert(response.body.data.id > 0, "应返回活动id");
+});
+client.global.set("actId", response.body.data.id);
+%}
+
+### 6. 同玩法重复建活动应被拒(唯一索引 + 友好提示)
+POST {{baseUrl}}/backend/lottery/activities
+Authorization: {{adminToken}}
+Content-Type: application/json
+
+{ "name": "e2e重复活动", "lottery_type": 1, "pay_type": 2, "cost_gold": 10, "status": 1 }
+
+> {%
+client.test("同玩法不可重复建活动", function () { client.assert(response.body.code !== 0, "应被拒"); });
+%}
+
+### 7. 建"谢谢参与"奖品(权重1000, 不限量)
+POST {{baseUrl}}/backend/lottery/prizes
+Authorization: {{adminToken}}
+Content-Type: application/json
+
+{ "activity_id": {{actId}}, "name": "e2e谢谢参与", "desc": "再接再厉", "type": 5,
+  "amount": 0, "odds": 1000, "stock": -1, "rank": 1, "status": 1 }
+
+> {%
+client.test("建谢谢参与奖", function () { client.assert(response.body.code === 0, response.body.message); });
+client.global.set("thanksId", response.body.data.id);
+%}
+
+### 8. 建实物奖(库存1, 权重先给0 —— 保证前面的抽奖必中谢谢参与)
+POST {{baseUrl}}/backend/lottery/prizes
+Authorization: {{adminToken}}
+Content-Type: application/json
+
+{ "activity_id": {{actId}}, "name": "e2e实物周边", "desc": "限量周边", "type": 4,
+  "amount": 1, "odds": 0, "stock": 1, "rank": 2, "status": 1 }
+
+> {%
+client.test("建实物奖", function () { client.assert(response.body.code === 0, response.body.message); });
+client.global.set("goodsId", response.body.data.id);
+%}
+
+### 9. 后台奖品列表(按 activity_id 筛; 后台看得到 odds)
+GET {{baseUrl}}/backend/lottery/prizes?activity_id={{actId}}
+Authorization: {{adminToken}}
+
+> {%
+client.test("后台奖品列表", function () {
+    client.assert(response.body.code === 0, response.body.message);
+    client.assert(response.body.data.list.length === 2, "应有2个奖品");
+    client.assert(response.body.data.list[0].odds === 1000, "后台应能看到权重");
+});
+%}
+
+### 10. 免费次数抽一次(pay_type=1) —— 必中谢谢参与, 不花金币
+POST {{baseUrl}}/front/v1/lottery/draw
+Authorization: {{token}}
+Content-Type: application/json
+
+{ "lottery_type": 1, "pay_type": 1 }
+
+> {%
+client.test("免费抽奖成功", function () {
+    client.assert(response.body.code === 0, response.body.message);
+    client.assert(response.body.data.prize_type === 5, "应中谢谢参与");
+    client.assert(response.body.data.cost_gold === 0, "免费次数不该扣金币");
+    client.assert(response.body.data.free_left === 0, "免费次数应用完");
+});
+client.global.set("freeHistoryId", response.body.data.history_id);
+%}
+
+### 11. 免费次数已用完 —— 再抽应被拒(不会把次数刷成负数)
+POST {{baseUrl}}/front/v1/lottery/draw
+Authorization: {{token}}
+Content-Type: application/json
+
+{ "lottery_type": 1, "pay_type": 1 }
+
+> {%
+client.test("免费次数用完被拦", function () {
+    client.assert(response.body.code !== 0, "应被拒");
+    client.assert(response.body.message.indexOf("免费次数") >= 0, "提示应说免费次数用完: " + response.body.message);
+});
+%}
+
+### 12. 余额不足抽奖被拒(单价天价, 事务内条件扣款拦截)
+POST {{baseUrl}}/front/v1/lottery/draw
+Authorization: {{token}}
+Content-Type: application/json
+
+{ "lottery_type": 1, "pay_type": 2 }
+
+> {%
+client.test("余额不足被拒", function () {
+    client.assert(response.body.code !== 0, "余额不足应被拒");
+    client.assert(response.body.message.indexOf("余额不足") >= 0, response.body.message);
+});
+%}
+
+### 13. 余额不足这次不该留下任何记录(整体回滚, 不像 tianbi 先发奖后扣费)
+GET {{baseUrl}}/front/v1/lottery/my?lottery_type=1&page=1&size=20
+Authorization: {{token}}
+
+> {%
+client.test("失败的抽奖不写记录", function () {
+    client.assert(response.body.code === 0, response.body.message);
+    client.assert(response.body.data.total === Number(client.global.get("base")) + 1,
+        "失败的抽奖不该留下记录, 实际 " + response.body.data.total);
+});
+%}
+
+### 14. 后台把单价改回 10 金币
+PUT {{baseUrl}}/backend/lottery/activities/{{actId}}
+Authorization: {{adminToken}}
+Content-Type: application/json
+
+{ "name": "e2e测试抽奖", "pay_type": 2, "cost_gold": 10, "daily_free": 1, "daily_limit": 20, "status": 1 }
+
+> {%
+client.test("改活动单价", function () { client.assert(response.body.code === 0, response.body.message); });
+%}
+
+### 15. 后台调账加 1000 金币
+POST {{baseUrl}}/backend/wallet/adjust
+Authorization: {{adminToken}}
+Content-Type: application/json
+
+{ "user_id": {{uid}}, "amount": 1000, "remark": "e2e抽奖测试" }
+
+> {%
+client.test("调账加金币", function () { client.assert(response.body.code === 0, response.body.message); });
+client.global.set("bal0", response.body.data.balance);
+%}
+
+### 16. 活动信息带登录态: 余额/剩余次数正确回填
+GET {{baseUrl}}/front/v1/lottery/info?lottery_type=1
+Authorization: {{token}}
+
+> {%
+client.test("登录态活动信息", function () {
+    client.assert(response.body.code === 0, response.body.message);
+    client.assert(response.body.data.logged_in === true, "应识别登录态");
+    client.assert(response.body.data.balance === Number(client.global.get("bal0")), "余额应与调账后一致");
+    client.assert(response.body.data.free_left === 0, "免费次数已用完");
+    client.assert(response.body.data.draw_left === 19, "今日还剩19次, 实际 " + response.body.data.draw_left);
+});
+%}
+
+### 17. 金币抽奖成功, 且金币被正确扣除 10
+POST {{baseUrl}}/front/v1/lottery/draw
+Authorization: {{token}}
+Content-Type: application/json
+
+{ "lottery_type": 1, "pay_type": 2 }
+
+> {%
+client.test("金币抽奖成功", function () {
+    client.assert(response.body.code === 0, response.body.message);
+    client.assert(response.body.data.prize_type === 5, "此时奖池只有谢谢参与");
+    client.assert(response.body.data.cost_gold === 10, "应付10金币");
+    client.assert(response.body.data.balance === Number(client.global.get("bal0")) - 10,
+        "余额应少10, 实际 " + response.body.data.balance);
+});
+%}
+
+### 18. 把实物奖权重调到极大、谢谢参与调 0 —— 下一抽必中实物
+PUT {{baseUrl}}/backend/lottery/prizes/{{goodsId}}
+Authorization: {{adminToken}}
+Content-Type: application/json
+
+{ "odds": 100000, "stock": 1, "amount": 1, "rank": 2, "status": 1 }
+
+> {%
+client.test("调高实物权重", function () { client.assert(response.body.code === 0, response.body.message); });
+%}
+
+### 19. 谢谢参与权重调 0(不参与抽取)
+PUT {{baseUrl}}/backend/lottery/prizes/{{thanksId}}
+Authorization: {{adminToken}}
+Content-Type: application/json
+
+{ "odds": 0, "stock": -1, "amount": 0, "rank": 1, "status": 1 }
+
+> {%
+client.test("谢谢参与权重调0", function () { client.assert(response.body.code === 0, response.body.message); });
+%}
+
+### 20. 抽中实物奖: status=2 待发货 + need_addr
+POST {{baseUrl}}/front/v1/lottery/draw
+Authorization: {{token}}
+Content-Type: application/json
+
+{ "lottery_type": 1, "pay_type": 2 }
+
+> {%
+client.test("抽中实物奖", function () {
+    client.assert(response.body.code === 0, response.body.message);
+    client.assert(response.body.data.prize_type === 4, "应中实物奖, 实际类型 " + response.body.data.prize_type);
+    client.assert(response.body.data.status === 2, "实物奖应为待发货");
+    client.assert(response.body.data.need_addr === true, "应提示填地址");
+    client.assert(response.body.data.balance === Number(client.global.get("bal0")) - 20, "余额应再少10");
+});
+client.global.set("goodsHistoryId", response.body.data.history_id);
+%}
+
+### 21. 把谢谢参与权重改回(实物库存已耗尽, 后续抽奖不再参与)
+PUT {{baseUrl}}/backend/lottery/prizes/{{thanksId}}
+Authorization: {{adminToken}}
+Content-Type: application/json
+
+{ "odds": 1000, "stock": -1, "amount": 0, "rank": 1, "status": 1 }
+
+> {%
+client.test("恢复谢谢参与权重", function () { client.assert(response.body.code === 0, response.body.message); });
+%}
+
+### 22. 实物库存已被抽完 —— 再抽只能中谢谢参与(库存耗尽的奖品自动出池)
+POST {{baseUrl}}/front/v1/lottery/draw
+Authorization: {{token}}
+Content-Type: application/json
+
+{ "lottery_type": 1, "pay_type": 2 }
+
+> {%
+client.test("库存耗尽奖品不再中", function () {
+    client.assert(response.body.code === 0, response.body.message);
+    client.assert(response.body.data.prize_type === 5, "实物已抽完, 只能中谢谢参与");
+});
+%}
+
+### 23. 填写实物奖收货地址
+POST {{baseUrl}}/front/v1/lottery/address
+Authorization: {{token}}
+Content-Type: application/json
+
+{ "history_id": {{goodsHistoryId}}, "receiver": "张三", "phone": "13800001111",
+  "address": "上海市浦东新区测试路1号101室" }
+
+> {%
+client.test("填收货地址", function () { client.assert(response.body.code === 0, response.body.message); });
+%}
+
+### 24. 重复填地址应被拒(条件更新 delivery_status=0 + 影响行数判定)
+POST {{baseUrl}}/front/v1/lottery/address
+Authorization: {{token}}
+Content-Type: application/json
+
+{ "history_id": {{goodsHistoryId}}, "receiver": "李四", "phone": "13900002222",
+  "address": "北京市朝阳区改地址路2号" }
+
+> {%
+client.test("重复填地址被拒", function () { client.assert(response.body.code !== 0, "重复提交应被拒"); });
+%}
+
+### 25. 非实物奖不能填地址
+POST {{baseUrl}}/front/v1/lottery/address
+Authorization: {{token}}
+Content-Type: application/json
+
+{ "history_id": {{freeHistoryId}}, "receiver": "张三", "phone": "13800001111",
+  "address": "上海市浦东新区测试路1号" }
+
+> {%
+client.test("非实物奖不可填地址", function () { client.assert(response.body.code !== 0, "应被拒"); });
+%}
+
+### 26. 我的收货单: 待发货
+GET {{baseUrl}}/front/v1/lottery/address/my?page=1&size=20
+Authorization: {{token}}
+
+> {%
+var mine = response.body.data.list.filter(function (a) {
+    return String(a.history_id) === String(client.global.get("goodsHistoryId"));
+});
+client.test("我的收货单", function () {
+    client.assert(response.body.code === 0, response.body.message);
+    client.assert(mine.length === 1, "应有1张收货单");
+    client.assert(mine[0].delivery_status === 1, "应为待发货");
+    client.assert(mine[0].receiver === "张三", "收货人应是第一次填的");
+});
+client.global.set("addrId", mine.length ? mine[0].id : 0);
+%}
+
+### 27. 后台收货单列表(按 delivery_status 筛)
+GET {{baseUrl}}/backend/lottery/addresses?delivery_status=1&page=1&size=50
+Authorization: {{adminToken}}
+
+> {%
+client.test("后台收货单列表", function () {
+    client.assert(response.body.code === 0, response.body.message);
+    var hit = response.body.data.list.some(function (a) {
+        return String(a.id) === String(client.global.get("addrId")) && a.prize_name === "e2e实物周边";
+    });
+    client.assert(hit, "待发货列表应含本次收货单");
+});
+%}
+
+### 28. 后台发货(1→2, 同时把中奖记录置为已发货)
+POST {{baseUrl}}/backend/lottery/addresses/{{addrId}}/ship
+Authorization: {{adminToken}}
+Content-Type: application/json
+
+{ "express_no": "SF-E2E-0001" }
+
+> {%
+client.test("后台发货", function () { client.assert(response.body.code === 0, response.body.message); });
+%}
+
+### 29. 重复发货应被拒(条件更新判定)
+POST {{baseUrl}}/backend/lottery/addresses/{{addrId}}/ship
+Authorization: {{adminToken}}
+Content-Type: application/json
+
+{ "express_no": "SF-E2E-0002" }
+
+> {%
+client.test("重复发货被拒", function () { client.assert(response.body.code !== 0, "应被拒"); });
+%}
+
+### 30. 中奖记录可查: 实物奖已流转为"已发货"
+GET {{baseUrl}}/front/v1/lottery/my?lottery_type=1&page=1&size=20
+Authorization: {{token}}
+
+> {%
+client.test("我的中奖记录", function () {
+    client.assert(response.body.code === 0, response.body.message);
+    client.assert(response.body.data.total === Number(client.global.get("base")) + 4,
+        "本次应新增4条记录(1免费+3金币), 实际总数 " + response.body.data.total);
+    var g = response.body.data.list.filter(function (h) {
+        return String(h.id) === String(client.global.get("goodsHistoryId"));
+    });
+    client.assert(g.length === 1 && g[0].status === 3, "实物奖应已发货");
+    client.assert(g[0].prize_text === "实物", "奖品类型文案");
+});
+%}
+
+### 31. 跑马灯用的是真实中奖记录(实物中奖已入榜, 昵称脱敏)
+GET {{baseUrl}}/front/v1/lottery/info?lottery_type=1
+
+> {%
+client.test("跑马灯为真实记录", function () {
+    client.assert(response.body.code === 0, response.body.message);
+    var hit = response.body.data.marquee.some(function (m) { return m.prize_name === "e2e实物周边"; });
+    client.assert(hit, "跑马灯应含刚中的实物奖");
+    response.body.data.marquee.forEach(function (m) {
+        client.assert(m.nickname.indexOf("*") >= 0, "昵称应脱敏: " + m.nickname);
+        client.assert(m.prize_type !== 5, "谢谢参与不该上跑马灯");
+    });
+});
+%}
+
+### 32. 后台中奖记录筛选(user_id + prize_type, 全部 string 接收)
+GET {{baseUrl}}/backend/lottery/histories?user_id={{uid}}&lottery_type=1&prize_type=4&status=3&page=1&size=20
+Authorization: {{adminToken}}
+
+> {%
+client.test("后台记录筛选", function () {
+    client.assert(response.body.code === 0, response.body.message);
+    client.assert(response.body.data.total >= 1, "实物+已发货应至少1条");
+    client.assert(response.body.data.list[0].prize_name === "e2e实物周边", "最新一条应是本次实物奖");
+    client.assert(String(response.body.data.list[0].id) === String(client.global.get("goodsHistoryId")), "应是本次中奖记录");
+});
+%}
+
+### 33. 后台记录不带筛选参数 = 全部(空串不应变成 0 条件)
+GET {{baseUrl}}/backend/lottery/histories?user_id={{uid}}&lottery_type=1&prize_type=&status=&page=1&size=50
+Authorization: {{adminToken}}
+
+> {%
+client.test("空筛选=全部", function () {
+    client.assert(response.body.code === 0, response.body.message);
+    client.assert(response.body.data.total === Number(client.global.get("base")) + 4,
+        "空筛选应返回该用户全部记录, 实际 " + response.body.data.total);
+});
+%}
+
+### 34. 每日次数上限: 把上限压到已用的 4 次
+PUT {{baseUrl}}/backend/lottery/activities/{{actId}}
+Authorization: {{adminToken}}
+Content-Type: application/json
+
+{ "name": "e2e测试抽奖", "pay_type": 2, "cost_gold": 10, "daily_free": 1, "daily_limit": 4, "status": 1 }
+
+> {%
+client.test("下调每日上限", function () { client.assert(response.body.code === 0, response.body.message); });
+%}
+
+### 35. 达到每日上限后抽奖被拒
+POST {{baseUrl}}/front/v1/lottery/draw
+Authorization: {{token}}
+Content-Type: application/json
+
+{ "lottery_type": 1, "pay_type": 2 }
+
+> {%
+client.test("每日上限生效", function () {
+    client.assert(response.body.code !== 0, "应被拒");
+    client.assert(response.body.message.indexOf("上限") >= 0, response.body.message);
+});
+%}
+
+### 36. 上限被拦后余额不变(没有偷扣钱)
+GET {{baseUrl}}/front/v1/lottery/info?lottery_type=1
+Authorization: {{token}}
+
+> {%
+client.test("被拦后余额不变", function () {
+    client.assert(response.body.code === 0, response.body.message);
+    client.assert(response.body.data.balance === Number(client.global.get("bal0")) - 30,
+        "余额应仍是扣3次后的值, 实际 " + response.body.data.balance);
+    client.assert(response.body.data.draw_left === 0, "剩余次数应为0");
+});
+%}
+
+### 37. 停用活动后前台不可见
+PUT {{baseUrl}}/backend/lottery/activities/{{actId}}
+Authorization: {{adminToken}}
+Content-Type: application/json
+
+{ "name": "e2e测试抽奖", "pay_type": 2, "cost_gold": 10, "daily_free": 1, "daily_limit": 4, "status": 0 }
+
+> {%
+client.test("停用活动", function () { client.assert(response.body.code === 0, response.body.message); });
+%}
+
+### 38. 停用后活动信息接口报错
+GET {{baseUrl}}/front/v1/lottery/info?lottery_type=1
+
+> {%
+client.test("停用活动不可访问", function () { client.assert(response.body.code !== 0, "停用后应不可见"); });
+%}
+
+### 39. 后台活动列表(status 空=全部)
+GET {{baseUrl}}/backend/lottery/activities?status=
+Authorization: {{adminToken}}
+
+> {%
+client.test("后台活动列表", function () {
+    client.assert(response.body.code === 0, response.body.message);
+    var hit = response.body.data.list.some(function (a) { return String(a.id) === String(client.global.get("actId")); });
+    client.assert(hit, "应含测试活动");
+});
+%}
+
+### 40. 清理: 删奖品
+DELETE {{baseUrl}}/backend/lottery/prizes/{{goodsId}}
+Authorization: {{adminToken}}
+
+> {%
+client.test("删实物奖", function () { client.assert(response.body.code === 0, response.body.message); });
+%}
+
+### 41. 清理: 删活动(连带删剩余奖品, 保留中奖记录作为发放凭证)
+DELETE {{baseUrl}}/backend/lottery/activities/{{actId}}
+Authorization: {{adminToken}}
+
+> {%
+client.test("删活动", function () { client.assert(response.body.code === 0, response.body.message); });
+%}
+
+### 42. 活动删了但中奖记录还在(资产发放凭证不可丢)
+GET {{baseUrl}}/backend/lottery/histories?user_id={{uid}}&lottery_type=1&page=1&size=50
+Authorization: {{adminToken}}
+
+> {%
+client.test("记录保留", function () {
+    client.assert(response.body.code === 0, response.body.message);
+    client.assert(response.body.data.total === Number(client.global.get("base")) + 4,
+        "中奖记录应完整保留, 实际 " + response.body.data.total);
+});
+%}
+
+### 43. 清理: 奖品已随活动删除
+GET {{baseUrl}}/backend/lottery/prizes?activity_id={{actId}}
+Authorization: {{adminToken}}
+
+> {%
+client.test("奖品已清空", function () {
+    client.assert(response.body.code === 0, response.body.message);
+    client.assert(response.body.data.list.length === 0, "奖品应已被连带删除");
+});
+%}

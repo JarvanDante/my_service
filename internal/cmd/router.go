@@ -5,22 +5,36 @@ import (
 
 	"github.com/JarvanDante/my_service/internal/dao"
 	adminmod "github.com/JarvanDante/my_service/internal/modules/admin"
+	aimod "github.com/JarvanDante/my_service/internal/modules/aitask"
 	appmod "github.com/JarvanDante/my_service/internal/modules/application"
 	checkinmod "github.com/JarvanDante/my_service/internal/modules/checkin"
 	collectmod "github.com/JarvanDante/my_service/internal/modules/collect"
+	comicsmod "github.com/JarvanDante/my_service/internal/modules/comics"
+	commentmod "github.com/JarvanDante/my_service/internal/modules/comment"
 	configmod "github.com/JarvanDante/my_service/internal/modules/config"
+	couponmod "github.com/JarvanDante/my_service/internal/modules/coupon"
 	feedbackmod "github.com/JarvanDante/my_service/internal/modules/feedback"
 	finmod "github.com/JarvanDante/my_service/internal/modules/finance"
+	lotterymod "github.com/JarvanDante/my_service/internal/modules/lottery"
 	mediamod "github.com/JarvanDante/my_service/internal/modules/media"
 	msgmod "github.com/JarvanDante/my_service/internal/modules/message"
+	novelmod "github.com/JarvanDante/my_service/internal/modules/novel"
 	opsmod "github.com/JarvanDante/my_service/internal/modules/ops"
+	photomod "github.com/JarvanDante/my_service/internal/modules/photo"
+	postmod "github.com/JarvanDante/my_service/internal/modules/post"
 	promomod "github.com/JarvanDante/my_service/internal/modules/promo"
+	pubmod "github.com/JarvanDante/my_service/internal/modules/publish"
+	ranksmod "github.com/JarvanDante/my_service/internal/modules/ranks"
 	redeemmod "github.com/JarvanDante/my_service/internal/modules/redeemcode"
+	rgmod "github.com/JarvanDante/my_service/internal/modules/redeemgoods"
+	searchmod "github.com/JarvanDante/my_service/internal/modules/search"
 	statsmod "github.com/JarvanDante/my_service/internal/modules/stats"
 	sysmod "github.com/JarvanDante/my_service/internal/modules/system"
 	tagmod "github.com/JarvanDante/my_service/internal/modules/tag"
 	usermod "github.com/JarvanDante/my_service/internal/modules/user"
 	videomod "github.com/JarvanDante/my_service/internal/modules/video"
+	walletmod "github.com/JarvanDante/my_service/internal/modules/wallet"
+	wdmod "github.com/JarvanDante/my_service/internal/modules/withdrawal"
 	"github.com/JarvanDante/my_service/internal/shared/middleware"
 )
 
@@ -40,6 +54,21 @@ func mountFront(s *ghttp.Server) {
 		collectmod.RegisterFront(group)
 		msgmod.RegisterFront(group)
 		opsmod.RegisterFront(group)
+		commentmod.RegisterFront(group)
+		postmod.RegisterFront(group)
+		ranksmod.RegisterFront(group)
+		rgmod.RegisterFront(group)
+		walletmod.RegisterFront(group)
+		wdmod.RegisterFront(group)
+		couponmod.RegisterFront(group)
+		comicsmod.RegisterFront(group)
+		novelmod.RegisterFront(group)
+		photomod.RegisterFront(group)
+		pubmod.RegisterFront(group)
+		searchmod.RegisterFront(group)
+		lotterymod.RegisterFront(group)
+		aimod.RegisterFront(group)
+		videomod.RegisterFront(group, dao.NewVideoRepo())
 	})
 
 	// ---- v2(将来大改时启用; 老的 v1 继续并存)----
@@ -56,6 +85,8 @@ func mountBackend(s *ghttp.Server) {
 		adminmod.RegisterPublic(group, dao.NewAdminRepo())
 		// 公开: 支付回调(网关调用, 签名校验在 logic)
 		finmod.RegisterCallback(group, dao.NewFinanceRepo())
+		// 公开: AI 供应商生成结果回调(验签在 logic, 幂等)
+		aimod.RegisterCallback(group)
 		// 仅需登录: 退出 / 查看自身信息(任何管理员)
 		group.Group("/", func(auth *ghttp.RouterGroup) {
 			auth.Middleware(middleware.AdminAuth, middleware.AdminOpLog)
@@ -79,6 +110,18 @@ func mountBackend(s *ghttp.Server) {
 			appmod.RegisterBackend(perm)
 			msgmod.RegisterBackend(perm)
 			opsmod.RegisterBackend(perm)
+			postmod.RegisterBackend(perm)
+			ranksmod.RegisterBackend(perm)
+			rgmod.RegisterBackend(perm)
+			walletmod.RegisterBackend(perm)
+			wdmod.RegisterBackend(perm)
+			couponmod.RegisterBackend(perm)
+			comicsmod.RegisterBackend(perm)
+			novelmod.RegisterBackend(perm)
+			photomod.RegisterBackend(perm)
+			pubmod.RegisterBackend(perm)
+			lotterymod.RegisterBackend(perm)
+			aimod.RegisterBackend(perm)
 		})
 	})
 }

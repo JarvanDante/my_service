@@ -1,0 +1,306 @@
+###############################################################################
+# 小说 Novel · e2e(整部购买/前N章免费/幂等/扣款自洽) · 前置: 迁移 00037
+# 覆盖: 后台建作品→建章节→上架 / 前台列表详情目录 / 免费章节免登录可读
+#       付费章节未购被拦 → 充值 → 购买 → 可读 / 重复购买被拒 / 余额扣减正确 / 清理
+###############################################################################
+
+@baseUrl = http://127.0.0.1:8000
+
+### 1. 前台登录
+POST {{baseUrl}}/front/v1/user/login
+Content-Type: application/json
+
+{ "device_id": "e2e-novel-001", "device_type": "ios", "device_version": "1.0" }
+
+> {%
+client.test("前台登录", function () {
+    client.assert(response.body.code === 0, response.body.message);
+});
+client.global.set("token", response.body.data.token);
+client.global.set("userId", response.body.data.user.id);
+%}
+
+### 2. 后台登录
+POST {{baseUrl}}/backend/auth/login
+Content-Type: application/json
+
+{ "username": "admin", "password": "admin123" }
+
+> {%
+client.test("后台登录", function () { client.assert(response.body.code === 0, response.body.message); });
+client.global.set("adminToken", response.body.data.token);
+%}
+
+### 3. 后台建付费小说(先不上架, 验证上架前前台看不到)
+POST {{baseUrl}}/backend/novels
+Authorization: {{adminToken}}
+Content-Type: application/json
+
+{
+  "title": "e2e测试小说·付费",
+  "author": "e2e作者",
+  "intro": "e2e 用付费小说",
+  "category": "e2e分类",
+  "tags": ["e2e", "付费"],
+  "is_vip": 0,
+  "price": 15,
+  "free_chapter": 1,
+  "is_audio": 0,
+  "update_status": 1,
+  "rank": 1,
+  "status": 0
+}
+
+> {%
+client.test("建作品", function () {
+    client.assert(response.body.code === 0, response.body.message);
+    client.assert(response.body.data.id > 0, "应返回作品id");
+});
+client.global.set("nid", response.body.data.id);
+%}
+
+### 4. 建第1章(免费章节, free_chapter=1)
+POST {{baseUrl}}/backend/novels/{{nid}}/chapters
+Authorization: {{adminToken}}
+Content-Type: application/json
+
+{ "seq": 1, "title": "第一章·试读", "content": "夜色沉沉，他推开那扇门，故事从这里开始。", "status": 1 }
+
+> {%
+client.test("建第1章", function () {
+    client.assert(response.body.code === 0, response.body.message);
+    client.assert(response.body.data.id > 0, "应返回章节id");
+});
+client.global.set("ch1", response.body.data.id);
+%}
+
+### 5. 建第2章(付费章节)
+POST {{baseUrl}}/backend/novels/{{nid}}/chapters
+Authorization: {{adminToken}}
+Content-Type: application/json
+
+{ "seq": 2, "title": "第二章·收费", "content": "门后的世界远比他想象的辽阔，也远比他想象的危险。", "status": 1 }
+
+> {%
+client.test("建第2章", function () { client.assert(response.body.code === 0, response.body.message); });
+client.global.set("ch2", response.body.data.id);
+%}
+
+### 6. 未上架时前台详情应看不到(status=0)
+GET {{baseUrl}}/front/v1/novel/detail?id={{nid}}
+
+> {%
+client.test("未上架不可见", function () { client.assert(response.body.code !== 0, "未上架作品前台不应可见"); });
+%}
+
+### 7. 后台上架
+POST {{baseUrl}}/backend/novels/{{nid}}/audit
+Authorization: {{adminToken}}
+Content-Type: application/json
+
+{ "status": 1 }
+
+> {%
+client.test("上架", function () { client.assert(response.body.code === 0, response.body.message); });
+%}
+
+### 8. 后台列表: 章节数与总字数应已由章节自动汇总
+GET {{baseUrl}}/backend/novels?keyword=e2e测试小说&status=1&page=1&size=20
+Authorization: {{adminToken}}
+
+> {%
+client.test("后台列表", function () {
+    client.assert(response.body.code === 0, response.body.message);
+    var r = response.body.data.list.filter(function (x) { return x.id === Number(client.global.get("nid")); })[0];
+    client.assert(r, "后台列表应含刚建的作品");
+    client.assert(r.chapter_count === 2, "章节数应为2, 实际 " + r.chapter_count);
+    client.assert(r.word_count > 0, "总字数应由正文汇总出来, 实际 " + r.word_count);
+});
+%}
+
+### 9. 前台列表(公开, 未登录)应能看到
+GET {{baseUrl}}/front/v1/novel/list?keyword=e2e测试小说&page=1&size=20
+
+> {%
+client.test("前台列表", function () {
+    client.assert(response.body.code === 0, response.body.message);
+    var hit = response.body.data.list.some(function (x) { return x.id === Number(client.global.get("nid")); });
+    client.assert(hit, "上架后前台列表应可见");
+});
+%}
+
+### 10. 前台详情(未登录): 应提示需付费且不可读
+GET {{baseUrl}}/front/v1/novel/detail?id={{nid}}
+
+> {%
+client.test("详情未登录", function () {
+    client.assert(response.body.code === 0, response.body.message);
+    client.assert(response.body.data.price === 15, "价格应为15");
+    client.assert(response.body.data.playable === false, "未购买不应可读整部");
+    client.assert(response.body.data.need_pay === true, "应标记需付费");
+    client.assert(response.body.data.is_buy === false, "未登录不应标记已购");
+});
+%}
+
+### 11. 前台目录(未登录): 第1章免费可读, 第2章不可读
+GET {{baseUrl}}/front/v1/novel/chapters?id={{nid}}
+
+> {%
+client.test("目录", function () {
+    client.assert(response.body.code === 0, response.body.message);
+    client.assert(response.body.data.novel_id === Number(client.global.get("nid")), "novel_id 应回显");
+    var l = response.body.data.list;
+    client.assert(l.length === 2, "应有2章, 实际 " + l.length);
+    client.assert(l[0].is_free === true && l[0].playable === true, "第1章应免费可读");
+    client.assert(l[1].is_free === false && l[1].playable === false, "第2章应付费且未解锁");
+    client.assert(l[0].word_count > 0, "目录应带字数");
+});
+%}
+
+### 12. 免费章节未登录可读(返回正文)
+GET {{baseUrl}}/front/v1/novel/read?chapter_id={{ch1}}
+
+> {%
+client.test("免费章节免登录可读", function () {
+    client.assert(response.body.code === 0, response.body.message);
+    client.assert(response.body.data.content.length > 0, "应返回正文");
+    client.assert(response.body.data.word_count > 0, "应返回字数");
+    client.assert(response.body.data.next_id === Number(client.global.get("ch2")), "next_id 应指向第2章");
+});
+%}
+
+### 13. 付费章节未购买(已登录)应被拦
+GET {{baseUrl}}/front/v1/novel/read?chapter_id={{ch2}}
+Authorization: {{token}}
+
+> {%
+client.test("付费章节未购被拦", function () {
+    client.assert(response.body.code !== 0, "未购买不应读到付费章节正文");
+});
+%}
+
+### 14. 后台调账 +100 金币(保证余额够买)
+POST {{baseUrl}}/backend/wallet/adjust
+Authorization: {{adminToken}}
+Content-Type: application/json
+
+{ "user_id": {{userId}}, "amount": 100, "remark": "e2e 小说购买充值" }
+
+> {%
+client.test("充值", function () { client.assert(response.body.code === 0, response.body.message); });
+client.global.set("balBefore", response.body.data.balance);
+%}
+
+### 15. 购买整部
+POST {{baseUrl}}/front/v1/novel/buy
+Authorization: {{token}}
+Content-Type: application/json
+
+{ "id": {{nid}} }
+
+> {%
+client.test("购买成功", function () {
+    client.assert(response.body.code === 0, response.body.message);
+    client.assert(response.body.data.price === 15, "扣费应为库里的15, 不受客户端影响");
+    var expect = Number(client.global.get("balBefore")) - 15;
+    client.assert(Math.abs(response.body.data.balance - expect) < 0.001,
+        "购买后余额应为 " + expect + ", 实际 " + response.body.data.balance);
+});
+%}
+
+### 16. 余额校验: 钱包接口口径应与购买返回一致
+GET {{baseUrl}}/front/v1/wallet/balance
+Authorization: {{token}}
+
+> {%
+client.test("余额扣减正确", function () {
+    client.assert(response.body.code === 0, response.body.message);
+    var expect = Number(client.global.get("balBefore")) - 15;
+    client.assert(Math.abs(response.body.data.balance - expect) < 0.001,
+        "钱包余额应为 " + expect + ", 实际 " + response.body.data.balance);
+});
+%}
+
+### 17. 重复购买应被拒(唯一约束幂等, 且不能再扣一次钱)
+POST {{baseUrl}}/front/v1/novel/buy
+Authorization: {{token}}
+Content-Type: application/json
+
+{ "id": {{nid}} }
+
+> {%
+client.test("重复购买被拒", function () { client.assert(response.body.code !== 0, "重复购买应报错"); });
+%}
+
+### 18. 重复购买后余额不变(确认没有二次扣款)
+GET {{baseUrl}}/front/v1/wallet/balance
+Authorization: {{token}}
+
+> {%
+client.test("未被二次扣款", function () {
+    var expect = Number(client.global.get("balBefore")) - 15;
+    client.assert(Math.abs(response.body.data.balance - expect) < 0.001,
+        "余额应仍为 " + expect + ", 实际 " + response.body.data.balance);
+});
+%}
+
+### 19. 购买后付费章节可读
+GET {{baseUrl}}/front/v1/novel/read?chapter_id={{ch2}}
+Authorization: {{token}}
+
+> {%
+client.test("购买后可读", function () {
+    client.assert(response.body.code === 0, response.body.message);
+    client.assert(response.body.data.content.length > 0, "应返回付费章节正文");
+    client.assert(response.body.data.prev_id === Number(client.global.get("ch1")), "prev_id 应指向第1章");
+});
+%}
+
+### 20. 详情应标记 is_buy=true 且 playable=true
+GET {{baseUrl}}/front/v1/novel/detail?id={{nid}}
+Authorization: {{token}}
+
+> {%
+client.test("已购状态回显", function () {
+    client.assert(response.body.code === 0, response.body.message);
+    client.assert(response.body.data.is_buy === true, "应标记已购");
+    client.assert(response.body.data.playable === true, "已购应整部可读");
+});
+%}
+
+### 21. 列表也应带上 is_buy
+GET {{baseUrl}}/front/v1/novel/list?keyword=e2e测试小说&page=1&size=20
+Authorization: {{token}}
+
+> {%
+client.test("列表 is_buy", function () {
+    var r = response.body.data.list.filter(function (x) { return x.id === Number(client.global.get("nid")); })[0];
+    client.assert(r && r.is_buy === true, "列表应批量标记已购");
+});
+%}
+
+### 22. 猜你喜欢(同分类随机, 不含自身)
+GET {{baseUrl}}/front/v1/novel/maylike?id={{nid}}&size=6
+
+> {%
+client.test("猜你喜欢", function () {
+    client.assert(response.body.code === 0, response.body.message);
+    var self = response.body.data.list.some(function (x) { return x.id === Number(client.global.get("nid")); });
+    client.assert(!self, "不应推荐作品自身");
+});
+%}
+
+### 23. 清理: 删除测试作品(连带章节)
+DELETE {{baseUrl}}/backend/novels/{{nid}}
+Authorization: {{adminToken}}
+
+> {%
+client.test("清理", function () { client.assert(response.body.code === 0, response.body.message); });
+%}
+
+### 24. 删除后前台详情不可见, 章节也应随之消失
+GET {{baseUrl}}/front/v1/novel/read?chapter_id={{ch1}}
+
+> {%
+client.test("章节已连带删除", function () { client.assert(response.body.code !== 0, "作品删除后章节不应可读"); });
+%}

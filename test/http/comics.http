@@ -1,0 +1,374 @@
+###############################################################################
+# 漫画 Comics · e2e(章节免费策略/付费解锁/购买幂等/余额守恒) · 前置: 迁移 00036
+# 覆盖: 后台作品与章节 CRUD、上下架、前台列表/详情/目录/阅读、
+#       免费章节免登录可读、付费章节未购被拦、购买后可读、重复购买被拒、余额扣减正确
+###############################################################################
+
+@baseUrl = http://127.0.0.1:8000
+
+### 1. 前台登录
+POST {{baseUrl}}/front/v1/user/login
+Content-Type: application/json
+
+{ "device_id": "e2e-comics-001", "device_type": "ios", "device_version": "1.0" }
+
+> {%
+client.test("登录成功", function () { client.assert(response.body.code === 0, response.body.message); });
+client.global.set("token", response.body.data.token);
+client.global.set("userId", response.body.data.user.id);
+%}
+
+### 2. 后台登录
+POST {{baseUrl}}/backend/auth/login
+Content-Type: application/json
+
+{ "username": "admin", "password": "admin123" }
+
+> {%
+client.global.set("adminToken", response.body.data.token);
+%}
+
+### 3. 后台新建付费漫画(price=30, 前1章免费), 先建成"待上架"
+POST {{baseUrl}}/backend/comics
+Authorization: {{adminToken}}
+Content-Type: application/json
+
+{ "title": "e2e漫画付费篇", "author": "e2e作者", "intro": "端到端测试用",
+  "category": "e2e分类", "tags": ["e2e标签"], "is_vip": 0, "price": 30,
+  "free_chapter": 1, "update_status": 1, "rank": 999, "status": 0 }
+
+> {%
+client.test("建作品", function () { client.assert(response.body.code === 0, response.body.message); });
+client.global.set("cid", response.body.data.id);
+%}
+
+### 4. VIP 与金币定价互斥 —— 同时给 is_vip=1 与 price>0 应被拒
+POST {{baseUrl}}/backend/comics
+Authorization: {{adminToken}}
+Content-Type: application/json
+
+{ "title": "e2e非法定价", "is_vip": 1, "price": 10, "status": 0 }
+
+> {%
+client.test("定价互斥校验", function () { client.assert(response.body.code !== 0, "VIP与金币价不能同时设置"); });
+%}
+
+### 5. 待上架作品前台列表看不到
+GET {{baseUrl}}/front/v1/comics/list?keyword=e2e漫画付费篇&page=1&size=20
+
+> {%
+client.test("待上架不可见", function () {
+    client.assert(response.body.code === 0, response.body.message);
+    client.assert(response.body.data.total === 0, "status=0 的作品不应出现在前台");
+});
+%}
+
+### 6. 建第1章(免费章)
+POST {{baseUrl}}/backend/comics/{{cid}}/chapters
+Authorization: {{adminToken}}
+Content-Type: application/json
+
+{ "seq": 1, "title": "第1话(免费)", "status": 1,
+  "pics": [{"url":"https://example.com/e2e_1_1.jpg","width":800,"height":1200}] }
+
+> {%
+client.test("建第1章", function () { client.assert(response.body.code === 0, response.body.message); });
+client.global.set("ch1", response.body.data.id);
+%}
+
+### 7. 建第2章(付费章)
+POST {{baseUrl}}/backend/comics/{{cid}}/chapters
+Authorization: {{adminToken}}
+Content-Type: application/json
+
+{ "seq": 2, "title": "第2话(付费)", "status": 1,
+  "pics": [{"url":"https://example.com/e2e_2_1.jpg","width":800,"height":1200},
+           {"url":"https://example.com/e2e_2_2.jpg","width":800,"height":1200}] }
+
+> {%
+client.test("建第2章", function () { client.assert(response.body.code === 0, response.body.message); });
+client.global.set("ch2", response.body.data.id);
+%}
+
+### 8. 章节序号重复 —— 应被拒
+POST {{baseUrl}}/backend/comics/{{cid}}/chapters
+Authorization: {{adminToken}}
+Content-Type: application/json
+
+{ "seq": 2, "title": "重复序号", "status": 1, "pics": [] }
+
+> {%
+client.test("章节序号查重", function () { client.assert(response.body.code !== 0, "同一作品的 seq 不可重复"); });
+%}
+
+### 9. 上架
+POST {{baseUrl}}/backend/comics/{{cid}}/audit
+Authorization: {{adminToken}}
+Content-Type: application/json
+
+{ "status": 1 }
+
+> {%
+client.test("上架", function () { client.assert(response.body.code === 0, response.body.message); });
+%}
+
+### 10. 前台列表可见, 且 chapter_count 已同步为 2
+GET {{baseUrl}}/front/v1/comics/list?keyword=e2e漫画付费篇&page=1&size=20
+
+> {%
+client.test("上架后可见", function () {
+    client.assert(response.body.code === 0, response.body.message);
+    client.assert(response.body.data.total >= 1, "上架后应可见");
+    var it = response.body.data.list[0];
+    client.assert(it.chapter_count === 2, "章节数应同步为2, 实际 " + it.chapter_count);
+    client.assert(it.price === 30, "价格应为30");
+});
+%}
+
+### 11. 按分类筛选可命中
+GET {{baseUrl}}/front/v1/comics/list?category=e2e分类&page=1&size=20
+
+> {%
+client.test("分类筛选", function () { client.assert(response.body.data.total >= 1, "分类筛选应命中"); });
+%}
+
+### 12. 按标签(jsonb 包含查询)筛选可命中
+GET {{baseUrl}}/front/v1/comics/list?tag=e2e标签&page=1&size=20
+
+> {%
+client.test("标签筛选", function () { client.assert(response.body.data.total >= 1, "标签筛选应命中"); });
+%}
+
+### 13. 未登录看详情: 应提示需要购买
+GET {{baseUrl}}/front/v1/comics/detail?id={{cid}}
+
+> {%
+client.test("未登录详情", function () {
+    client.assert(response.body.code === 0, response.body.message);
+    client.assert(response.body.data.playable === false, "付费作品未登录不应可看");
+    client.assert(response.body.data.need_pay === true, "应提示需付费");
+});
+%}
+
+### 14. 目录: 第1章 is_free/playable=true, 第2章 false
+GET {{baseUrl}}/front/v1/comics/chapters?id={{cid}}
+Authorization: {{token}}
+
+> {%
+client.test("免费章节策略", function () {
+    client.assert(response.body.code === 0, response.body.message);
+    var list = response.body.data.list;
+    client.assert(list.length === 2, "应有2章");
+    client.assert(list[0].is_free === true && list[0].playable === true, "第1章应免费可读");
+    client.assert(list[1].is_free === false && list[1].playable === false, "第2章未购不可读");
+});
+%}
+
+### 15. 读第1章(免费, 不带 token 也能读)
+GET {{baseUrl}}/front/v1/comics/read?chapter_id={{ch1}}
+
+> {%
+client.test("免费章免登录可读", function () {
+    client.assert(response.body.code === 0, response.body.message);
+    client.assert(response.body.data.pics.length === 1, "应返回1张图");
+    client.assert(response.body.data.next_id > 0, "应有下一章");
+});
+%}
+
+### 16. 读第2章(付费, 未购) —— 应被拦
+GET {{baseUrl}}/front/v1/comics/read?chapter_id={{ch2}}
+Authorization: {{token}}
+
+> {%
+client.test("付费章未购被拦", function () { client.assert(response.body.code !== 0, "未购买不应读到付费章"); });
+%}
+
+### 17. 余额不足时购买应失败(先不充值直接买 —— 若账号本来有钱, 该断言可能跳过)
+POST {{baseUrl}}/front/v1/comics/buy
+Authorization: {{token}}
+Content-Type: application/json
+
+{ "id": {{cid}} }
+
+> {%
+client.global.set("firstBuyCode", response.body.code);
+%}
+
+### 18. 后台给测试账号充 100 金币
+POST {{baseUrl}}/backend/wallet/adjust
+Authorization: {{adminToken}}
+Content-Type: application/json
+
+{ "user_id": {{userId}}, "amount": 100, "remark": "e2e 漫画购买本金" }
+
+> {%
+client.test("充值", function () { client.assert(response.body.code === 0, response.body.message); });
+client.global.set("balBefore", response.body.data.balance);
+%}
+
+### 19. 购买漫画
+POST {{baseUrl}}/front/v1/comics/buy
+Authorization: {{token}}
+Content-Type: application/json
+
+{ "id": {{cid}} }
+
+> {%
+client.test("购买成功", function () {
+    // 第17步若已购成功(账号原本有钱), 这里会返回"已购买过", 属预期
+    var ok = response.body.code === 0 || String(response.body.message).indexOf("已购买") >= 0;
+    client.assert(ok, response.body.message);
+});
+%}
+
+### 20. 重复购买 —— 必须被拒(唯一约束幂等)
+POST {{baseUrl}}/front/v1/comics/buy
+Authorization: {{token}}
+Content-Type: application/json
+
+{ "id": {{cid}} }
+
+> {%
+client.test("重复购买被拒", function () { client.assert(response.body.code !== 0, "同一作品不能买两次"); });
+%}
+
+### 21. 购买后余额只扣了一次 30
+GET {{baseUrl}}/front/v1/wallet/balance
+Authorization: {{token}}
+
+> {%
+client.test("余额只扣一次", function () {
+    client.assert(response.body.code === 0, response.body.message);
+    var expect = Number(client.global.get("balBefore")) - 30;
+    var actual = response.body.data.balance;
+    var okOnce = Math.abs(actual - expect) < 0.001;
+    var okAlreadyBought = Math.abs(actual - Number(client.global.get("balBefore"))) < 0.001
+        && Number(client.global.get("firstBuyCode")) === 0;
+    client.assert(okOnce || okAlreadyBought,
+        "余额应恰好扣一次30, 期望 " + expect + " 实际 " + actual);
+});
+%}
+
+### 22. 购买后详情 is_buy=true 且 playable=true
+GET {{baseUrl}}/front/v1/comics/detail?id={{cid}}
+Authorization: {{token}}
+
+> {%
+client.test("购后解锁", function () {
+    client.assert(response.body.data.is_buy === true, "应标记已购");
+    client.assert(response.body.data.playable === true, "应可看");
+});
+%}
+
+### 23. 购买后可读第2章
+GET {{baseUrl}}/front/v1/comics/read?chapter_id={{ch2}}
+Authorization: {{token}}
+
+> {%
+client.test("购后可读付费章", function () {
+    client.assert(response.body.code === 0, response.body.message);
+    client.assert(response.body.data.pics.length === 2, "第2章应返回2张图");
+    client.assert(response.body.data.prev_id > 0, "应有上一章");
+});
+%}
+
+### 24. 列表里该作品 is_buy=true(批量标记, 不是 N+1)
+GET {{baseUrl}}/front/v1/comics/list?keyword=e2e漫画付费篇&page=1&size=20
+Authorization: {{token}}
+
+> {%
+client.test("列表批量标已购", function () {
+    client.assert(response.body.data.list[0].is_buy === true, "列表应标记已购");
+});
+%}
+
+### 25. 猜你喜欢不包含自身
+GET {{baseUrl}}/front/v1/comics/maylike?id={{cid}}&size=5
+
+> {%
+client.test("猜你喜欢", function () {
+    client.assert(response.body.code === 0, response.body.message);
+    var hit = response.body.data.list.some(function (r) { return r.id == client.global.get("cid"); });
+    client.assert(!hit, "不应推荐自己");
+});
+%}
+
+### 26. 免费作品(样板数据)全部章节可读, 无需购买
+GET {{baseUrl}}/front/v1/comics/list?keyword=样板漫画·免费篇&page=1&size=5
+
+> {%
+client.test("免费样板可见", function () {
+    client.assert(response.body.data.total >= 1, "样板免费漫画应存在");
+});
+client.global.set("freeId", response.body.data.list[0].id);
+%}
+
+### 27. 免费作品详情 playable=true
+GET {{baseUrl}}/front/v1/comics/detail?id={{freeId}}
+
+> {%
+client.test("免费作品直接可看", function () {
+    client.assert(response.body.data.playable === true, "免费作品应直接可看");
+    client.assert(response.body.data.need_pay === false, "免费作品不应要求付费");
+});
+%}
+
+### 28. 后台章节列表
+GET {{baseUrl}}/backend/comics/{{cid}}/chapters?page=1&size=50
+Authorization: {{adminToken}}
+
+> {%
+client.test("后台章节列表", function () {
+    client.assert(response.body.code === 0, response.body.message);
+    client.assert(response.body.data.total === 2, "应有2章");
+});
+%}
+
+### 29. 编辑章节(改标题与图片)
+PUT {{baseUrl}}/backend/comics-chapters/{{ch2}}
+Authorization: {{adminToken}}
+Content-Type: application/json
+
+{ "title": "第2话(已改)", "status": 1,
+  "pics": [{"url":"https://example.com/e2e_2_new.jpg","width":900,"height":1400}] }
+
+> {%
+client.test("编辑章节", function () { client.assert(response.body.code === 0, response.body.message); });
+%}
+
+### 30. 下架后前台不可见
+POST {{baseUrl}}/backend/comics/{{cid}}/audit
+Authorization: {{adminToken}}
+Content-Type: application/json
+
+{ "status": 2 }
+
+> {%
+client.test("下架", function () { client.assert(response.body.code === 0, response.body.message); });
+%}
+
+### 31. 下架后详情报错
+GET {{baseUrl}}/front/v1/comics/detail?id={{cid}}
+Authorization: {{token}}
+
+> {%
+client.test("下架后不可见", function () { client.assert(response.body.code !== 0, "下架作品不应可见"); });
+%}
+
+### 32. 清理: 删除作品(连带章节)
+DELETE {{baseUrl}}/backend/comics/{{cid}}
+Authorization: {{adminToken}}
+
+> {%
+client.test("删除作品", function () { client.assert(response.body.code === 0, response.body.message); });
+%}
+
+### 33. 章节已连带删除
+GET {{baseUrl}}/backend/comics/{{cid}}/chapters?page=1&size=50
+Authorization: {{adminToken}}
+
+> {%
+client.test("章节连带删除", function () {
+    client.assert(response.body.data.total === 0, "作品删除后章节应一并消失");
+});
+%}

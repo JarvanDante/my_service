@@ -1,0 +1,41 @@
+// Package v1 前台视频浏览契约。
+// 后台契约在 api/backend/video/v1(路径 /videos), 前台走 /video/xxx, 两边字段裁剪不同:
+// 前台不下发 cover_key/source_key/created_by 这类运营侧字段。
+package v1
+
+import "github.com/gogf/gf/v2/frame/g"
+
+type Item struct {
+	Id          int64  `json:"id"`
+	Title       string `json:"title"`
+	Description string `json:"description"`
+	CoverUrl    string `json:"cover_url"`
+	SourceUrl   string `json:"source_url"`
+	Duration    int    `json:"duration"`
+	CreatedAt   string `json:"created_at"`
+}
+
+// ListReq 视频列表(公开, 只出已上架)。
+// sort: 0综合(人工 sort 权重) 1最新 2时长。
+type ListReq struct {
+	g.Meta  `path:"/video/list" method:"get" tags:"Front/Video" summary:"视频列表"`
+	Keyword string `json:"keyword"`
+	Sort    int    `json:"sort" v:"in:0,1,2#排序方式非法"`
+	Page    int    `json:"page"`
+	Size    int    `json:"size"`
+}
+type ListRes struct {
+	List  []Item `json:"list"`
+	Total int    `json:"total"`
+	Page  int    `json:"page"`
+	Size  int    `json:"size"`
+}
+
+// DetailReq 视频详情(公开, 只出已上架)。
+type DetailReq struct {
+	g.Meta `path:"/video/detail" method:"get" tags:"Front/Video" summary:"视频详情"`
+	Id     int64 `json:"id" v:"required|min:1#视频ID必填"`
+}
+type DetailRes struct {
+	Item
+}

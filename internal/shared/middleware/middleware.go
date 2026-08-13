@@ -36,6 +36,24 @@ func Auth(r *ghttp.Request) {
 	r.Middleware.Next()
 }
 
+// AuthOptional 宽松鉴权: 带了合法 token 就把 userId 写入 ctx, 没带或无效**不报错**。
+//
+// 用于「公开但要认人」的接口 —— 漫画/小说/图集的列表与详情, 未登录能看简介,
+// 登录了要额外知道是否已购买、能否解锁。别用 Auth 去做这件事(会把游客挡在门外),
+// 也别不挂中间件(那样即使带了 token 也读不到 userId)。
+func AuthOptional(r *ghttp.Request) {
+	token := r.Header.Get("Authorization")
+	if token == "" {
+		token = r.Get("token").String()
+	}
+	if token != "" {
+		if uid, err := kit.ParseToken(r.GetCtx(), token); err == nil && uid > 0 {
+			r.SetCtxVar(consts.CtxUserId, uid)
+		}
+	}
+	r.Middleware.Next()
+}
+
 // RateLimit 前台按客户端 IP 限流(登录前即生效, 防暴力登录/刷接口)。
 func RateLimit(r *ghttp.Request) {
 	ctx := r.Context()

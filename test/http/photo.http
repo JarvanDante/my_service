@@ -1,0 +1,242 @@
+###############################################################################
+# 图集 Photo · e2e(前 N 张预览 / 购买解锁全图 / 防重复购买 / 余额校验) · 前置: 迁移 00038
+###############################################################################
+
+@baseUrl = http://127.0.0.1:8000
+
+### 1. 后台登录
+POST {{baseUrl}}/backend/auth/login
+Content-Type: application/json
+
+{ "username": "admin", "password": "admin123" }
+
+> {%
+client.global.set("adminToken", response.body.data.token);
+%}
+
+### 2. 后台建图集(5张图, free_count=2, 付费20金币, 先待上架)
+POST {{baseUrl}}/backend/photos
+Authorization: {{adminToken}}
+Content-Type: application/json
+
+{
+  "title": "e2e图集·付费篇",
+  "cover": "https://example.com/e2e_cover.jpg",
+  "intro": "e2e 用图集",
+  "category": "写真",
+  "tags": ["e2e"],
+  "is_vip": 0,
+  "price": 20,
+  "free_count": 2,
+  "pics": [
+    { "url": "https://example.com/e2e_1.jpg", "width": 1080, "height": 1620 },
+    { "url": "https://example.com/e2e_2.jpg", "width": 1080, "height": 1620 },
+    { "url": "https://example.com/e2e_3.jpg", "width": 1080, "height": 1620 },
+    { "url": "https://example.com/e2e_4.jpg", "width": 1080, "height": 1620 },
+    { "url": "https://example.com/e2e_5.jpg", "width": 1080, "height": 1620 }
+  ],
+  "rank": 1,
+  "status": 0
+}
+
+> {%
+client.test("建图集", function () {
+    client.assert(response.body.code === 0, response.body.message);
+    client.assert(response.body.data.id > 0, "应返回图集id");
+});
+client.global.set("albumId", response.body.data.id);
+%}
+
+### 3. 未上架时前台详情取不到(status=0)
+GET {{baseUrl}}/front/v1/photo/detail?id={{albumId}}
+
+> {%
+client.test("未上架不可见", function () { client.assert(response.body.code !== 0, "待上架图集不应对前台可见"); });
+%}
+
+### 4. 后台上架
+POST {{baseUrl}}/backend/photos/{{albumId}}/audit
+Authorization: {{adminToken}}
+Content-Type: application/json
+
+{ "status": 1 }
+
+> {%
+client.test("上架", function () { client.assert(response.body.code === 0, response.body.message); });
+%}
+
+### 5. 前台列表(公开)可见该图集
+GET {{baseUrl}}/front/v1/photo/list?keyword=e2e图集&page=1&size=20
+
+> {%
+client.test("列表可见", function () {
+    client.assert(response.body.code === 0, response.body.message);
+    var hit = response.body.data.list.some(function (r) { return r.id === Number(client.global.get("albumId")); });
+    client.assert(hit, "列表应含刚上架的图集");
+});
+%}
+
+### 6. 未登录看详情 —— 只应拿到前 2 张预览图
+GET {{baseUrl}}/front/v1/photo/detail?id={{albumId}}
+
+> {%
+client.test("未登录只给预览", function () {
+    client.assert(response.body.code === 0, response.body.message);
+    var d = response.body.data;
+    client.assert(d.playable === false, "未解锁不应 playable");
+    client.assert(d.need_pay === true, "应提示需要付费");
+    client.assert(d.pics.length === 2, "未解锁只应下发 free_count=2 张, 实得 " + d.pics.length);
+    client.assert(d.preview_count === 2, "preview_count 应为 2");
+    client.assert(d.total_count === 5, "total_count 应为 5");
+    client.assert(d.pics[0].url.indexOf("e2e_1") >= 0, "预览应是前 N 张");
+});
+%}
+
+### 7. 前台登录
+POST {{baseUrl}}/front/v1/user/login
+Content-Type: application/json
+
+{ "device_id": "e2e-photo-001", "device_type": "ios", "device_version": "1.0" }
+
+> {%
+client.global.set("token", response.body.data.token);
+client.global.set("uid", response.body.data.user.id);
+%}
+
+### 8. 后台调账加 100 金币(保证够买)
+POST {{baseUrl}}/backend/wallet/adjust
+Authorization: {{adminToken}}
+Content-Type: application/json
+
+{ "user_id": {{uid}}, "amount": 100, "remark": "e2e图集测试充值" }
+
+> {%
+client.test("调账", function () { client.assert(response.body.code === 0, response.body.message); });
+%}
+
+### 9. 已登录但未购 —— 仍只有 2 张, 但 enough 应为 true
+GET {{baseUrl}}/front/v1/photo/detail?id={{albumId}}
+Authorization: {{token}}
+
+> {%
+client.test("未购仍被截断", function () {
+    client.assert(response.body.code === 0, response.body.message);
+    var d = response.body.data;
+    client.assert(d.pics.length === 2, "未购仍只给 2 张");
+    client.assert(d.is_buy === false, "尚未购买");
+    client.assert(d.enough === true, "余额已充足");
+});
+%}
+
+### 10. 购买图集
+POST {{baseUrl}}/front/v1/photo/buy
+Authorization: {{token}}
+Content-Type: application/json
+
+{ "id": {{albumId}} }
+
+> {%
+client.test("购买成功", function () {
+    client.assert(response.body.code === 0, response.body.message);
+    client.assert(response.body.data.price === 20, "价格应为服务端定的 20");
+});
+%}
+
+### 11. 购买后详情 —— 应拿到全部 5 张
+GET {{baseUrl}}/front/v1/photo/detail?id={{albumId}}
+Authorization: {{token}}
+
+> {%
+client.test("解锁全图", function () {
+    client.assert(response.body.code === 0, response.body.message);
+    var d = response.body.data;
+    client.assert(d.playable === true, "已购应 playable");
+    client.assert(d.is_buy === true, "已购应 is_buy");
+    client.assert(d.pics.length === 5, "解锁后应给全部 5 张, 实得 " + d.pics.length);
+    client.assert(d.preview_count === 5 && d.total_count === 5, "解锁后 preview_count 应等于 total_count");
+});
+%}
+
+### 12. 重复购买应被拒(paywall 唯一约束防重)
+POST {{baseUrl}}/front/v1/photo/buy
+Authorization: {{token}}
+Content-Type: application/json
+
+{ "id": {{albumId}} }
+
+> {%
+client.test("重复购买被拒", function () { client.assert(response.body.code !== 0, "重复购买应被拒"); });
+%}
+
+### 13. 建一套天价图集 + 上架(用于余额校验)
+POST {{baseUrl}}/backend/photos
+Authorization: {{adminToken}}
+Content-Type: application/json
+
+{
+  "title": "e2e图集·天价篇",
+  "intro": "余额不足场景",
+  "category": "写真",
+  "tags": ["e2e"],
+  "price": 999999,
+  "free_count": 1,
+  "pics": [
+    { "url": "https://example.com/e2e_x1.jpg", "width": 1080, "height": 1620 },
+    { "url": "https://example.com/e2e_x2.jpg", "width": 1080, "height": 1620 }
+  ],
+  "status": 1
+}
+
+> {%
+client.test("建天价图集", function () { client.assert(response.body.code === 0, response.body.message); });
+client.global.set("richId", response.body.data.id);
+%}
+
+### 14. 余额不够时详情 enough=false
+GET {{baseUrl}}/front/v1/photo/detail?id={{richId}}
+Authorization: {{token}}
+
+> {%
+client.test("余额不足标记", function () {
+    client.assert(response.body.code === 0, response.body.message);
+    client.assert(response.body.data.enough === false, "余额应不足");
+    client.assert(response.body.data.pics.length === 1, "free_count=1 只给 1 张");
+});
+%}
+
+### 15. 余额不足时购买应失败
+POST {{baseUrl}}/front/v1/photo/buy
+Authorization: {{token}}
+Content-Type: application/json
+
+{ "id": {{richId}} }
+
+> {%
+client.test("余额不足被拒", function () { client.assert(response.body.code !== 0, "余额不足应拒绝扣款"); });
+%}
+
+### 16. 未登录买应 401(购买接口需登录)
+POST {{baseUrl}}/front/v1/photo/buy
+Content-Type: application/json
+
+{ "id": {{albumId}} }
+
+> {%
+client.test("未登录购买被拒", function () { client.assert(response.body.code !== 0, "未登录不应能购买"); });
+%}
+
+### 17. 清理: 删除天价图集
+DELETE {{baseUrl}}/backend/photos/{{richId}}
+Authorization: {{adminToken}}
+
+> {%
+client.test("清理天价图集", function () { client.assert(response.body.code === 0, response.body.message); });
+%}
+
+### 18. 清理: 删除测试图集
+DELETE {{baseUrl}}/backend/photos/{{albumId}}
+Authorization: {{adminToken}}
+
+> {%
+client.test("清理测试图集", function () { client.assert(response.body.code === 0, response.body.message); });
+%}

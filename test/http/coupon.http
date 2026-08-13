@@ -1,0 +1,269 @@
+###############################################################################
+# 优惠券 Coupon · e2e(领券限量/限领、抵扣算法、最优券、核销) · 前置: 迁移 00034
+# 覆盖: 券模板 CRUD、总量防超发、每人限领、抵用券/折扣券抵扣计算、门槛过滤、
+#       最优券挑选、发放、后台用户券查询、已发放券不可删
+###############################################################################
+
+@baseUrl = http://127.0.0.1:8000
+
+### 1. 前台登录
+POST {{baseUrl}}/front/v1/user/login
+Content-Type: application/json
+
+{ "device_id": "e2e-coupon-001", "device_type": "ios", "device_version": "1.0" }
+
+> {%
+client.global.set("token", response.body.data.token);
+client.global.set("userId", response.body.data.user.id);
+%}
+
+### 2. 后台登录
+POST {{baseUrl}}/backend/auth/login
+Content-Type: application/json
+
+{ "username": "admin", "password": "admin123" }
+
+> {%
+client.global.set("adminToken", response.body.data.token);
+%}
+
+### 3. 建一张抵用券: 满100减20, 通用场景, 总量2张, 每人限领1张
+POST {{baseUrl}}/backend/coupons
+Authorization: {{adminToken}}
+Content-Type: application/json
+
+{ "name": "e2e满100减20", "type": 1, "scene": 3, "face_value": 20, "threshold": 100,
+  "total": 2, "per_limit": 1, "expire_day": 7, "status": 1 }
+
+> {%
+client.test("建抵用券", function () { client.assert(response.body.code === 0, response.body.message); });
+client.global.set("cashTpl", response.body.data.id);
+%}
+
+### 4. 建一张折扣券: 8折, 门槛50, 最高抵扣30
+POST {{baseUrl}}/backend/coupons
+Authorization: {{adminToken}}
+Content-Type: application/json
+
+{ "name": "e2e八折券", "type": 2, "scene": 3, "discount": 80, "threshold": 50,
+  "max_deduct": 30, "total": -1, "per_limit": 1, "expire_day": 7, "status": 1 }
+
+> {%
+client.test("建折扣券", function () { client.assert(response.body.code === 0, response.body.message); });
+client.global.set("discTpl", response.body.data.id);
+%}
+
+### 5. 非法折扣(120) —— 应被拒
+POST {{baseUrl}}/backend/coupons
+Authorization: {{adminToken}}
+Content-Type: application/json
+
+{ "name": "e2e非法折扣", "type": 2, "scene": 3, "discount": 120, "status": 1 }
+
+> {%
+client.test("折扣区间校验", function () { client.assert(response.body.code !== 0, "折扣需在1~99"); });
+%}
+
+### 6. 前台可领券列表能看到这两张
+GET {{baseUrl}}/front/v1/coupon/tpls
+
+> {%
+client.test("可领券列表", function () {
+    client.assert(response.body.code === 0, response.body.message);
+    client.assert(response.body.data.list.length >= 2, "至少两张可领券");
+});
+%}
+
+### 7. 领抵用券
+POST {{baseUrl}}/front/v1/coupon/receive
+Authorization: {{token}}
+Content-Type: application/json
+
+{ "tpl_id": {{cashTpl}} }
+
+> {%
+client.test("领券成功", function () { client.assert(response.body.code === 0, response.body.message); });
+client.global.set("cashCoupon", response.body.data.id);
+%}
+
+### 8. 同一张券再领 —— 每人限领1张, 应被拒
+POST {{baseUrl}}/front/v1/coupon/receive
+Authorization: {{token}}
+Content-Type: application/json
+
+{ "tpl_id": {{cashTpl}} }
+
+> {%
+client.test("限领校验", function () { client.assert(response.body.code !== 0, "超出每人限领应被拒"); });
+%}
+
+### 9. 领折扣券
+POST {{baseUrl}}/front/v1/coupon/receive
+Authorization: {{token}}
+Content-Type: application/json
+
+{ "tpl_id": {{discTpl}} }
+
+> {%
+client.test("领折扣券", function () { client.assert(response.body.code === 0, response.body.message); });
+client.global.set("discCoupon", response.body.data.id);
+%}
+
+### 10. 我的券: 应有两张未使用
+GET {{baseUrl}}/front/v1/coupon/my?status=1&page=1&size=20
+Authorization: {{token}}
+
+> {%
+client.test("我的券", function () {
+    client.assert(response.body.code === 0, response.body.message);
+    client.assert(response.body.data.total >= 2, "应有两张未使用券");
+});
+%}
+
+### 11. 订单 60 元: 只有折扣券可用(抵用券门槛100不满足)
+#    折扣券 8折 → 抵 12
+GET {{baseUrl}}/front/v1/coupon/available?scene=3&amount=60
+Authorization: {{token}}
+
+> {%
+client.test("门槛过滤 + 折扣计算", function () {
+    client.assert(response.body.code === 0, response.body.message);
+    var ids = response.body.data.list.map(function (r) { return r.id; });
+    client.assert(ids.indexOf(Number(client.global.get("cashCoupon"))) < 0, "未达门槛的抵用券不应出现");
+    var best = response.body.data.best_deduct;
+    client.assert(Math.abs(best - 12) < 0.011, "60 的 8 折应抵 12, 实际 " + best);
+    client.assert(Math.abs(response.body.data.pay_amount - 48) < 0.011, "应付 48");
+});
+%}
+
+### 12. 订单 200 元: 两张都可用, 折扣券抵 40 但封顶 30, 抵用券抵 20 → 最优是折扣券 30
+GET {{baseUrl}}/front/v1/coupon/available?scene=3&amount=200
+Authorization: {{token}}
+
+> {%
+client.test("最高抵扣封顶 + 最优券挑选", function () {
+    client.assert(response.body.code === 0, response.body.message);
+    client.assert(response.body.data.list.length >= 2, "两张券都应可用");
+    client.assert(Math.abs(response.body.data.best_deduct - 30) < 0.011,
+        "折扣券应被 max_deduct=30 封顶, 实际 " + response.body.data.best_deduct);
+    client.assert(response.body.data.best_id == client.global.get("discCoupon"), "最优券应为折扣券");
+});
+%}
+
+### 13. 订单 110 元: 折扣券抵 22, 抵用券抵 20 → 最优仍是折扣券
+GET {{baseUrl}}/front/v1/coupon/available?scene=3&amount=110
+Authorization: {{token}}
+
+> {%
+client.test("按抵扣额择优", function () {
+    client.assert(Math.abs(response.body.data.best_deduct - 22) < 0.011, "110 的 8 折应抵 22");
+});
+%}
+
+### 14. 换一个设备再领抵用券, 把总量 2 张领完
+POST {{baseUrl}}/front/v1/user/login
+Content-Type: application/json
+
+{ "device_id": "e2e-coupon-002", "device_type": "ios", "device_version": "1.0" }
+
+> {%
+client.global.set("token2", response.body.data.token);
+client.global.set("userId2", response.body.data.user.id);
+%}
+
+### 15. 第二个用户领抵用券(第 2 张, 领完)
+POST {{baseUrl}}/front/v1/coupon/receive
+Authorization: {{token2}}
+Content-Type: application/json
+
+{ "tpl_id": {{cashTpl}} }
+
+> {%
+client.test("第二张领取成功", function () { client.assert(response.body.code === 0, response.body.message); });
+%}
+
+### 16. 第三个设备再领 —— 总量已尽, 应被拒(防超发)
+POST {{baseUrl}}/front/v1/user/login
+Content-Type: application/json
+
+{ "device_id": "e2e-coupon-003", "device_type": "ios", "device_version": "1.0" }
+
+> {%
+client.global.set("token3", response.body.data.token);
+%}
+
+### 17. 超发校验
+POST {{baseUrl}}/front/v1/coupon/receive
+Authorization: {{token3}}
+Content-Type: application/json
+
+{ "tpl_id": {{cashTpl}} }
+
+> {%
+client.test("防超发", function () { client.assert(response.body.code !== 0, "总量2张已领完, 应被拒"); });
+%}
+
+### 18. 后台定向发放折扣券给第二个用户
+POST {{baseUrl}}/backend/coupons/{{discTpl}}/grant
+Authorization: {{adminToken}}
+Content-Type: application/json
+
+{ "user_ids": [{{userId2}}] }
+
+> {%
+client.test("定向发放", function () {
+    client.assert(response.body.code === 0, response.body.message);
+    client.assert(response.body.data.success === 1, "应成功发放1张");
+});
+%}
+
+### 19. 后台用户券记录可查
+GET {{baseUrl}}/backend/coupons/users?tpl_id={{cashTpl}}&page=1&size=20
+Authorization: {{adminToken}}
+
+> {%
+client.test("用户券记录", function () {
+    client.assert(response.body.code === 0, response.body.message);
+    client.assert(response.body.data.total === 2, "抵用券应发出2张, 实际 " + response.body.data.total);
+});
+%}
+
+### 20. 已发放的模板不可删 —— 应被拒(保护历史数据)
+DELETE {{baseUrl}}/backend/coupons/{{cashTpl}}
+Authorization: {{adminToken}}
+
+> {%
+client.test("已发放不可删", function () { client.assert(response.body.code !== 0, "已发放的券应禁止删除"); });
+%}
+
+### 21. 停用模板(替代删除)
+PUT {{baseUrl}}/backend/coupons/{{cashTpl}}
+Authorization: {{adminToken}}
+Content-Type: application/json
+
+{ "status": 0 }
+
+> {%
+client.test("停用成功", function () { client.assert(response.body.code === 0, response.body.message); });
+%}
+
+### 22. 停用后不再出现在可领列表
+GET {{baseUrl}}/front/v1/coupon/tpls
+
+> {%
+client.test("停用后不可领", function () {
+    var ids = response.body.data.list.map(function (r) { return r.id; });
+    client.assert(ids.indexOf(Number(client.global.get("cashTpl"))) < 0, "停用券不应出现在可领列表");
+});
+%}
+
+### 23. 后台券模板列表(按状态筛选)
+GET {{baseUrl}}/backend/coupons?status=1&page=1&size=20
+Authorization: {{adminToken}}
+
+> {%
+client.test("模板列表", function () {
+    client.assert(response.body.code === 0, response.body.message);
+    client.assert(response.body.data.total >= 1, "应有启用中的券");
+});
+%}

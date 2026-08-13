@@ -37,6 +37,50 @@ func (s *sVideo) List(ctx context.Context, in service.ListInput) (*service.ListD
 	return &service.ListDTO{List: out, Total: total, Page: page, Size: size}, nil
 }
 
+// FrontList 前台列表。复用后台那套 repo.List, 只是把 Status 钉死成"已发布" ——
+// 前台与后台的差异只有可见范围与排序口径, 没必要为此在 video 模块里再开一条 g.Model 直连。
+func (s *sVideo) FrontList(ctx context.Context, in service.FrontListInput) (*service.ListDTO, error) {
+	page, size := in.Page, in.Size
+	if page <= 0 {
+		page = 1
+	}
+	if size <= 0 {
+		size = 20
+	}
+	if size > 100 { // 前台是公开接口, 限一下单页上限, 免得被拿来整表拉取
+		size = 100
+	}
+	list, total, err := s.repo.List(ctx, domain.ListFilter{
+		Keyword: strings.TrimSpace(in.Keyword),
+		Status:  entity.VideoStatusPublished,
+		Sort:    in.Sort,
+	}, page, size)
+	if err != nil {
+		return nil, gerror.WrapCode(gcode.CodeDbOperationError, err, "查询视频失败")
+	}
+	out := make([]*service.VideoDTO, 0, len(list))
+	for _, v := range list {
+		out = append(out, toDTO(v))
+	}
+	return &service.ListDTO{List: out, Total: total, Page: page, Size: size}, nil
+}
+
+// FrontDetail 前台详情。草稿/下架与不存在返回同一个错误, 避免前台通过错误文案
+// 探测出"这个 id 有内容, 只是暂时下架"。
+func (s *sVideo) FrontDetail(ctx context.Context, id int64) (*service.VideoDTO, error) {
+	if id <= 0 {
+		return nil, gerror.NewCode(gcode.CodeInvalidParameter, "ID必填")
+	}
+	v, err := s.repo.Find(ctx, id)
+	if err != nil {
+		return nil, gerror.WrapCode(gcode.CodeDbOperationError, err, "查询视频失败")
+	}
+	if v == nil || v.Id == 0 || v.Status != entity.VideoStatusPublished {
+		return nil, gerror.NewCode(gcode.CodeNotFound, "视频不存在或已下架")
+	}
+	return toDTO(v), nil
+}
+
 func (s *sVideo) Create(ctx context.Context, in service.SaveInput) (int64, error) {
 	if err := validateSave(in); err != nil {
 		return 0, err

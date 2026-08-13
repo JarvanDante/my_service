@@ -1,0 +1,220 @@
+###############################################################################
+# 前台视频浏览 Video · e2e(只出已上架 / 排序 / 分页 / 详情)
+# 前置迁移: 00014(video)
+###############################################################################
+
+@baseUrl = http://127.0.0.1:8000
+@kw = e2e前台视频
+
+### 1. 前台登录(前台接口公开, 这里只验证带 token 也能正常访问)
+POST {{baseUrl}}/front/v1/user/login
+Content-Type: application/json
+
+{ "device_id": "e2e-videofront-001", "device_type": "ios", "device_version": "1.0" }
+
+> {%
+client.global.set("token", response.body.data.token);
+%}
+
+### 2. 后台登录
+POST {{baseUrl}}/backend/auth/login
+Content-Type: application/json
+
+{ "username": "admin", "password": "admin123" }
+
+> {%
+client.global.set("adminToken", response.body.data.token);
+%}
+
+### 3. 建视频A(已上架, 时长 100, 权重 5)
+POST {{baseUrl}}/backend/videos
+Authorization: {{adminToken}}
+Content-Type: application/json
+
+{ "title": "e2e前台视频A", "description": "前台用例A",
+  "cover_url": "https://example.com/a.jpg", "source_url": "https://example.com/a.mp4",
+  "duration": 100, "sort": 5, "status": 1 }
+
+> {%
+client.test("建视频A", function () { client.assert(response.body.code === 0, response.body.message); });
+client.global.set("vidA", response.body.data.id);
+%}
+
+### 4. 建视频B(已上架, 时长 300, 权重 1)
+POST {{baseUrl}}/backend/videos
+Authorization: {{adminToken}}
+Content-Type: application/json
+
+{ "title": "e2e前台视频B", "description": "前台用例B",
+  "cover_url": "https://example.com/b.jpg", "source_url": "https://example.com/b.mp4",
+  "duration": 300, "sort": 1, "status": 1 }
+
+> {%
+client.test("建视频B", function () { client.assert(response.body.code === 0, response.body.message); });
+client.global.set("vidB", response.body.data.id);
+%}
+
+### 5. 建视频C(草稿 status=0, 前台不可见)
+POST {{baseUrl}}/backend/videos
+Authorization: {{adminToken}}
+Content-Type: application/json
+
+{ "title": "e2e前台视频C草稿", "description": "前台用例C",
+  "source_url": "https://example.com/c.mp4", "duration": 50, "sort": 9, "status": 0 }
+
+> {%
+client.test("建视频C", function () { client.assert(response.body.code === 0, response.body.message); });
+client.global.set("vidC", response.body.data.id);
+%}
+
+### 6. 前台列表(公开, 不带 token): 只出已上架
+GET {{baseUrl}}/front/v1/video/list?keyword={{kw}}&page=1&size=20
+Accept: application/json
+
+> {%
+client.test("前台列表", function () {
+    client.assert(response.body.code === 0, response.body.message);
+    var d = response.body.data;
+    client.assert(d.total >= 2, "至少应有 A/B 两条, 实际 total=" + d.total);
+    var hasA = d.list.some(function (r) { return r.title === "e2e前台视频A"; });
+    var hasB = d.list.some(function (r) { return r.title === "e2e前台视频B"; });
+    client.assert(hasA && hasB, "A/B 应可见");
+});
+client.test("草稿不可见", function () {
+    var hasC = response.body.data.list.some(function (r) { return r.title === "e2e前台视频C草稿"; });
+    client.assert(!hasC, "草稿视频不该出现在前台列表");
+});
+client.test("前台不下发运营字段", function () {
+    var it = response.body.data.list[0];
+    client.assert(it.cover_key === undefined, "不应下发 cover_key");
+    client.assert(it.created_by === undefined, "不应下发 created_by");
+});
+%}
+
+### 7. 带 token 访问(AuthOptional: 登录态也不该影响可见范围)
+GET {{baseUrl}}/front/v1/video/list?keyword={{kw}}&page=1&size=20
+Authorization: {{token}}
+Accept: application/json
+
+> {%
+client.test("带token列表", function () {
+    client.assert(response.body.code === 0, response.body.message);
+    client.assert(response.body.data.total >= 2, "结果应与游客一致");
+});
+%}
+
+### 8. sort=2 按时长倒序 —— B(300) 应排在 A(100) 前
+GET {{baseUrl}}/front/v1/video/list?keyword={{kw}}&sort=2&page=1&size=20
+Accept: application/json
+
+> {%
+client.test("时长排序", function () {
+    client.assert(response.body.code === 0, response.body.message);
+    var list = response.body.data.list;
+    var iA = -1, iB = -1;
+    for (var i = 0; i < list.length; i++) {
+        if (list[i].title === "e2e前台视频A") iA = i;
+        if (list[i].title === "e2e前台视频B") iB = i;
+    }
+    client.assert(iA >= 0 && iB >= 0, "A/B 都应在结果里");
+    client.assert(iB < iA, "时长长的 B 应排在 A 之前");
+});
+%}
+
+### 9. sort=0 综合(按人工权重) —— A(sort=5) 应排在 B(sort=1) 前
+GET {{baseUrl}}/front/v1/video/list?keyword={{kw}}&sort=0&page=1&size=20
+Accept: application/json
+
+> {%
+client.test("综合排序", function () {
+    client.assert(response.body.code === 0, response.body.message);
+    var list = response.body.data.list;
+    var iA = -1, iB = -1;
+    for (var i = 0; i < list.length; i++) {
+        if (list[i].title === "e2e前台视频A") iA = i;
+        if (list[i].title === "e2e前台视频B") iB = i;
+    }
+    client.assert(iA >= 0 && iB >= 0, "A/B 都应在结果里");
+    client.assert(iA < iB, "权重高的 A 应排在 B 之前");
+});
+%}
+
+### 10. 分页: size=1 只返回一条, total 仍是全部命中数
+GET {{baseUrl}}/front/v1/video/list?keyword={{kw}}&page=1&size=1
+Accept: application/json
+
+> {%
+client.test("分页第1页", function () {
+    client.assert(response.body.code === 0, response.body.message);
+    client.assert(response.body.data.list.length === 1, "size=1 应只返回1条");
+    client.assert(response.body.data.total >= 2, "total 是命中总数, 不受 size 影响");
+    client.global.set("p1Title", response.body.data.list[0].title);
+});
+%}
+
+### 11. 分页: 第2页应是不同的一条
+GET {{baseUrl}}/front/v1/video/list?keyword={{kw}}&page=2&size=1
+Accept: application/json
+
+> {%
+client.test("分页第2页", function () {
+    client.assert(response.body.code === 0, response.body.message);
+    client.assert(response.body.data.list.length === 1, "第2页应有1条");
+    client.assert(response.body.data.list[0].title !== client.global.get("p1Title"), "第2页不该与第1页重复");
+});
+%}
+
+### 12. 详情(已上架)
+GET {{baseUrl}}/front/v1/video/detail?id={{vidA}}
+Accept: application/json
+
+> {%
+client.test("详情", function () {
+    client.assert(response.body.code === 0, response.body.message);
+    var d = response.body.data;
+    client.assert(d.id > 0, "应返回视频id");
+    client.assert(d.title === "e2e前台视频A", "标题应匹配");
+    client.assert(d.source_url.length > 0, "应返回播放地址");
+    client.assert(d.duration === 100, "时长应匹配");
+});
+%}
+
+### 13. 详情: 草稿视频前台不可见
+GET {{baseUrl}}/front/v1/video/detail?id={{vidC}}
+Accept: application/json
+
+> {%
+client.test("草稿详情被拒", function () { client.assert(response.body.code !== 0, "草稿视频不该能看详情"); });
+%}
+
+### 14. 详情: 不存在的 id
+GET {{baseUrl}}/front/v1/video/detail?id=99999999
+Accept: application/json
+
+> {%
+client.test("不存在的视频", function () { client.assert(response.body.code !== 0, "不存在应报错"); });
+%}
+
+### 15. 清理 A
+DELETE {{baseUrl}}/backend/videos/{{vidA}}
+Authorization: {{adminToken}}
+
+> {%
+client.test("清理A", function () { client.assert(response.body.code === 0, response.body.message); });
+%}
+
+### 16. 清理 B
+DELETE {{baseUrl}}/backend/videos/{{vidB}}
+Authorization: {{adminToken}}
+
+> {%
+client.test("清理B", function () { client.assert(response.body.code === 0, response.body.message); });
+%}
+
+### 17. 清理 C
+DELETE {{baseUrl}}/backend/videos/{{vidC}}
+Authorization: {{adminToken}}
+
+> {%
+client.test("清理C", function () { client.assert(response.body.code === 0, response.body.message); });
+%}

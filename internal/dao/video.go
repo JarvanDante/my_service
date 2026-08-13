@@ -32,8 +32,18 @@ func (r *videoRepo) List(ctx context.Context, f videodomain.ListFilter, page, si
 	if err != nil {
 		return nil, 0, err
 	}
+	q := m.Clone()
+	// 排序在 SQL 里做, 保证与分页一致。default 分支即原有的"综合"顺序, 后台不传 Sort 时行为不变。
+	switch f.Sort {
+	case 1: // 最新: 自增主键即时间序, 比按 created_at 排省一个索引
+		q = q.OrderDesc("id")
+	case 2: // 时长
+		q = q.OrderDesc("duration").OrderDesc("id")
+	default:
+		q = q.OrderDesc("sort").OrderDesc("id")
+	}
 	var list []*entity.Video
-	err = m.Clone().OrderDesc("sort").OrderDesc("id").Page(page, size).Scan(&list)
+	err = q.Page(page, size).Scan(&list)
 	return list, total, err
 }
 

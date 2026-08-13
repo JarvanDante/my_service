@@ -1,0 +1,107 @@
+###############################################################################
+# 排行/热搜 Rank · e2e · 前置: 迁移 00030(热搜样板3条), Redis 可用(不可用自动降级)
+###############################################################################
+
+@baseUrl = http://127.0.0.1:8000
+
+### 1. 热搜词(公开, 样板至少3条)
+GET {{baseUrl}}/front/v1/hotsearch/list
+
+> {%
+client.test("热搜词", function () {
+    client.assert(response.body.code === 0, response.body.message);
+    client.assert(response.body.data.list.length >= 3, "至少3条样板热搜");
+});
+%}
+
+### 2. 前台登录 + 造点赞数据
+POST {{baseUrl}}/front/v1/user/login
+Content-Type: application/json
+
+{ "device_id": "e2e-rank-001", "device_type": "ios", "device_version": "1.0" }
+
+> {%
+client.global.set("token", response.body.data.token);
+%}
+
+### 3. 点赞视频 9101/9102(9102 点两类? 单用户唯一, 用两内容)
+POST {{baseUrl}}/front/v1/collect/operate
+Authorization: {{token}}
+Content-Type: application/json
+
+{ "ids": [9101, 9102], "media_type": 1, "flag": true, "type": 2 }
+
+> {%
+client.test("造点赞", function () { client.assert(response.body.code === 0, response.body.message); });
+%}
+
+### 4. 后台登录 + 清排行缓存(确保读到新数据)
+POST {{baseUrl}}/backend/auth/login
+Content-Type: application/json
+
+{ "username": "admin", "password": "admin123" }
+
+> {%
+client.global.set("adminToken", response.body.data.token);
+%}
+
+### 5. 刷新缓存
+POST {{baseUrl}}/backend/rank/refresh
+Authorization: {{adminToken}}
+
+> {%
+client.test("刷新缓存", function () { client.assert(response.body.code === 0, response.body.message); });
+%}
+
+### 6. 排行榜应含刚点赞的内容
+GET {{baseUrl}}/front/v1/rank/list?media_type=1&period=day
+
+> {%
+client.test("日榜", function () {
+    client.assert(response.body.code === 0, response.body.message);
+    var hit = response.body.data.list.some(function (r) { return r.content_id === 9101 || r.content_id === 9102; });
+    client.assert(hit, "日榜应含刚点赞的内容");
+    client.assert(response.body.data.list[0].rank_no === 1, "第一名 rank_no=1");
+});
+%}
+
+### 7. 后台新增热搜词
+POST {{baseUrl}}/backend/hotsearch
+Authorization: {{adminToken}}
+Content-Type: application/json
+
+{ "keyword": "e2e热词", "heat": 999, "status": 1 }
+
+> {%
+client.test("新增热词", function () { client.assert(response.body.code === 0, response.body.message); });
+client.global.set("hsId", response.body.data.id);
+%}
+
+### 8. 前台热搜第一应为 e2e热词(heat=999)
+GET {{baseUrl}}/front/v1/hotsearch/list
+
+> {%
+client.test("热词置顶", function () {
+    client.assert(response.body.code === 0, response.body.message);
+    client.assert(response.body.data.list[0].keyword === "e2e热词", "heat=999 应排第一");
+});
+%}
+
+### 9. 清理: 删热词 + 取消点赞
+DELETE {{baseUrl}}/backend/hotsearch/{{hsId}}
+Authorization: {{adminToken}}
+
+> {%
+client.test("删热词", function () { client.assert(response.body.code === 0, response.body.message); });
+%}
+
+### 10. 清理点赞
+POST {{baseUrl}}/front/v1/collect/delete
+Authorization: {{token}}
+Content-Type: application/json
+
+{ "ids": [9101, 9102], "media_type": 1, "type": 2 }
+
+> {%
+client.test("清理点赞", function () { client.assert(response.body.code === 0, response.body.message); });
+%}

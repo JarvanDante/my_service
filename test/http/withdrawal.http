@@ -1,0 +1,373 @@
+###############################################################################
+# 提现 Withdrawal · e2e(冻结/状态机/退款/幂等) · 前置: 迁移 00033
+# 覆盖: 配置、收款账户 CRUD、申请冻结、余额守恒、撤回退款、后台审核拒绝退款、
+#       审核通过→打款、重复操作被拦(幂等)
+# 注意: 默认配置 min=100 multiple=10 fee_rate=2 daily_limit=3 interval=10s,
+#       本文件会先把 interval 与 daily_limit 放宽以便连跑(第 3 步)。
+###############################################################################
+
+@baseUrl = http://127.0.0.1:8000
+
+### 1. 前台登录
+POST {{baseUrl}}/front/v1/user/login
+Content-Type: application/json
+
+{ "device_id": "e2e-wd-001", "device_type": "ios", "device_version": "1.0" }
+
+> {%
+client.global.set("token", response.body.data.token);
+client.global.set("userId", response.body.data.user.id);
+%}
+
+### 2. 后台登录
+POST {{baseUrl}}/backend/auth/login
+Content-Type: application/json
+
+{ "username": "admin", "password": "admin123" }
+
+> {%
+client.global.set("adminToken", response.body.data.token);
+%}
+
+### 3. 取提现相关配置项的 id(要临时放宽频控与日限, 否则本文件连跑会被频控拦)
+GET {{baseUrl}}/backend/config?grp=withdrawal&page=1&size=50
+Authorization: {{adminToken}}
+
+> {%
+client.test("提现配置已随迁移写入", function () {
+    client.assert(response.body.code === 0, response.body.message);
+    client.assert(response.body.data.total >= 7, "00033 应写入 7 条 withdrawal 配置");
+});
+response.body.data.list.forEach(function (r) {
+    if (r.key === "withdraw_interval_sec") client.global.set("cfgIntervalId", r.id);
+    if (r.key === "withdraw_daily_limit")  client.global.set("cfgDailyId", r.id);
+});
+%}
+
+### 3.1 频控放宽到 0 秒
+PUT {{baseUrl}}/backend/config/{{cfgIntervalId}}
+Authorization: {{adminToken}}
+Content-Type: application/json
+
+{ "value": "0", "remark": "e2e 临时放宽", "status": 1 }
+
+> {%
+client.test("放宽频控", function () { client.assert(response.body.code === 0, response.body.message); });
+%}
+
+### 4. 日限放宽到 99
+PUT {{baseUrl}}/backend/config/{{cfgDailyId}}
+Authorization: {{adminToken}}
+Content-Type: application/json
+
+{ "value": "99", "remark": "e2e 临时放宽", "status": 1 }
+
+> {%
+client.test("放宽日限", function () { client.assert(response.body.code === 0, response.body.message); });
+%}
+
+### 5. 充值 2000 金币(后台调账)
+POST {{baseUrl}}/backend/wallet/adjust
+Authorization: {{adminToken}}
+Content-Type: application/json
+
+{ "user_id": {{userId}}, "amount": 2000, "remark": "e2e 提现测试本金" }
+
+> {%
+client.test("充值成功", function () { client.assert(response.body.code === 0, response.body.message); });
+client.global.set("bal0", response.body.data.balance);
+%}
+
+### 6. 提现配置
+GET {{baseUrl}}/front/v1/withdrawal/config
+Authorization: {{token}}
+
+> {%
+client.test("配置可读", function () {
+    client.assert(response.body.code === 0, response.body.message);
+    client.assert(response.body.data.min_amount > 0, "应有最低提现额");
+});
+client.global.set("feeRate", response.body.data.fee_rate);
+%}
+
+### 7. 添加收款账户
+POST {{baseUrl}}/front/v1/bankcard/add
+Authorization: {{token}}
+Content-Type: application/json
+
+{ "account_type": 1, "account_name": "张三", "account_no": "6222021234567890", "bank_name": "招商银行" }
+
+> {%
+client.test("加卡成功", function () { client.assert(response.body.code === 0, response.body.message); });
+client.global.set("cardId", response.body.data.id);
+%}
+
+### 8. 重复添加同一账号 —— 应被拒
+POST {{baseUrl}}/front/v1/bankcard/add
+Authorization: {{token}}
+Content-Type: application/json
+
+{ "account_type": 1, "account_name": "张三", "account_no": "6222021234567890", "bank_name": "招商银行" }
+
+> {%
+client.test("账号查重", function () { client.assert(response.body.code !== 0, "同一账号不应重复添加"); });
+%}
+
+### 9. 含空格的账号 —— 应被拒(移植自 tianbi 校验)
+POST {{baseUrl}}/front/v1/bankcard/add
+Authorization: {{token}}
+Content-Type: application/json
+
+{ "account_type": 1, "account_name": "张 三", "account_no": "6222020000000001", "bank_name": "招商银行" }
+
+> {%
+client.test("空格校验", function () { client.assert(response.body.code !== 0, "含空格应被拒"); });
+%}
+
+### 10. 卡列表
+GET {{baseUrl}}/front/v1/bankcard/list
+Authorization: {{token}}
+
+> {%
+client.test("卡列表", function () {
+    client.assert(response.body.code === 0, response.body.message);
+    client.assert(response.body.data.list.length >= 1, "至少一张卡");
+});
+%}
+
+### 11. 金额不是倍数 —— 应被拒
+POST {{baseUrl}}/front/v1/withdrawal/apply
+Authorization: {{token}}
+Content-Type: application/json
+
+{ "card_id": {{cardId}}, "amount": 105 }
+
+> {%
+client.test("倍数校验", function () { client.assert(response.body.code !== 0, "非整数倍应被拒"); });
+%}
+
+### 12. 低于最低额 —— 应被拒
+POST {{baseUrl}}/front/v1/withdrawal/apply
+Authorization: {{token}}
+Content-Type: application/json
+
+{ "card_id": {{cardId}}, "amount": 10 }
+
+> {%
+client.test("最低额校验", function () { client.assert(response.body.code !== 0, "低于最低额应被拒"); });
+%}
+
+### 13. 超过余额 —— 应被拒(防透支)
+POST {{baseUrl}}/front/v1/withdrawal/apply
+Authorization: {{token}}
+Content-Type: application/json
+
+{ "card_id": {{cardId}}, "amount": 99999990 }
+
+> {%
+client.test("余额校验", function () { client.assert(response.body.code !== 0, "超额应被拒"); });
+%}
+
+### 14. 正常申请 200(冻结 200, 手续费按费率)
+POST {{baseUrl}}/front/v1/withdrawal/apply
+Authorization: {{token}}
+Content-Type: application/json
+
+{ "card_id": {{cardId}}, "amount": 200 }
+
+> {%
+client.test("申请成功", function () {
+    client.assert(response.body.code === 0, response.body.message);
+    var rate = Number(client.global.get("feeRate"));
+    var expectFee = Math.round(200 * rate / 100 * 100) / 100;
+    client.assert(Math.abs(response.body.data.fee - expectFee) < 0.011, "手续费应为 " + expectFee);
+    client.assert(Math.abs(response.body.data.real_amount - (200 - expectFee)) < 0.011, "到账金额应=申请-手续费");
+});
+client.global.set("wdId1", response.body.data.id);
+%}
+
+### 15. 余额应已被冻结扣除 200, 且 frozen=200
+GET {{baseUrl}}/front/v1/wallet/balance
+Authorization: {{token}}
+
+> {%
+client.test("申请即冻结", function () {
+    client.assert(response.body.code === 0, response.body.message);
+    var expect = Number(client.global.get("bal0")) - 200;
+    client.assert(Math.abs(response.body.data.balance - expect) < 0.001, "余额应扣 200");
+    client.assert(response.body.data.frozen >= 200, "在途冻结应 >= 200");
+});
+%}
+
+### 16. 用户撤回 —— 原路退款
+POST {{baseUrl}}/front/v1/withdrawal/cancel
+Authorization: {{token}}
+Content-Type: application/json
+
+{ "id": {{wdId1}} }
+
+> {%
+client.test("撤回成功", function () { client.assert(response.body.code === 0, response.body.message); });
+%}
+
+### 17. 重复撤回 —— 必须被拦(幂等: 只能退一次款)
+POST {{baseUrl}}/front/v1/withdrawal/cancel
+Authorization: {{token}}
+Content-Type: application/json
+
+{ "id": {{wdId1}} }
+
+> {%
+client.test("重复撤回被拦", function () { client.assert(response.body.code !== 0, "已撤回的单不能再撤"); });
+%}
+
+### 18. 余额已回到申请前(退款守恒)
+GET {{baseUrl}}/front/v1/wallet/balance
+Authorization: {{token}}
+
+> {%
+client.test("退款守恒", function () {
+    var expect = Number(client.global.get("bal0"));
+    client.assert(Math.abs(response.body.data.balance - expect) < 0.001,
+        "撤回后余额应回到 " + expect + ", 实际 " + response.body.data.balance);
+});
+%}
+
+### 19. 再申请一笔 300, 走后台"审核拒绝"路径
+POST {{baseUrl}}/front/v1/withdrawal/apply
+Authorization: {{token}}
+Content-Type: application/json
+
+{ "card_id": {{cardId}}, "amount": 300 }
+
+> {%
+client.test("申请成功", function () { client.assert(response.body.code === 0, response.body.message); });
+client.global.set("wdId2", response.body.data.id);
+%}
+
+### 20. 后台列表能看到待审核单
+GET {{baseUrl}}/backend/withdrawals?status=1&user_id={{userId}}&page=1&size=20
+Authorization: {{adminToken}}
+
+> {%
+client.test("后台待审列表", function () {
+    client.assert(response.body.code === 0, response.body.message);
+    client.assert(response.body.data.total >= 1, "应有待审单");
+    client.assert(response.body.data.list[0].status_text === "审核中", "状态文案");
+});
+%}
+
+### 21. 审核拒绝 —— 自动退款
+POST {{baseUrl}}/backend/withdrawals/{{wdId2}}/audit
+Authorization: {{adminToken}}
+Content-Type: application/json
+
+{ "pass": false, "remark": "e2e 拒绝测试" }
+
+> {%
+client.test("拒绝成功", function () { client.assert(response.body.code === 0, response.body.message); });
+%}
+
+### 22. 重复审核 —— 必须被拦(不能重复退款)
+POST {{baseUrl}}/backend/withdrawals/{{wdId2}}/audit
+Authorization: {{adminToken}}
+Content-Type: application/json
+
+{ "pass": false, "remark": "e2e 重复拒绝" }
+
+> {%
+client.test("重复审核被拦", function () { client.assert(response.body.code !== 0, "终态单不可再审核"); });
+%}
+
+### 23. 余额再次守恒
+GET {{baseUrl}}/front/v1/wallet/balance
+Authorization: {{token}}
+
+> {%
+client.test("拒绝退款守恒", function () {
+    var expect = Number(client.global.get("bal0"));
+    client.assert(Math.abs(response.body.data.balance - expect) < 0.001, "拒绝后余额应回到 " + expect);
+});
+%}
+
+### 24. 申请第三笔 500, 走"审核通过 → 打款"完整链路
+POST {{baseUrl}}/front/v1/withdrawal/apply
+Authorization: {{token}}
+Content-Type: application/json
+
+{ "card_id": {{cardId}}, "amount": 500 }
+
+> {%
+client.global.set("wdId3", response.body.data.id);
+%}
+
+### 25. 审核通过
+POST {{baseUrl}}/backend/withdrawals/{{wdId3}}/audit
+Authorization: {{adminToken}}
+Content-Type: application/json
+
+{ "pass": true, "remark": "e2e 通过" }
+
+> {%
+client.test("审核通过", function () { client.assert(response.body.code === 0, response.body.message); });
+%}
+
+### 26. 未审核先打款的单不存在, 这里对已通过单标记打款
+POST {{baseUrl}}/backend/withdrawals/{{wdId3}}/mark-paid
+Authorization: {{adminToken}}
+Content-Type: application/json
+
+{ "voucher": "https://example.com/voucher.png", "remark": "e2e 已转账" }
+
+> {%
+client.test("打款成功", function () { client.assert(response.body.code === 0, response.body.message); });
+%}
+
+### 27. 已打款单再次打款 —— 被拦
+POST {{baseUrl}}/backend/withdrawals/{{wdId3}}/mark-paid
+Authorization: {{adminToken}}
+Content-Type: application/json
+
+{ "voucher": "x", "remark": "重复打款" }
+
+> {%
+client.test("重复打款被拦", function () { client.assert(response.body.code !== 0, "已打款单不可再打"); });
+%}
+
+### 28. 我的提现记录: 应包含 撤回/拒绝/已打款 三种终态
+GET {{baseUrl}}/front/v1/withdrawal/my?page=1&size=20
+Authorization: {{token}}
+
+> {%
+client.test("我的提现", function () {
+    client.assert(response.body.code === 0, response.body.message);
+    var st = response.body.data.list.map(function (r) { return r.status; });
+    client.assert(st.indexOf(6) >= 0, "应有已撤回");
+    client.assert(st.indexOf(5) >= 0, "应有已拒绝");
+    client.assert(st.indexOf(4) >= 0, "应有已打款");
+});
+%}
+
+### 29. 打款成功的 500 不再退回(余额 = bal0 - 500)
+GET {{baseUrl}}/front/v1/wallet/balance
+Authorization: {{token}}
+
+> {%
+client.test("打款不退款", function () {
+    var expect = Number(client.global.get("bal0")) - 500;
+    client.assert(Math.abs(response.body.data.balance - expect) < 0.001,
+        "已打款金额不应回到余额, 期望 " + expect);
+    client.assert(response.body.data.withdrawn >= 500, "累计提现应 >= 500");
+});
+%}
+
+### 30. 清理: 删除测试卡
+POST {{baseUrl}}/front/v1/bankcard/del
+Authorization: {{token}}
+Content-Type: application/json
+
+{ "ids": [{{cardId}}] }
+
+> {%
+client.test("删卡", function () { client.assert(response.body.code === 0, response.body.message); });
+%}

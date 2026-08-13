@@ -1,20 +1,23 @@
 ###############################################################################
-# 后台 B0.1 · Casbin 角色权限 真实端到端测试
-# 超管种子账号: admin / admin123 (角色码 superadmin, 中间件直接放行)
+# 后台 RBAC 权限 · e2e(权限节点 CRUD + 角色授权)
+#
+# 说明: 本文件原先测的是旧的 Casbin 式接口 `/backend/roles/{code}/perms`(path+method 粒度),
+#       那套在「casbin_rule 和 shared/rbac 都是死代码」「动态菜单权限」两次改造后已被删除。
+#       现行模型是: 权限树节点(admin_permission) + 角色持有节点 id 列表(admin_role.permissions),
+#       授权动作 = 更新角色的 permissions 字段。本文件已按现行接口重写。
 ###############################################################################
 
 @baseUrl = http://127.0.0.1:8000
 
-### 1. 超管登录 —— 保存 token
+### 1. 后台登录(超管)
 POST {{baseUrl}}/backend/auth/login
 Content-Type: application/json
 
 { "username": "admin", "password": "admin123" }
 
 > {%
-client.test("超管登录成功", function () {
+client.test("登录成功", function () {
     client.assert(response.body.code === 0, "code 应为 0: " + response.body.message);
-    client.assert(response.body.data.token !== "", "应返回 token");
 });
 client.global.set("adminToken", response.body.data.token);
 %}
@@ -32,69 +35,122 @@ client.test("角色列表", function () {
 });
 %}
 
-### 3. 给运营角色 op 新增权限: 允许 GET /backend/users/:id
-POST {{baseUrl}}/backend/roles/op/perms
+### 3. 权限树 —— 应有内容
+GET {{baseUrl}}/backend/permissions
+Authorization: {{adminToken}}
+
+> {%
+client.test("权限树", function () {
+    client.assert(response.body.code === 0, "code 应为 0: " + response.body.message);
+    client.assert(response.body.data.list.length >= 1, "权限树不应为空");
+});
+client.global.set("rootPermId", response.body.data.list[0].id);
+%}
+
+### 4. 新增一个权限节点(接口型: isMenu=0)
+POST {{baseUrl}}/backend/permissions
 Authorization: {{adminToken}}
 Content-Type: application/json
 
-{ "path": "/backend/users/:id", "method": "GET" }
+{ "parentId": {{rootPermId}}, "name": "e2e临时权限", "routeUrl": "/backend/e2e-temp",
+  "method": "GET", "isMenu": 0, "sort": 999, "status": 1 }
 
 > {%
-client.test("新增权限成功", function () {
+client.test("新增权限节点", function () {
+    client.assert(response.body.code === 0, "code 应为 0: " + response.body.message);
+    client.assert(response.body.data.id > 0, "应返回节点id");
+});
+client.global.set("permId", response.body.data.id);
+%}
+
+### 5. 权限树里能找到刚建的节点(树是嵌套的, 递归找)
+GET {{baseUrl}}/backend/permissions
+Authorization: {{adminToken}}
+
+> {%
+client.test("新节点入树", function () {
+    var target = Number(client.global.get("permId"));
+    function find(nodes) {
+        for (var i = 0; i < nodes.length; i++) {
+            if (nodes[i].id === target) return true;
+            if (nodes[i].children && find(nodes[i].children)) return true;
+        }
+        return false;
+    }
+    client.assert(find(response.body.data.list), "权限树应包含新增节点");
+});
+%}
+
+### 6. 建一个测试角色, 并授予该权限节点
+POST {{baseUrl}}/backend/roles
+Authorization: {{adminToken}}
+Content-Type: application/json
+
+{ "name": "e2e临时角色", "code": "e2e_tmp_role", "remark": "端到端测试用",
+  "permissions": "{{permId}}" }
+
+> {%
+client.test("建角色并授权", function () {
+    client.assert(response.body.code === 0, "code 应为 0: " + response.body.message);
+});
+client.global.set("roleId", response.body.data.id);
+%}
+
+### 7. 角色列表里该角色的 permissions 含刚授的节点
+GET {{baseUrl}}/backend/roles
+Authorization: {{adminToken}}
+
+> {%
+client.test("授权已生效", function () {
+    var role = response.body.data.list.filter(function (r) { return r.code === "e2e_tmp_role"; })[0];
+    client.assert(role !== undefined, "应能查到 e2e_tmp_role");
+    client.assert(String(role.permissions).indexOf(String(client.global.get("permId"))) >= 0,
+        "角色 permissions 应含新授的节点id, 实际: " + role.permissions);
+});
+%}
+
+### 8. 回收权限(把 permissions 置空)
+PUT {{baseUrl}}/backend/roles/{{roleId}}
+Authorization: {{adminToken}}
+Content-Type: application/json
+
+{ "name": "e2e临时角色", "remark": "端到端测试用", "status": 1, "permissions": "" }
+
+> {%
+client.test("回收权限", function () {
     client.assert(response.body.code === 0, "code 应为 0: " + response.body.message);
 });
 %}
 
-### 4. 查询 op 角色权限 —— 应含刚加的那条
-GET {{baseUrl}}/backend/roles/op/perms
+### 9. 确认已回收
+GET {{baseUrl}}/backend/roles
 Authorization: {{adminToken}}
 
 > {%
-client.test("op 权限列表含新增项", function () {
-    client.assert(response.body.code === 0, "code 应为 0");
-    var hit = response.body.data.list.some(function (p) {
-        return p.path === "/backend/users/:id" && p.method === "GET";
-    });
-    client.assert(hit, "应包含 GET /backend/users/:id");
+client.test("权限已回收", function () {
+    var role = response.body.data.list.filter(function (r) { return r.code === "e2e_tmp_role"; })[0];
+    client.assert(role !== undefined, "角色应还在");
+    client.assert(String(role.permissions).indexOf(String(client.global.get("permId"))) < 0,
+        "permissions 应已不含该节点, 实际: " + role.permissions);
 });
 %}
 
-### 5. 删除 op 角色刚加的权限
-DELETE {{baseUrl}}/backend/roles/op/perms
+### 10. 清理: 删角色
+DELETE {{baseUrl}}/backend/roles/{{roleId}}
 Authorization: {{adminToken}}
-Content-Type: application/json
-
-{ "path": "/backend/users/:id", "method": "GET" }
 
 > {%
-client.test("删除权限成功", function () {
+client.test("删角色", function () {
     client.assert(response.body.code === 0, "code 应为 0: " + response.body.message);
 });
 %}
 
-### 6. 再查 op 权限 —— 应已为空(或不含该条)
-GET {{baseUrl}}/backend/roles/op/perms
+### 11. 清理: 删权限节点
+DELETE {{baseUrl}}/backend/permissions/{{permId}}
 Authorization: {{adminToken}}
 
 > {%
-client.test("op 权限已删除", function () {
-    client.assert(response.body.code === 0, "code 应为 0");
-    var hit = response.body.data.list.some(function (p) {
-        return p.path === "/backend/users/:id" && p.method === "GET";
-    });
-    client.assert(!hit, "应不再包含该权限");
-});
-%}
-
-### 7. 给超管配权限 —— 应被拒(超管无需配置)
-POST {{baseUrl}}/backend/roles/superadmin/perms
-Authorization: {{adminToken}}
-Content-Type: application/json
-
-{ "path": "/backend/x", "method": "GET" }
-
-> {%
-client.test("超管配权被拒", function () {
-    client.assert(response.body.code !== 0, "应报错: 超管无需配置权限");
+client.test("删权限节点", function () {
+    client.assert(response.body.code === 0, "code 应为 0: " + response.body.message);
 });
 %}

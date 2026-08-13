@@ -1,0 +1,230 @@
+###############################################################################
+# UGC投稿 Publish · e2e(敏感词拦截 / 撤回幂等 / 审核幂等) · 前置: 迁移 00039
+# 敏感词管理接口: /backend/filterword (GET 列表 / POST 批量添加 / DELETE {id})
+###############################################################################
+
+@baseUrl = http://127.0.0.1:8000
+
+### 1. 后台登录
+POST {{baseUrl}}/backend/auth/login
+Content-Type: application/json
+
+{ "username": "admin", "password": "admin123" }
+
+> {%
+client.global.set("adminToken", response.body.data.token);
+%}
+
+### 2. 确保敏感词存在(00027 已种 '测试敏感词', 重复添加自动跳过)
+POST {{baseUrl}}/backend/filterword
+Authorization: {{adminToken}}
+Content-Type: application/json
+
+{ "words": ["测试敏感词"] }
+
+> {%
+client.test("敏感词就绪", function () { client.assert(response.body.code === 0, response.body.message); });
+%}
+
+### 3. 前台登录
+POST {{baseUrl}}/front/v1/user/login
+Content-Type: application/json
+
+{ "device_id": "e2e-publish-001", "device_type": "ios", "device_version": "1.0" }
+
+> {%
+client.global.set("token", response.body.data.token);
+client.global.set("uid", response.body.data.user.id);
+%}
+
+### 4. 投稿成功(这条留给"撤回"流程)
+POST {{baseUrl}}/front/v1/publish/submit
+Authorization: {{token}}
+Content-Type: application/json
+
+{
+  "type": 2,
+  "title": "e2e投稿·待撤回",
+  "intro": "一条用于撤回流程的漫画投稿",
+  "cover": "https://example.com/pub_cover.jpg",
+  "resource": ["https://example.com/pub_res_1.zip"],
+  "tags": ["e2e"]
+}
+
+> {%
+client.test("投稿成功", function () {
+    client.assert(response.body.code === 0, response.body.message);
+    client.assert(response.body.data.id > 0, "应返回投稿id");
+});
+client.global.set("pubCancelId", response.body.data.id);
+%}
+
+### 5. 再投一条(这条留给"审核"流程)
+POST {{baseUrl}}/front/v1/publish/submit
+Authorization: {{token}}
+Content-Type: application/json
+
+{
+  "type": 4,
+  "title": "e2e投稿·待审核",
+  "intro": "一条用于审核流程的图集投稿",
+  "resource": ["https://example.com/pub_res_2.zip"],
+  "tags": ["e2e"]
+}
+
+> {%
+client.test("第二条投稿成功", function () { client.assert(response.body.code === 0, response.body.message); });
+client.global.set("pubAuditId", response.body.data.id);
+%}
+
+### 6. 标题带敏感词 —— 应被拒
+POST {{baseUrl}}/front/v1/publish/submit
+Authorization: {{token}}
+Content-Type: application/json
+
+{ "type": 1, "title": "e2e投稿测试敏感词", "intro": "正常简介" }
+
+> {%
+client.test("标题敏感词被拒", function () { client.assert(response.body.code !== 0, "含敏感词的标题应被拒"); });
+%}
+
+### 7. 简介带敏感词 —— 同样应被拒
+POST {{baseUrl}}/front/v1/publish/submit
+Authorization: {{token}}
+Content-Type: application/json
+
+{ "type": 1, "title": "e2e投稿正常标题", "intro": "简介里混了测试敏感词" }
+
+> {%
+client.test("简介敏感词被拒", function () { client.assert(response.body.code !== 0, "含敏感词的简介应被拒"); });
+%}
+
+### 8. 我的投稿可见(应含刚提交的两条, 状态为待审 0)
+GET {{baseUrl}}/front/v1/publish/my?page=1&size=20
+Authorization: {{token}}
+
+> {%
+client.test("我的投稿", function () {
+    client.assert(response.body.code === 0, response.body.message);
+    var cancelId = Number(client.global.get("pubCancelId"));
+    var auditId = Number(client.global.get("pubAuditId"));
+    var hitC = response.body.data.list.some(function (r) { return r.id === cancelId && r.status === 0; });
+    var hitA = response.body.data.list.some(function (r) { return r.id === auditId && r.status === 0; });
+    client.assert(hitC && hitA, "我的列表应含两条待审投稿");
+});
+%}
+
+### 9. 撤回待审投稿
+POST {{baseUrl}}/front/v1/publish/cancel
+Authorization: {{token}}
+Content-Type: application/json
+
+{ "id": {{pubCancelId}} }
+
+> {%
+client.test("撤回成功", function () { client.assert(response.body.code === 0, response.body.message); });
+%}
+
+### 10. 重复撤回应被拒(条件更新 RowsAffected=0)
+POST {{baseUrl}}/front/v1/publish/cancel
+Authorization: {{token}}
+Content-Type: application/json
+
+{ "id": {{pubCancelId}} }
+
+> {%
+client.test("重复撤回被拒", function () { client.assert(response.body.code !== 0, "已撤回的投稿不应能再撤回"); });
+%}
+
+### 11. 我的投稿按 status 筛(3=已撤回)
+GET {{baseUrl}}/front/v1/publish/my?status=3&page=1&size=20
+Authorization: {{token}}
+
+> {%
+client.test("撤回态可筛", function () {
+    client.assert(response.body.code === 0, response.body.message);
+    var cancelId = Number(client.global.get("pubCancelId"));
+    var hit = response.body.data.list.some(function (r) { return r.id === cancelId; });
+    client.assert(hit, "撤回的投稿应出现在 status=3 的筛选里");
+});
+%}
+
+### 12. 后台列表可见(按 status/user_id/type 筛, 全部 string 传参)
+GET {{baseUrl}}/backend/publishes?status=0&user_id={{uid}}&type=4&page=1&size=20
+Authorization: {{adminToken}}
+
+> {%
+client.test("后台列表", function () {
+    client.assert(response.body.code === 0, response.body.message);
+    var auditId = Number(client.global.get("pubAuditId"));
+    var hit = response.body.data.list.some(function (r) { return r.id === auditId && r.status === 0; });
+    client.assert(hit, "后台待审列表应含该投稿");
+});
+%}
+
+### 13. 后台列表不传筛选 = 全部
+GET {{baseUrl}}/backend/publishes?page=1&size=20
+Authorization: {{adminToken}}
+
+> {%
+client.test("空筛选=全部", function () {
+    client.assert(response.body.code === 0, response.body.message);
+    client.assert(response.body.data.total >= 2, "不传 status 应返回全部投稿");
+});
+%}
+
+### 14. 审核通过
+POST {{baseUrl}}/backend/publishes/{{pubAuditId}}/audit
+Authorization: {{adminToken}}
+Content-Type: application/json
+
+{ "pass": true }
+
+> {%
+client.test("审核通过", function () { client.assert(response.body.code === 0, response.body.message); });
+%}
+
+### 15. 重复审核应被拒(仅 status=0 可审)
+POST {{baseUrl}}/backend/publishes/{{pubAuditId}}/audit
+Authorization: {{adminToken}}
+Content-Type: application/json
+
+{ "pass": false, "reject_reason": "重复审核测试" }
+
+> {%
+client.test("重复审核被拒", function () { client.assert(response.body.code !== 0, "已处理的投稿不应能再审核"); });
+%}
+
+### 16. 已通过的投稿不可再撤回
+POST {{baseUrl}}/front/v1/publish/cancel
+Authorization: {{token}}
+Content-Type: application/json
+
+{ "id": {{pubAuditId}} }
+
+> {%
+client.test("已审不可撤回", function () { client.assert(response.body.code !== 0, "已通过的投稿不应能撤回"); });
+%}
+
+### 17. 我的投稿里该条已变成通过(status=1)
+GET {{baseUrl}}/front/v1/publish/my?status=1&page=1&size=20
+Authorization: {{token}}
+
+> {%
+client.test("审核结果回传", function () {
+    client.assert(response.body.code === 0, response.body.message);
+    var auditId = Number(client.global.get("pubAuditId"));
+    var hit = response.body.data.list.some(function (r) { return r.id === auditId; });
+    client.assert(hit, "通过的投稿应出现在 status=1 的筛选里");
+});
+%}
+
+### 18. 未登录投稿应被拒
+POST {{baseUrl}}/front/v1/publish/submit
+Content-Type: application/json
+
+{ "type": 1, "title": "e2e未登录投稿" }
+
+> {%
+client.test("未登录被拒", function () { client.assert(response.body.code !== 0, "未登录不应能投稿"); });
+%}

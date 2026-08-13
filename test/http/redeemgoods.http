@@ -1,0 +1,112 @@
+###############################################################################
+# 商品兑换 RedeemGoods · e2e(防超卖/防透支/流水) · 前置: 迁移 00031
+# 需要账户有金币: 可先跑 redeemcode.http 兑换 WELCOME100 或后台调整
+###############################################################################
+
+@baseUrl = http://127.0.0.1:8000
+
+### 1. 前台登录
+POST {{baseUrl}}/front/v1/user/login
+Content-Type: application/json
+
+{ "device_id": "e2e-rgoods-001", "device_type": "ios", "device_version": "1.0" }
+
+> {%
+client.global.set("token", response.body.data.token);
+%}
+
+### 2. 先领 WELCOME100 金币(可能已领过, 不断言)
+POST {{baseUrl}}/front/v1/redeemcode/use
+Authorization: {{token}}
+Content-Type: application/json
+
+{ "code": "WELCOME100" }
+
+### 3. 商品列表(公开, 样板至少1条)
+GET {{baseUrl}}/front/v1/redeem/list?page=1&size=20
+
+> {%
+client.test("商品列表", function () {
+    client.assert(response.body.code === 0, response.body.message);
+    client.assert(response.body.data.list.length >= 1, "至少1个样板商品");
+});
+client.global.set("goodsId", response.body.data.list[0].id);
+%}
+
+### 4. 后台登录 + 建一个库存1的测试商品
+POST {{baseUrl}}/backend/auth/login
+Content-Type: application/json
+
+{ "username": "admin", "password": "admin123" }
+
+> {%
+client.global.set("adminToken", response.body.data.token);
+%}
+
+### 5. 建测试商品(库存1, 价10金币)
+POST {{baseUrl}}/backend/redeem-goods
+Authorization: {{adminToken}}
+Content-Type: application/json
+
+{ "name": "e2e限量商品", "cost_gold": 10, "stock": 1, "rank": 1, "status": 1 }
+
+> {%
+client.test("建商品", function () { client.assert(response.body.code === 0, response.body.message); });
+client.global.set("gid", response.body.data.id);
+%}
+
+### 6. 兑换成功(库存 1→0)
+POST {{baseUrl}}/front/v1/redeem/exchange
+Authorization: {{token}}
+Content-Type: application/json
+
+{ "goods_id": {{gid}} }
+
+> {%
+client.test("兑换成功", function () {
+    client.assert(response.body.code === 0, "兑换失败(若余额不足请先领金币): " + response.body.message);
+    client.assert(response.body.data.order_id > 0, "应返回订单id");
+});
+%}
+
+### 7. 再兑换 —— 库存已 0 应被拦(防超卖)
+POST {{baseUrl}}/front/v1/redeem/exchange
+Authorization: {{token}}
+Content-Type: application/json
+
+{ "goods_id": {{gid}} }
+
+> {%
+client.test("超卖被拦", function () { client.assert(response.body.code !== 0, "库存0应被拒"); });
+%}
+
+### 8. 我的兑换历史应含该商品
+GET {{baseUrl}}/front/v1/redeem/history?page=1&size=20
+Authorization: {{token}}
+
+> {%
+client.test("兑换历史", function () {
+    client.assert(response.body.code === 0, response.body.message);
+    var hit = response.body.data.list.some(function (r) { return r.goods_name === "e2e限量商品"; });
+    client.assert(hit, "历史应含刚兑换的商品");
+});
+%}
+
+### 9. 后台兑换记录可查
+GET {{baseUrl}}/backend/redeem-goods/orders?goods_id={{gid}}&page=1&size=20
+Authorization: {{adminToken}}
+
+> {%
+client.test("后台记录", function () {
+    client.assert(response.body.code === 0, response.body.message);
+    client.assert(response.body.data.total === 1, "应有1条兑换记录");
+});
+%}
+
+### 10. 清理测试商品
+DELETE {{baseUrl}}/backend/redeem-goods/{{gid}}
+Authorization: {{adminToken}}
+
+> {%
+client.test("清理", function () { client.assert(response.body.code === 0, response.body.message); });
+%}

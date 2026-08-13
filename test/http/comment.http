@@ -1,0 +1,85 @@
+###############################################################################
+# 评论 Comment · e2e(发表/树形回复/敏感词拦截) · 前置: 迁移 00028
+###############################################################################
+
+@baseUrl = http://127.0.0.1:8000
+
+### 1. 前台登录
+POST {{baseUrl}}/front/v1/user/login
+Content-Type: application/json
+
+{ "device_id": "e2e-comment-001", "device_type": "ios", "device_version": "1.0" }
+
+> {%
+client.test("登录", function () { client.assert(response.body.code === 0, response.body.message); });
+client.global.set("token", response.body.data.token);
+%}
+
+### 2. 发顶层评论(视频9001)
+POST {{baseUrl}}/front/v1/comment/add
+Authorization: {{token}}
+Content-Type: application/json
+
+{ "media_type": 1, "content_id": 9001, "content": "e2e顶层评论" }
+
+> {%
+client.test("发评论", function () {
+    client.assert(response.body.code === 0, response.body.message);
+    client.assert(response.body.data.id > 0, "应返回评论id");
+});
+client.global.set("rootId", response.body.data.id);
+%}
+
+### 3. 回复该评论
+POST {{baseUrl}}/front/v1/comment/add
+Authorization: {{token}}
+Content-Type: application/json
+
+{ "media_type": 1, "content_id": 9001, "parent_id": {{rootId}}, "content": "e2e一级回复" }
+
+> {%
+client.test("回复", function () { client.assert(response.body.code === 0, response.body.message); });
+client.global.set("replyId", response.body.data.id);
+%}
+
+### 4. 回复的回复(锚到同一顶层)
+POST {{baseUrl}}/front/v1/comment/add
+Authorization: {{token}}
+Content-Type: application/json
+
+{ "media_type": 1, "content_id": 9001, "parent_id": {{replyId}}, "content": "e2e二级回复" }
+
+> {%
+client.test("二级回复", function () { client.assert(response.body.code === 0, response.body.message); });
+%}
+
+### 5. 敏感词拦截(前置: 迁移00027含"测试敏感词")
+POST {{baseUrl}}/front/v1/comment/add
+Authorization: {{token}}
+Content-Type: application/json
+
+{ "media_type": 1, "content_id": 9001, "content": "包含测试敏感词的评论" }
+
+> {%
+client.test("敏感词被拦", function () {
+    client.assert(response.body.code !== 0, "命中敏感词应被拒");
+    client.assert(response.body.message.indexOf("违禁") >= 0, "应提示违禁词");
+});
+%}
+
+### 6. 列表: 顶层带 2 条回复(树形 parent_id 保留)
+POST {{baseUrl}}/front/v1/comment/list
+Content-Type: application/json
+
+{ "media_type": 1, "content_id": 9001, "page": 1, "size": 20 }
+
+> {%
+client.test("树形列表", function () {
+    client.assert(response.body.code === 0, response.body.message);
+    var top = response.body.data.list.filter(function (r) { return r.id == client.global.get("rootId"); })[0];
+    client.assert(top !== undefined, "应含顶层评论");
+    client.assert(top.reply_count === 2, "顶层 reply_count 应为 2");
+    client.assert(top.replies.length === 2, "应带 2 条回复");
+    client.assert(top.replies[1].parent_id == client.global.get("replyId"), "二级回复 parent_id 应指向一级回复");
+});
+%}

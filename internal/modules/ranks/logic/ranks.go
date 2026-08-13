@@ -1,0 +1,184 @@
+// Package logic 排行/热搜业务(移植自 tianbi rank/hotsearch)。
+// 排行: Mongo 聚合改 PG GROUP BY(user_collect 点赞), Redis 缓存 60s, Redis 异常降级直查。
+package logic
+
+import (
+	"context"
+	"encoding/json"
+	"fmt"
+	"strings"
+
+	"github.com/gogf/gf/v2/errors/gerror"
+	"github.com/gogf/gf/v2/frame/g"
+	"github.com/gogf/gf/v2/os/gtime"
+
+	"github.com/JarvanDante/my_service/internal/model/entity"
+	"github.com/JarvanDante/my_service/internal/modules/ranks/service"
+)
+
+const (
+	rkSiteId   = 1
+	rkTopN     = 50
+	rkCacheTTL = 60 // 秒
+)
+
+type sRank struct{}
+
+func New() service.IRank { return &sRank{} }
+
+func cacheKey(mediaType int, period string) string {
+	return fmt.Sprintf("rank:%d:%d:%s", rkSiteId, mediaType, period)
+}
+
+// Rank 点赞聚合排行 + Redis 缓存。
+func (s *sRank) Rank(ctx context.Context, mediaType int, period string) ([]service.RankItem, error) {
+	if period != "day" && period != "week" {
+		period = "all"
+	}
+	key := cacheKey(mediaType, period)
+	// 1. 读缓存(异常降级)
+	if v, err := g.Redis().Get(ctx, key); err == nil && !v.IsNil() && v.String() != "" {
+		var cached []service.RankItem
+		if json.Unmarshal([]byte(v.String()), &cached) == nil {
+			return cached, nil
+		}
+	}
+	// 2. PG GROUP BY 聚合(tianbi Mongo $group 的等价物)
+	m := g.Model("user_collect").Ctx(ctx).
+		Where("site_id", rkSiteId).Where("op_type", 2). // 点赞
+		Where("media_type", mediaType)
+	switch period {
+	case "day":
+		m = m.Where("created_at >= ?", gtime.Now().StartOfDay())
+	case "week":
+		m = m.Where("created_at >= ?", gtime.Now().AddDate(0, 0, -7))
+	}
+	all, err := m.Fields("content_id, COUNT(*) AS score").
+		Group("content_id").Order("score DESC, content_id DESC").Limit(rkTopN).All()
+	if err != nil {
+		return nil, err
+	}
+	out := make([]service.RankItem, 0, len(all))
+	for i, rec := range all {
+		out = append(out, service.RankItem{
+			ContentId: rec["content_id"].Int64(), MediaType: mediaType,
+			Score: rec["score"].Int64(), RankNo: i + 1,
+		})
+	}
+	// 3. 写缓存(尽力而为)
+	if b, e := json.Marshal(out); e == nil {
+		_ = g.Redis().SetEX(ctx, key, string(b), rkCacheTTL)
+	}
+	return out, nil
+}
+
+// RefreshRank 清除全部排行缓存。
+func (s *sRank) RefreshRank(ctx context.Context) error {
+	for _, mt := range []int{1, 2} {
+		for _, p := range []string{"day", "week", "all"} {
+			_, _ = g.Redis().Del(ctx, cacheKey(mt, p))
+		}
+	}
+	return nil
+}
+
+// HotKeywords 前台热搜词。
+func (s *sRank) HotKeywords(ctx context.Context) ([]string, error) {
+	var list []*entity.HotSearch
+	if err := g.Model("hot_search").Ctx(ctx).
+		Where("site_id", rkSiteId).Where("status", 1).
+		OrderDesc("heat").OrderDesc("search_count").Limit(20).Scan(&list); err != nil {
+		return nil, err
+	}
+	out := make([]string, 0, len(list))
+	for _, r := range list {
+		out = append(out, r.Keyword)
+	}
+	return out, nil
+}
+
+func (s *sRank) HotList(ctx context.Context, f service.HotFilter) ([]*service.HotDTO, int, error) {
+	if f.Page <= 0 {
+		f.Page = 1
+	}
+	if f.Size <= 0 {
+		f.Size = 20
+	}
+	m := g.Model("hot_search").Ctx(ctx).Where("site_id", rkSiteId)
+	if f.Status >= 0 {
+		m = m.Where("status", f.Status)
+	}
+	if f.Keyword != "" {
+		m = m.Where("keyword ILIKE ?", "%"+f.Keyword+"%")
+	}
+	total, err := m.Clone().Count()
+	if err != nil {
+		return nil, 0, err
+	}
+	var list []*entity.HotSearch
+	if err := m.Clone().OrderDesc("heat").OrderDesc("search_count").Page(f.Page, f.Size).Scan(&list); err != nil {
+		return nil, 0, err
+	}
+	out := make([]*service.HotDTO, 0, len(list))
+	for _, r := range list {
+		updated := ""
+		if r.UpdatedAt != nil {
+			updated = r.UpdatedAt.String()
+		}
+		out = append(out, &service.HotDTO{
+			Id: r.Id, Keyword: r.Keyword, Heat: r.Heat,
+			SearchCount: r.SearchCount, Status: r.Status, UpdatedAt: updated,
+		})
+	}
+	return out, total, nil
+}
+
+func (s *sRank) HotCreate(ctx context.Context, keyword string, heat, status int) (int64, error) {
+	keyword = strings.TrimSpace(keyword)
+	if keyword == "" {
+		return 0, gerror.New("关键词不能为空")
+	}
+	cnt, err := g.Model("hot_search").Ctx(ctx).
+		Where("site_id", rkSiteId).Where("keyword", keyword).Count()
+	if err != nil {
+		return 0, err
+	}
+	if cnt > 0 {
+		return 0, gerror.New("该关键词已存在")
+	}
+	if status != 0 && status != 1 {
+		status = 1
+	}
+	id, err := g.Model("hot_search").Ctx(ctx).Data(g.Map{
+		"site_id": rkSiteId, "keyword": keyword, "heat": heat, "status": status,
+	}).InsertAndGetId()
+	if err != nil {
+		return 0, err
+	}
+	return id, nil
+}
+
+func (s *sRank) HotUpdate(ctx context.Context, id int64, keyword string, heat, status int) error {
+	if id <= 0 {
+		return gerror.New("ID非法")
+	}
+	data := g.Map{"heat": heat, "updated_at": gtime.Now()}
+	if strings.TrimSpace(keyword) != "" {
+		data["keyword"] = strings.TrimSpace(keyword)
+	}
+	if status == 0 || status == 1 {
+		data["status"] = status
+	}
+	_, err := g.Model("hot_search").Ctx(ctx).
+		Where("site_id", rkSiteId).Where("id", id).Data(data).Update()
+	return err
+}
+
+func (s *sRank) HotDelete(ctx context.Context, id int64) error {
+	if id <= 0 {
+		return gerror.New("ID非法")
+	}
+	_, err := g.Model("hot_search").Ctx(ctx).
+		Where("site_id", rkSiteId).Where("id", id).Delete()
+	return err
+}

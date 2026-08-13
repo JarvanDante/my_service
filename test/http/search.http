@@ -1,0 +1,199 @@
+###############################################################################
+# 全站搜索 Search · e2e(跨表命中 / 上架过滤 / 热搜埋点 / 联想)
+# 前置迁移: 00030(hot_search) 00035(pg_trgm) 00036~00038(comics/novel/photo)
+# 关键词用 e2e搜索标记词 这种独特串, 避免与样板数据/其他用例互相干扰
+###############################################################################
+
+@baseUrl = http://127.0.0.1:8000
+@kw = e2e搜索标记词
+
+### 1. 后台登录
+POST {{baseUrl}}/backend/auth/login
+Content-Type: application/json
+
+{ "username": "admin", "password": "admin123" }
+
+> {%
+client.global.set("adminToken", response.body.data.token);
+%}
+
+### 2. 建一条已上架漫画(命中源之一)
+POST {{baseUrl}}/backend/comics
+Authorization: {{adminToken}}
+Content-Type: application/json
+
+{ "title": "e2e搜索标记词漫画", "author": "e2e作者", "cover": "https://example.com/c.jpg",
+  "intro": "搜索用例", "category": "热血", "tags": ["e2e"], "is_vip": 0, "price": 0,
+  "free_chapter": 1, "update_status": 1, "rank": 0, "status": 1 }
+
+> {%
+client.test("建漫画", function () { client.assert(response.body.code === 0, response.body.message); });
+client.global.set("cid", response.body.data.id);
+%}
+
+### 3. 建一条已上架小说
+POST {{baseUrl}}/backend/novels
+Authorization: {{adminToken}}
+Content-Type: application/json
+
+{ "title": "e2e搜索标记词小说", "author": "e2e作者", "cover": "https://example.com/n.jpg",
+  "intro": "搜索用例", "category": "都市", "tags": ["e2e"], "is_vip": 0, "price": 0,
+  "free_chapter": 1, "is_audio": 0, "update_status": 1, "rank": 0, "status": 1 }
+
+> {%
+client.test("建小说", function () { client.assert(response.body.code === 0, response.body.message); });
+client.global.set("nid", response.body.data.id);
+%}
+
+### 4. 建一条已上架视频
+POST {{baseUrl}}/backend/videos
+Authorization: {{adminToken}}
+Content-Type: application/json
+
+{ "title": "e2e搜索标记词视频", "description": "搜索用例",
+  "cover_url": "https://example.com/v.jpg", "source_url": "https://example.com/v.mp4",
+  "duration": 60, "sort": 0, "status": 1 }
+
+> {%
+client.test("建视频", function () { client.assert(response.body.code === 0, response.body.message); });
+client.global.set("vid", response.body.data.id);
+%}
+
+### 5. 建一条未上架漫画(status=0, 用于验证搜不到)
+POST {{baseUrl}}/backend/comics
+Authorization: {{adminToken}}
+Content-Type: application/json
+
+{ "title": "e2e搜索标记词未上架漫画", "author": "e2e作者", "intro": "不该被搜到",
+  "category": "热血", "tags": ["e2e"], "is_vip": 0, "price": 0,
+  "free_chapter": 1, "update_status": 1, "rank": 0, "status": 0 }
+
+> {%
+client.test("建未上架漫画", function () { client.assert(response.body.code === 0, response.body.message); });
+client.global.set("cidOff", response.body.data.id);
+%}
+
+### 6. 全站搜索 type=0 —— 同时命中漫画/小说/视频
+GET {{baseUrl}}/front/v1/search?keyword={{kw}}&type=0
+Accept: application/json
+
+> {%
+client.test("聚合搜索命中多类", function () {
+    client.assert(response.body.code === 0, response.body.message);
+    var d = response.body.data;
+    client.assert(d.comics && d.comics.length >= 1, "应命中漫画");
+    client.assert(d.novels && d.novels.length >= 1, "应命中小说");
+    client.assert(d.videos && d.videos.length >= 1, "应命中视频");
+    client.assert(d.total_hit >= 3, "总命中数应 >=3, 实际=" + d.total_hit);
+});
+client.test("统一结构字段齐全", function () {
+    var it = response.body.data.comics[0];
+    client.assert(it.media_type === 3, "漫画 media_type 应为 3");
+    client.assert(it.id > 0 && it.title.length > 0, "id/title 必填");
+    client.assert(it.author === "e2e作者", "漫画应带作者");
+});
+%}
+
+### 7. type=3 只返回漫画(单类走 list+total 分页)
+GET {{baseUrl}}/front/v1/search?keyword={{kw}}&type=3&page=1&size=20
+Accept: application/json
+
+> {%
+client.test("只返回漫画", function () {
+    client.assert(response.body.code === 0, response.body.message);
+    var d = response.body.data;
+    client.assert(d.list.length >= 1, "应有结果");
+    client.assert(d.total >= 1, "应有 total");
+    client.assert(d.novels === undefined && d.videos === undefined, "单类查询不应下发其他分组");
+    var allComics = d.list.every(function (r) { return r.media_type === 3; });
+    client.assert(allComics, "结果应全部是漫画");
+});
+%}
+
+### 8. 未上架内容搜不到(status=0 的那条漫画)
+GET {{baseUrl}}/front/v1/search?keyword={{kw}}&type=3&page=1&size=50
+Accept: application/json
+
+> {%
+client.test("未上架不可见", function () {
+    client.assert(response.body.code === 0, response.body.message);
+    var hit = response.body.data.list.some(function (r) { return r.title === "e2e搜索标记词未上架漫画"; });
+    client.assert(!hit, "未上架漫画不该出现在搜索结果里");
+});
+%}
+
+### 9. 搜索埋点: 后台热搜列表能看到该词且 search_count>=1
+GET {{baseUrl}}/backend/hotsearch?keyword={{kw}}&page=1&size=20
+Authorization: {{adminToken}}
+
+> {%
+client.test("热搜埋点", function () {
+    client.assert(response.body.code === 0, response.body.message);
+    var row = response.body.data.list.filter(function (r) { return r.keyword === "e2e搜索标记词"; })[0];
+    client.assert(row !== undefined, "热搜词表里应有该关键词");
+    client.assert(row.search_count >= 1, "search_count 应 >=1, 实际=" + (row && row.search_count));
+    client.assert(row.status === 1, "新入库的热搜词应为展示态");
+    client.global.set("hotId", row.id);
+});
+%}
+
+### 10. 联想: 按前缀 e2e 能联想到该词
+GET {{baseUrl}}/front/v1/search/suggest?keyword=e2e
+Accept: application/json
+
+> {%
+client.test("联想词", function () {
+    client.assert(response.body.code === 0, response.body.message);
+    client.assert(response.body.data.list.length <= 10, "联想词最多 10 个");
+    var hit = response.body.data.list.indexOf("e2e搜索标记词") >= 0;
+    client.assert(hit, "应联想到 e2e搜索标记词");
+});
+%}
+
+### 11. 关键词必填(空关键词应被拦)
+GET {{baseUrl}}/front/v1/search?type=0
+Accept: application/json
+
+> {%
+client.test("空关键词被拦", function () { client.assert(response.body.code !== 0, "keyword 必填"); });
+%}
+
+### 12. 清理: 删漫画
+DELETE {{baseUrl}}/backend/comics/{{cid}}
+Authorization: {{adminToken}}
+
+> {%
+client.test("清理漫画", function () { client.assert(response.body.code === 0, response.body.message); });
+%}
+
+### 13. 清理: 删未上架漫画
+DELETE {{baseUrl}}/backend/comics/{{cidOff}}
+Authorization: {{adminToken}}
+
+> {%
+client.test("清理未上架漫画", function () { client.assert(response.body.code === 0, response.body.message); });
+%}
+
+### 14. 清理: 删小说
+DELETE {{baseUrl}}/backend/novels/{{nid}}
+Authorization: {{adminToken}}
+
+> {%
+client.test("清理小说", function () { client.assert(response.body.code === 0, response.body.message); });
+%}
+
+### 15. 清理: 删视频
+DELETE {{baseUrl}}/backend/videos/{{vid}}
+Authorization: {{adminToken}}
+
+> {%
+client.test("清理视频", function () { client.assert(response.body.code === 0, response.body.message); });
+%}
+
+### 16. 清理: 删热搜词(埋点产生的)
+DELETE {{baseUrl}}/backend/hotsearch/{{hotId}}
+Authorization: {{adminToken}}
+
+> {%
+client.test("清理热搜词", function () { client.assert(response.body.code === 0, response.body.message); });
+%}

@@ -1,0 +1,124 @@
+###############################################################################
+# 钱包 Wallet · e2e(余额/流水/人工调账) · 前置: 无新迁移(用 users.balance + user_balance_log)
+# 覆盖: 前台余额、前台流水、后台全站流水、后台调账(加币/扣币/扣成负数被拦)
+###############################################################################
+
+@baseUrl = http://127.0.0.1:8000
+
+### 1. 前台登录
+POST {{baseUrl}}/front/v1/user/login
+Content-Type: application/json
+
+{ "device_id": "e2e-wallet-001", "device_type": "ios", "device_version": "1.0" }
+
+> {%
+client.test("登录成功", function () {
+    client.assert(response.body.code === 0, response.body.message);
+});
+client.global.set("token", response.body.data.token);
+client.global.set("userId", response.body.data.user.id);
+%}
+
+### 2. 后台登录
+POST {{baseUrl}}/backend/auth/login
+Content-Type: application/json
+
+{ "username": "admin", "password": "admin123" }
+
+> {%
+client.global.set("adminToken", response.body.data.token);
+%}
+
+### 3. 查当前余额(基线)
+GET {{baseUrl}}/front/v1/wallet/balance
+Authorization: {{token}}
+
+> {%
+client.test("余额接口", function () {
+    client.assert(response.body.code === 0, response.body.message);
+    client.assert(typeof response.body.data.balance === "number", "balance 应为数字");
+});
+client.global.set("balance0", response.body.data.balance);
+%}
+
+### 4. 后台调账 +500(必须写流水)
+POST {{baseUrl}}/backend/wallet/adjust
+Authorization: {{adminToken}}
+Content-Type: application/json
+
+{ "user_id": {{userId}}, "amount": 500, "remark": "e2e 测试充值" }
+
+> {%
+client.test("加币成功", function () {
+    client.assert(response.body.code === 0, response.body.message);
+    var expect = Number(client.global.get("balance0")) + 500;
+    client.assert(Math.abs(response.body.data.balance - expect) < 0.001,
+        "调账后余额应为 " + expect + ", 实际 " + response.body.data.balance);
+});
+%}
+
+### 5. 前台流水应能看到这笔 admin_adjust 收入
+GET {{baseUrl}}/front/v1/wallet/waters?direction=1&scene=admin_adjust&page=1&size=10
+Authorization: {{token}}
+
+> {%
+client.test("流水可查", function () {
+    client.assert(response.body.code === 0, response.body.message);
+    client.assert(response.body.data.total >= 1, "应至少一条调账流水");
+    var r = response.body.data.list[0];
+    client.assert(r.direction === 1, "应为收入");
+    client.assert(Math.abs(r.balance_after - r.balance_before - r.amount) < 0.001,
+        "before/after/amount 必须自洽");
+});
+%}
+
+### 6. 后台调账 -100(扣币)
+POST {{baseUrl}}/backend/wallet/adjust
+Authorization: {{adminToken}}
+Content-Type: application/json
+
+{ "user_id": {{userId}}, "amount": -100, "remark": "e2e 测试扣款" }
+
+> {%
+client.test("扣币成功", function () {
+    client.assert(response.body.code === 0, response.body.message);
+});
+client.global.set("balNow", response.body.data.balance);
+%}
+
+### 7. 扣一个远超余额的数 —— 必须被拦(防透支)
+POST {{baseUrl}}/backend/wallet/adjust
+Authorization: {{adminToken}}
+Content-Type: application/json
+
+{ "user_id": {{userId}}, "amount": -99999999, "remark": "e2e 透支测试" }
+
+> {%
+client.test("防透支", function () {
+    client.assert(response.body.code !== 0, "余额不足时必须拒绝, 不能扣成负数");
+});
+%}
+
+### 8. 余额没有被第7步改动(事务回滚验证)
+GET {{baseUrl}}/front/v1/wallet/balance
+Authorization: {{token}}
+
+> {%
+client.test("余额未被污染", function () {
+    client.assert(response.body.code === 0, response.body.message);
+    var expect = Number(client.global.get("balNow"));
+    client.assert(Math.abs(response.body.data.balance - expect) < 0.001,
+        "失败的扣款不能改变余额");
+});
+%}
+
+### 9. 后台全站流水按用户筛选
+GET {{baseUrl}}/backend/wallet/logs?user_id={{userId}}&page=1&size=20
+Authorization: {{adminToken}}
+
+> {%
+client.test("后台流水", function () {
+    client.assert(response.body.code === 0, response.body.message);
+    client.assert(response.body.data.total >= 2, "至少有加币+扣币两条");
+});
+%}
