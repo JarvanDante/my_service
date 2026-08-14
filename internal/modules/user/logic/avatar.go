@@ -15,8 +15,8 @@ import (
 
 // builtinAvatars 内置兜底头像(resource/public/avatar, 由 /static 静态目录提供)。
 var builtinAvatars = func() []string {
-	out := make([]string, 0, 48)
-	for i := 1; i <= 48; i++ {
+	out := make([]string, 0, 50)
+	for i := 1; i <= 50; i++ {
 		out = append(out, fmt.Sprintf("/static/avatar/av%02d.png", i))
 	}
 	return out
