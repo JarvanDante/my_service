@@ -1,0 +1,139 @@
+###############################################################################
+# 前台 · 凭证找回账号 端到端测试
+# 链路: 旧设备注册 → 后台取登录凭证(account_slat) → 新设备先自动注册出空壳号
+#       → 用凭证 restore → 账号换绑到新设备, 新设备再登录命中原账号
+# 用例可重复运行(每轮 restore 会把上一轮的占位账号挪走)
+###############################################################################
+
+@baseUrl = http://127.0.0.1:8000
+
+### 1. 超管登录(用后台拿凭证)
+POST {{baseUrl}}/backend/auth/login
+Content-Type: application/json
+
+{ "username": "admin", "password": "admin123" }
+
+> {%
+client.test("超管登录成功", function () {
+    client.assert(response.body.code === 0, "code 应为 0: " + response.body.message);
+});
+client.global.set("adminToken", response.body.data.token);
+%}
+
+### 2. 旧设备登录 —— 原账号(要被找回的那个)
+POST {{baseUrl}}/front/v1/user/login
+Content-Type: application/json
+
+{ "device_id": "e2e-restore-old", "device_type": "ios", "device_version": "1.0" }
+
+> {%
+client.test("原账号就绪", function () {
+    client.assert(response.body.code === 0, "code 应为 0: " + response.body.message);
+});
+client.global.set("oldUid", response.body.data.user.id);
+%}
+
+### 3. 后台查该用户 —— 拿登录凭证(登录二维码内容)
+GET {{baseUrl}}/backend/users?user_id={{oldUid}}&page=1&size=1
+Authorization: {{adminToken}}
+
+> {%
+client.test("拿到账号凭证", function () {
+    client.assert(response.body.code === 0, "code 应为 0: " + response.body.message);
+    var u = response.body.data.list[0];
+    client.assert(u && u.id === client.global.get("oldUid"), "应命中原账号");
+    client.assert(u.account_slat && u.account_slat.indexOf("==>") > 0, "account_slat 应为 username==>md5 格式");
+    client.global.set("credential", u.account_slat);
+});
+%}
+
+### 4. 新设备登录 —— 模拟重装后自动注册出的空壳号
+POST {{baseUrl}}/front/v1/user/login
+Content-Type: application/json
+
+{ "device_id": "e2e-restore-new", "device_type": "android", "device_version": "2.0" }
+
+> {%
+client.test("空壳号已生成(与原账号不同)", function () {
+    client.assert(response.body.code === 0, "code 应为 0: " + response.body.message);
+    client.assert(response.body.data.user.id !== client.global.get("oldUid"), "新设备应先注册出另一个账号");
+});
+%}
+
+### 5. 凭证找回 —— 账号换绑到新设备
+POST {{baseUrl}}/front/v1/user/restore
+Content-Type: application/json
+
+{ "credential": "{{credential}}", "device_id": "e2e-restore-new", "device_type": "android", "device_version": "2.0" }
+
+> {%
+client.test("找回成功且身份是原账号", function () {
+    client.assert(response.body.code === 0, "code 应为 0: " + response.body.message);
+    client.assert(response.body.data.token && response.body.data.token.length > 0, "应签发 token");
+    client.assert(response.body.data.user.id === client.global.get("oldUid"), "restore 应返回原账号");
+});
+%}
+
+### 6. 新设备再登录 —— 应直接命中原账号(换绑生效)
+POST {{baseUrl}}/front/v1/user/login
+Content-Type: application/json
+
+{ "device_id": "e2e-restore-new", "device_type": "android", "device_version": "2.0" }
+
+> {%
+client.test("换绑生效, 设备登录命中原账号", function () {
+    client.assert(response.body.code === 0, "code 应为 0: " + response.body.message);
+    client.assert(response.body.data.user.id === client.global.get("oldUid"), "新设备登录应返回原账号");
+});
+%}
+
+### 7. 伪造凭证 —— md5 对不上应被拒
+POST {{baseUrl}}/front/v1/user/restore
+Content-Type: application/json
+
+{ "credential": "device_e2e-restore-old==>00000000000000000000000000000000", "device_id": "e2e-restore-new" }
+
+> {%
+client.test("伪造凭证被拒", function () {
+    client.assert(response.body.code !== 0, "应报错: 凭证校验不通过");
+});
+%}
+
+### 8. 冻结原账号后找回应被拦截
+POST {{baseUrl}}/backend/users/{{oldUid}}/disable
+Authorization: {{adminToken}}
+Content-Type: application/json
+
+{ "op": "disable", "reason": "E2E 冻结拦截找回" }
+
+> {%
+client.test("冻结成功", function () {
+    client.assert(response.body.code === 0, "code 应为 0: " + response.body.message);
+});
+%}
+
+### 9. 冻结状态 restore —— 应被拒并透出原因
+POST {{baseUrl}}/front/v1/user/restore
+Content-Type: application/json
+
+{ "credential": "{{credential}}", "device_id": "e2e-restore-new" }
+
+> {%
+client.test("冻结账号不可找回", function () {
+    client.assert(response.body.code !== 0, "应报错");
+    client.assert(response.body.message.indexOf("E2E 冻结拦截找回") >= 0, "应透出冻结原因: " + response.body.message);
+});
+%}
+
+### 10. 解冻(用例可重复跑的关键)
+POST {{baseUrl}}/backend/users/{{oldUid}}/disable
+Authorization: {{adminToken}}
+Content-Type: application/json
+
+{ "op": "enable" }
+
+> {%
+client.test("解冻成功", function () {
+    client.assert(response.body.code === 0, "code 应为 0: " + response.body.message);
+});
+%}
