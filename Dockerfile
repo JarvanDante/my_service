@@ -14,5 +14,6 @@ RUN apt-get update \
 WORKDIR /app
 COPY --from=builder /out/myservice /app/myservice
 COPY manifest/config/config.docker.yaml /app/manifest/config/config.yaml
+COPY resource/public /app/resource/public
 EXPOSE 8000
 CMD ["/app/myservice"]

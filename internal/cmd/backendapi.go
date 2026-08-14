@@ -17,7 +17,7 @@ var BackendAPI = gcmd.Command{
 	Func: func(ctx context.Context, parser *gcmd.Parser) error {
 		s := g.Server("backendapi")
 		s.SetAddr(cfgAddr(ctx, "backendapi.address", ":8002"))
-		s.AddStaticPath("/static", "resource/public") // 内置静态资源(默认头像包等)
+		mountStatic(ctx, s)
 		s.Use(middleware.CORS, ghttp.MiddlewareHandlerResponse)
 		s.BindStatusHandler(404, middleware.NotFound)
 		s.BindHandler("/health", middleware.Health)
