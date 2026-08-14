@@ -3,6 +3,7 @@ package logic
 
 import (
 	"context"
+	"strings"
 
 	"github.com/gogf/gf/v2/errors/gerror"
 	"github.com/gogf/gf/v2/frame/g"
@@ -36,11 +37,19 @@ func (s *sUser) Login(ctx context.Context, in service.LoginInput) (*service.Logi
 		return nil, err
 	}
 	if u == nil {
-		// 自动注册
+		// 自动注册。用户名从设备号派生, 但设备可能曾被凭证找回换绑过 ——
+		// 原账号还占着 device_<id> 这个用户名, 撞唯一索引时追加随机后缀。
+		username := "device_" + in.DeviceId
+		if exist, e := s.repo.FindByAccount(ctx, username); e != nil {
+			return nil, e
+		} else if exist != nil {
+			username = username + "_" + grand.S(4)
+		}
 		now := gtime.Now()
 		id, err := s.repo.Create(ctx, g.Map{
-			"username":       "device_" + in.DeviceId,
-			"nickname":       "用户" + grand.Digits(6),
+			"username":       username,
+			"nickname":       randNickname(),
+			"img":            randAvatar(ctx),
 			"slat":           grand.S(8),
 			"device_id":      in.DeviceId,
 			"device_type":    in.DeviceType,
@@ -77,6 +86,50 @@ func (s *sUser) Login(ctx context.Context, in service.LoginInput) (*service.Logi
 		Token: token,
 		User:  toUserInfo(u),
 	}, nil
+}
+
+// Restore 凭证找回账号(公开): 校验 username==>md5(username_appid) 凭证,
+// 通过后把账号换绑到当前设备并签发 token。重装后自动注册的空壳号会被让位(见 RebindDevice)。
+func (s *sUser) Restore(ctx context.Context, in service.RestoreInput) (*service.LoginDTO, error) {
+	cred := strings.TrimSpace(in.Credential)
+	if cred == "" || in.DeviceId == "" {
+		return nil, gerror.New("凭证与设备号不能为空")
+	}
+	parts := strings.SplitN(cred, "==>", 2)
+	if len(parts) != 2 || parts[0] == "" || parts[1] == "" {
+		return nil, gerror.New("凭证格式不正确")
+	}
+	username := parts[0]
+	u, err := s.repo.FindByAccount(ctx, username)
+	if err != nil {
+		return nil, err
+	}
+	if u == nil || u.Username != username {
+		return nil, gerror.New("凭证无效: 账号不存在")
+	}
+	// 与后台登录二维码同一套算法核验, 防止仅凭用户名冒领
+	expect := buildAccountSlat(ctx, u.Username, u.SiteId, nil)
+	if expect == "" || !strings.EqualFold(expect, username+"==>"+parts[1]) {
+		return nil, gerror.New("凭证无效: 校验不通过")
+	}
+	if u.IsDisabled == 1 {
+		msg := u.ErrorMsg
+		if msg == "" {
+			msg = "账号已被禁用"
+		}
+		return nil, gerror.New(msg)
+	}
+	if err = s.repo.RebindDevice(ctx, u.Id, in.DeviceId, in.DeviceType, in.DeviceVersion, in.Ip); err != nil {
+		return nil, err
+	}
+	if u, err = s.repo.FindById(ctx, u.Id); err != nil {
+		return nil, err
+	}
+	token, err := kit.IssueToken(ctx, u.Id)
+	if err != nil {
+		return nil, err
+	}
+	return &service.LoginDTO{Token: token, User: toUserInfo(u)}, nil
 }
 
 // Info 当前用户详情。

@@ -15,13 +15,13 @@ import (
 func RegisterFront(group *ghttp.RouterGroup, repo domain.Repository) {
 	ctrl := front.New(logic.New(repo))
 	// 公开接口(无需 token)
-	group.Bind(ctrl.Login)
+	group.Bind(ctrl.Login, ctrl.Restore)
 	// 需登录接口
 	group.Group("/", func(auth *ghttp.RouterGroup) {
 		auth.Middleware(middleware.Auth, middleware.UserRateLimit)
 		auth.Bind(
 			ctrl.Info, ctrl.Logout, ctrl.Refresh, ctrl.BindPhone,
-			ctrl.Home, ctrl.Update, ctrl.Images, ctrl.Find,
+			ctrl.Home, ctrl.Update, ctrl.Images, ctrl.Find, ctrl.Avatars,
 			ctrl.DoFollow, ctrl.Follows, ctrl.Fans,
 			ctrl.BindParent, ctrl.BindCode, ctrl.Redeem, ctrl.CodeLogs,
 			ctrl.Share, ctrl.ShareLogs, ctrl.ShareReport,

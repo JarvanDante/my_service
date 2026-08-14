@@ -42,6 +42,27 @@ func (c *Controller) Login(ctx context.Context, req *v1.LoginReq) (res *v1.Login
 	return &v1.LoginRes{Token: dto.Token, User: toApiUser(ctx, dto.User)}, nil
 }
 
+// Avatars 需登录: 默认头像列表。
+func (c *Controller) Avatars(ctx context.Context, req *v1.AvatarsReq) (res *v1.AvatarsRes, err error) {
+	return &v1.AvatarsRes{List: c.user.DefaultAvatars(ctx)}, nil
+}
+
+// Restore 公开: 凭证找回账号。
+func (c *Controller) Restore(ctx context.Context, req *v1.RestoreReq) (res *v1.RestoreRes, err error) {
+	r := ghttp.RequestFromCtx(ctx)
+	dto, err := c.user.Restore(ctx, service.RestoreInput{
+		Credential:    req.Credential,
+		DeviceId:      req.DeviceId,
+		DeviceType:    req.DeviceType,
+		DeviceVersion: req.DeviceVersion,
+		Ip:            r.GetClientIp(),
+	})
+	if err != nil {
+		return nil, err
+	}
+	return &v1.RestoreRes{Token: dto.Token, User: toApiUser(ctx, dto.User)}, nil
+}
+
 // Info 需登录。
 func (c *Controller) Info(ctx context.Context, req *v1.InfoReq) (res *v1.InfoRes, err error) {
 	id, err := uid(ctx)

@@ -95,6 +95,17 @@ type DisableReq struct {
 }
 type DisableRes struct{}
 
+// 批量冻结 / 解冻(对齐公司后台用户列表的批量操作)
+type BatchDisableReq struct {
+	g.Meta `path:"/users/batch-disable" method:"post" tags:"Backend/User" summary:"批量冻结/解冻用户(后台)"`
+	Ids    []int64 `json:"ids" v:"required#用户ID列表必填"`
+	Op     string  `json:"op"  v:"required|in:disable,enable#操作必填|op 仅支持 disable/enable"`
+	Reason string  `json:"reason"` // 冻结原因(op=disable 时可填, 前台登录时透出)
+}
+type BatchDisableRes struct {
+	Affected int `json:"affected"` // 实际变更行数
+}
+
 // 调整用户组 / VIP 到期
 type GroupReq struct {
 	g.Meta       `path:"/users/{id}/group" method:"post" tags:"Backend/User" summary:"调整用户组(后台)"`

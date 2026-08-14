@@ -62,6 +62,19 @@ func String(ctx context.Context, key, def string) string {
 	return v
 }
 
+// StringSlice 取字符串数组配置(如默认头像列表)。
+func StringSlice(ctx context.Context, key string, def []string) []string {
+	s := raw(ctx, key)
+	if s == "" {
+		return def
+	}
+	var v []string
+	if err := json.Unmarshal([]byte(s), &v); err != nil || len(v) == 0 {
+		return def
+	}
+	return v
+}
+
 // Bool 取布尔配置(如提现开关)。
 func Bool(ctx context.Context, key string, def bool) bool {
 	s := raw(ctx, key)

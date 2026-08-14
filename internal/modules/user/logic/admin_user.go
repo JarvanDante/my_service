@@ -77,6 +77,25 @@ func (s *sUser) AdminSetDisabled(ctx context.Context, id int64, disable bool, re
 	return s.repo.SetDisabled(ctx, id, flag, reason)
 }
 
+// AdminBatchSetDisabled 批量冻结/解冻, 返回实际变更人数。
+func (s *sUser) AdminBatchSetDisabled(ctx context.Context, ids []int64, disable bool, reason string) (int, error) {
+	if len(ids) == 0 {
+		return 0, gerror.New("用户ID列表不能为空")
+	}
+	if len(ids) > 500 {
+		return 0, gerror.New("单次最多操作500个用户")
+	}
+	flag := 0
+	if disable {
+		flag = 1
+		if reason == "" {
+			reason = "后台批量冻结"
+		}
+	}
+	n, err := s.repo.SetDisabledBatch(ctx, ids, flag, reason)
+	return int(n), err
+}
+
 func (s *sUser) AdminSetGroup(ctx context.Context, in service.AdminSetGroupInput) error {
 	if in.UserId <= 0 {
 		return gerror.New("用户ID无效")

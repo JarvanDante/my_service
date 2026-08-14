@@ -10,6 +10,15 @@ type LoginInput struct {
 	Ip            string
 }
 
+// RestoreInput 凭证找回账号(公开)。
+type RestoreInput struct {
+	Credential    string // 登录二维码内容 username==>md5(username_appid)
+	DeviceId      string
+	DeviceType    string
+	DeviceVersion string
+	Ip            string
+}
+
 // UserInfoDTO 当前用户详情(含私密字段)。
 type UserInfoDTO struct {
 	Id        int64
@@ -431,6 +440,7 @@ type UserDTO struct {
 type IUser interface {
 	// 认证
 	Login(ctx context.Context, in LoginInput) (*LoginDTO, error)
+	Restore(ctx context.Context, in RestoreInput) (*LoginDTO, error)
 	Logout(ctx context.Context, userId int64) error
 	Refresh(ctx context.Context, userId int64) (string, error)
 	// 资料
@@ -438,6 +448,7 @@ type IUser interface {
 	Home(ctx context.Context, viewerId, homeId int64) (*HomeDTO, error)
 	UpdateProfile(ctx context.Context, userId int64, in UpdateProfileInput) error
 	Images(ctx context.Context, userId int64) ([]string, error)
+	DefaultAvatars(ctx context.Context) []string
 	FindByAccount(ctx context.Context, account string) (*PublicUserDTO, error)
 	BindPhone(ctx context.Context, userId int64, phone, code string) error
 	// 社交
@@ -477,6 +488,7 @@ type IUser interface {
 	AdminListUsers(ctx context.Context, in AdminUserListInput) (*AdminUserListDTO, error)
 	AdminUserDetail(ctx context.Context, id int64) (*AdminUserDetailDTO, error)
 	AdminSetDisabled(ctx context.Context, id int64, disable bool, reason string) error
+	AdminBatchSetDisabled(ctx context.Context, ids []int64, disable bool, reason string) (int, error)
 	AdminSetGroup(ctx context.Context, in AdminSetGroupInput) error
 	AdminAdjustBalance(ctx context.Context, in AdminAdjustBalanceInput) error
 	AdminBalanceLogs(ctx context.Context, userId int64, page, size int) ([]*BalanceLogDTO, int, error)

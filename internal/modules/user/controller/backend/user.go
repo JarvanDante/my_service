@@ -70,6 +70,14 @@ func (c *Controller) Disable(ctx context.Context, req *v1.DisableReq) (res *v1.D
 }
 
 // Group 调整用户组。
+func (c *Controller) BatchDisable(ctx context.Context, req *v1.BatchDisableReq) (res *v1.BatchDisableRes, err error) {
+	n, err := c.user.AdminBatchSetDisabled(ctx, req.Ids, req.Op == "disable", req.Reason)
+	if err != nil {
+		return nil, err
+	}
+	return &v1.BatchDisableRes{Affected: n}, nil
+}
+
 func (c *Controller) Group(ctx context.Context, req *v1.GroupReq) (res *v1.GroupRes, err error) {
 	if err = c.user.AdminSetGroup(ctx, service.AdminSetGroupInput{
 		UserId: req.Id, GroupId: req.GroupId, GroupName: req.GroupName,

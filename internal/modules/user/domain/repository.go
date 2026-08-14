@@ -83,6 +83,9 @@ type Repository interface {
 	// 后台管理(B1)
 	AdminListUsers(ctx context.Context, f AdminUserFilter, page, size int) ([]*entity.Users, int, error)
 	SetDisabled(ctx context.Context, id int64, disabled int, reason string) error
+	SetDisabledBatch(ctx context.Context, ids []int64, disabled int, reason string) (int64, error)
+	// RebindDevice 把账号换绑到新设备(凭证找回): 同一事务内释放该设备上的其他账号并更新登录轨迹。
+	RebindDevice(ctx context.Context, userId int64, deviceId, deviceType, deviceVersion, ip string) error
 	UpdateGroup(ctx context.Context, id, groupId int64, groupName string, groupRate int, groupEndTime int64) error
 	AdminAdjustBalance(ctx context.Context, userId int64, target string, amount float64, refId, remark string) error
 	BalanceLogs(ctx context.Context, userId int64, page, size int) ([]*entity.UserBalanceLog, int, error)

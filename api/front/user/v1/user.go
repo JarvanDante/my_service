@@ -33,6 +33,20 @@ type LoginRes struct {
 	User  UserInfo `json:"user"`
 }
 
+// 找回账号(公开): 用账号凭证(登录二维码内容 username==>md5)把账号换绑到当前设备并登录。
+// 场景: 用户卸载重装/换机后, 扫码或粘贴之前保存的凭证恢复原账号。
+type RestoreReq struct {
+	g.Meta        `path:"/user/restore" method:"post" tags:"Front/User" summary:"凭证找回账号"`
+	Credential    string `json:"credential"  v:"required#账号凭证必填"`
+	DeviceId      string `json:"device_id"   v:"required#设备号必填"`
+	DeviceType    string `json:"device_type"`
+	DeviceVersion string `json:"device_version"`
+}
+type RestoreRes struct {
+	Token string   `json:"token"`
+	User  UserInfo `json:"user"`
+}
+
 // 个人信息(需登录)
 type InfoReq struct {
 	g.Meta `path:"/user/info" method:"get" tags:"Front/User" summary:"个人信息"`
@@ -99,6 +113,14 @@ type UpdateReq struct {
 	Sex       int    `json:"sex" v:"in:0,1,2#性别不合法"`
 }
 type UpdateRes struct{}
+
+// 默认头像列表(需登录, 改资料时供用户挑选)
+type AvatarsReq struct {
+	g.Meta `path:"/user/avatars" method:"get" tags:"Front/User" summary:"默认头像列表"`
+}
+type AvatarsRes struct {
+	List []string `json:"list"`
+}
 
 // 用户图片(需登录)
 type ImagesReq struct {

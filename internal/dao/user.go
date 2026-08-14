@@ -8,6 +8,7 @@ import (
 	"github.com/gogf/gf/v2/errors/gerror"
 	"github.com/gogf/gf/v2/frame/g"
 	"github.com/gogf/gf/v2/os/gtime"
+	"github.com/gogf/gf/v2/util/gconv"
 
 	"github.com/JarvanDante/my_service/internal/model/entity"
 	"github.com/JarvanDante/my_service/internal/modules/user/domain"
@@ -636,6 +637,59 @@ func (r *userRepo) SetDisabled(ctx context.Context, id int64, disabled int, reas
 		"error_msg":   reason,
 	}).Update()
 	return err
+}
+
+// SetDisabledBatch 批量冻结(1)/解冻(0), 返回实际变更行数。解冻时清空禁用原因。
+// 只更新状态确实需要变化的行(WHERE is_disabled <> ?), 幂等且计数真实。
+func (r *userRepo) SetDisabledBatch(ctx context.Context, ids []int64, disabled int, reason string) (int64, error) {
+	if len(ids) == 0 {
+		return 0, nil
+	}
+	if disabled == 0 {
+		reason = ""
+	}
+	res, err := g.Model("users").Ctx(ctx).
+		WhereIn("id", ids).
+		Where("is_disabled <> ?", disabled).
+		Data(g.Map{"is_disabled": disabled, "error_msg": reason}).
+		Update()
+	if err != nil {
+		return 0, err
+	}
+	n, _ := res.RowsAffected()
+	return n, nil
+}
+
+// RebindDevice 凭证找回: 账号换绑到新设备。
+// 同一事务内先把当前占用该设备号的其他账号(通常是重装后自动注册的空壳号)挪走,
+// 保证之后的设备登录唯一命中被找回的账号; 再绑定并更新登录轨迹。
+func (r *userRepo) RebindDevice(ctx context.Context, userId int64, deviceId, deviceType, deviceVersion, ip string) error {
+	return g.DB().Transaction(ctx, func(ctx context.Context, tx gdb.TX) error {
+		// 释放同设备的其他账号: device_id 改成可追溯的占位值, 不删数据
+		_, err := tx.Model("users").Ctx(ctx).
+			Where("device_id", deviceId).WhereNot("id", userId).
+			Data(g.Map{"device_id": gdb.Raw("'moved_' || id || '_' || device_id")}).
+			Update()
+		if err != nil {
+			return err
+		}
+		now := gtime.Now()
+		data := g.Map{
+			"device_id":     deviceId,
+			"last_login_at": now,
+			"last_date":     gconv.Int(now.Format("Ymd")),
+			"last_ip":       ip,
+			"login_num":     &gdb.Counter{Field: "login_num", Value: 1},
+		}
+		if deviceType != "" {
+			data["device_type"] = deviceType
+		}
+		if deviceVersion != "" {
+			data["device_version"] = deviceVersion
+		}
+		_, err = tx.Model("users").Ctx(ctx).Where("id", userId).Data(data).Update()
+		return err
+	})
 }
 
 // UpdateGroup 调整用户组快照字段(组定义表 B4 再建)。

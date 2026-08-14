@@ -202,3 +202,83 @@ client.test("op 非法被拒", function () {
     client.assert(response.body.code !== 0, "应报错: op 仅支持 disable/enable");
 });
 %}
+
+### 16. 再造第二个测试用户(批量操作素材)
+POST {{baseUrl}}/front/v1/user/login
+Content-Type: application/json
+
+{ "device_id": "e2e-b1-user2", "device_type": "android", "device_version": "1.0" }
+
+> {%
+client.test("第二个用户就绪", function () {
+    client.assert(response.body.code === 0, "code 应为 0: " + response.body.message);
+});
+client.global.set("uid2", response.body.data.user.id);
+%}
+
+### 17. 批量冻结两个用户
+POST {{baseUrl}}/backend/users/batch-disable
+Authorization: {{adminToken}}
+Content-Type: application/json
+
+{ "ids": [{{uid}}, {{uid2}}], "op": "disable", "reason": "E2E 批量冻结" }
+
+> {%
+client.test("批量冻结成功且计数为2", function () {
+    client.assert(response.body.code === 0, "code 应为 0: " + response.body.message);
+    client.assert(response.body.data.affected === 2, "应变更2人, 实际: " + response.body.data.affected);
+});
+%}
+
+### 18. 重复冻结 —— 幂等, 计数应为0
+POST {{baseUrl}}/backend/users/batch-disable
+Authorization: {{adminToken}}
+Content-Type: application/json
+
+{ "ids": [{{uid}}, {{uid2}}], "op": "disable", "reason": "E2E 批量冻结" }
+
+> {%
+client.test("重复冻结计数为0", function () {
+    client.assert(response.body.code === 0, "code 应为 0: " + response.body.message);
+    client.assert(response.body.data.affected === 0, "已冻结的不应重复计数, 实际: " + response.body.data.affected);
+});
+%}
+
+### 19. 详情确认 —— 批量冻结生效且原因记录
+GET {{baseUrl}}/backend/users/{{uid2}}
+Authorization: {{adminToken}}
+
+> {%
+client.test("批量冻结生效", function () {
+    client.assert(response.body.code === 0, "code 应为 0");
+    client.assert(response.body.data.is_disabled === 1, "应已冻结");
+    client.assert(response.body.data.error_msg === "E2E 批量冻结", "冻结原因应记录");
+});
+%}
+
+### 20. 批量解冻(用例可重复跑的关键)
+POST {{baseUrl}}/backend/users/batch-disable
+Authorization: {{adminToken}}
+Content-Type: application/json
+
+{ "ids": [{{uid}}, {{uid2}}], "op": "enable" }
+
+> {%
+client.test("批量解冻成功且计数为2", function () {
+    client.assert(response.body.code === 0, "code 应为 0: " + response.body.message);
+    client.assert(response.body.data.affected === 2, "应变更2人, 实际: " + response.body.data.affected);
+});
+%}
+
+### 21. 空列表 —— 校验拦截
+POST {{baseUrl}}/backend/users/batch-disable
+Authorization: {{adminToken}}
+Content-Type: application/json
+
+{ "ids": [], "op": "disable" }
+
+> {%
+client.test("空ID列表被拒", function () {
+    client.assert(response.body.code !== 0, "应报错: 用户ID列表必填");
+});
+%}

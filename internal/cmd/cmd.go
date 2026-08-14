@@ -26,6 +26,7 @@ var Main = gcmd.Command{
 	Brief: "漫隐 API · 一体化开发入口",
 	Func: func(ctx context.Context, parser *gcmd.Parser) error {
 		s := g.Server()
+		s.AddStaticPath("/static", "resource/public") // 内置静态资源(默认头像包等)
 		s.Use(middleware.CORS, ghttp.MiddlewareHandlerResponse)
 		s.BindStatusHandler(404, middleware.NotFound)
 		s.BindHandler("/health", middleware.Health)
