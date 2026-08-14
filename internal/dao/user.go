@@ -756,9 +756,37 @@ func (r *userRepo) BalanceLogs(ctx context.Context, userId int64, page, size int
 
 // ==================== 用户组定义(B4) ====================
 
-func (r *userRepo) GroupList(ctx context.Context) ([]*entity.UserGroup, error) {
+func groupData(ug *entity.UserGroup) g.Map {
+	return g.Map{
+		"name":              ug.Name,
+		"rate":              ug.Rate,
+		"rights":            ug.Rights,
+		"remark":            ug.Remark,
+		"sort":              ug.Sort,
+		"status":            ug.Status,
+		"img":               ug.Img,
+		"title_heat":        ug.TitleHeat,
+		"title_description": ug.TitleDescription,
+		"title_picture":     ug.TitlePicture,
+		"level":             ug.Level,
+		"promotion_type":    ug.PromotionType,
+		"price":             ug.Price,
+		"old_price":         ug.OldPrice,
+		"day_num":           ug.DayNum,
+		"gift_num":          ug.GiftNum,
+		"download_num":      ug.DownloadNum,
+		"day_tips":          ug.DayTips,
+		"price_tips":        ug.PriceTips,
+	}
+}
+
+func (r *userRepo) GroupList(ctx context.Context, name string) ([]*entity.UserGroup, error) {
+	m := g.Model("user_group").Ctx(ctx)
+	if name != "" {
+		m = m.WhereLike("name", "%"+name+"%")
+	}
 	var list []*entity.UserGroup
-	err := g.Model("user_group").Ctx(ctx).Order("sort asc, id asc").Scan(&list)
+	err := m.Order("sort asc, id asc").Scan(&list)
 	return list, err
 }
 
@@ -769,10 +797,7 @@ func (r *userRepo) GroupFind(ctx context.Context, id int64) (*entity.UserGroup, 
 }
 
 func (r *userRepo) GroupCreate(ctx context.Context, ug *entity.UserGroup) (int64, error) {
-	res, err := g.Model("user_group").Ctx(ctx).Data(g.Map{
-		"name": ug.Name, "rate": ug.Rate, "rights": ug.Rights,
-		"remark": ug.Remark, "sort": ug.Sort, "status": ug.Status,
-	}).Insert()
+	res, err := g.Model("user_group").Ctx(ctx).Data(groupData(ug)).Insert()
 	if err != nil {
 		return 0, err
 	}
@@ -782,11 +807,9 @@ func (r *userRepo) GroupCreate(ctx context.Context, ug *entity.UserGroup) (int64
 // GroupUpdate 更新组定义, 并同步该组所有用户的快照字段(name/rate)。
 func (r *userRepo) GroupUpdate(ctx context.Context, ug *entity.UserGroup) error {
 	return g.DB().Transaction(ctx, func(ctx context.Context, tx gdb.TX) error {
-		if _, err := tx.Model("user_group").Ctx(ctx).Where("id", ug.Id).Data(g.Map{
-			"name": ug.Name, "rate": ug.Rate, "rights": ug.Rights,
-			"remark": ug.Remark, "sort": ug.Sort, "status": ug.Status,
-			"updated_at": gtime.Now(),
-		}).Update(); err != nil {
+		data := groupData(ug)
+		data["updated_at"] = gtime.Now()
+		if _, err := tx.Model("user_group").Ctx(ctx).Where("id", ug.Id).Data(data).Update(); err != nil {
 			return err
 		}
 		_, err := tx.Model("users").Ctx(ctx).Where("group_id", ug.Id).Data(g.Map{

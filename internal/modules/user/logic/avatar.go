@@ -15,8 +15,8 @@ import (
 
 // builtinAvatars 内置兜底头像(resource/public/avatar, 由 /static 静态目录提供)。
 var builtinAvatars = func() []string {
-	out := make([]string, 0, 50)
-	for i := 1; i <= 50; i++ {
+	out := make([]string, 0, 48)
+	for i := 1; i <= 48; i++ {
 		out = append(out, fmt.Sprintf("/static/avatar/av%02d.png", i))
 	}
 	return out
@@ -25,6 +25,25 @@ var builtinAvatars = func() []string {
 // avatarPool 当前生效的默认头像池: 配置优先, 内置兜底。
 func avatarPool(ctx context.Context) []string {
 	return appcfg.StringSlice(ctx, "default_avatars", builtinAvatars)
+}
+
+// builtinBackgrounds 内置兜底主页背景(resource/public/bg, 16 张渐变图)。
+var builtinBackgrounds = func() []string {
+	out := make([]string, 0, 16)
+	for i := 1; i <= 16; i++ {
+		out = append(out, fmt.Sprintf("/static/bg/bg%02d.jpg", i))
+	}
+	return out
+}()
+
+// randBackground 注册用: 随机取一张默认主页背景(配置 default_backgrounds 优先)。
+// 对齐公司 getUserbackGround() 的做法。
+func randBackground(ctx context.Context) string {
+	pool := appcfg.StringSlice(ctx, "default_backgrounds", builtinBackgrounds)
+	if len(pool) == 0 {
+		return ""
+	}
+	return pool[grand.Intn(len(pool))]
 }
 
 // DefaultAvatars 默认头像列表(前台改资料时挑选, 对齐公司 /user/avatar 接口)。

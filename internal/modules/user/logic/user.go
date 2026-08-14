@@ -50,6 +50,7 @@ func (s *sUser) Login(ctx context.Context, in service.LoginInput) (*service.Logi
 			"username":       username,
 			"nickname":       randNickname(),
 			"img":            randAvatar(ctx),
+			"bg_img":         randBackground(ctx),
 			"slat":           grand.S(8),
 			"device_id":      in.DeviceId,
 			"device_type":    in.DeviceType,

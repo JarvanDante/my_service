@@ -324,23 +324,50 @@ type BalanceLogDTO struct {
 // ---- B4 用户组定义 ----
 
 type UserGroupDTO struct {
-	Id     int64
-	Name   string
-	Rate   int
-	Rights string
-	Remark string
-	Sort   int
-	Status int
+	Id               int64
+	Name             string
+	Rate             int
+	Rights           string
+	Remark           string
+	Sort             int
+	Status           int
+	Img              string
+	TitleHeat        string
+	TitleDescription string
+	TitlePicture     string
+	Level            int
+	PromotionType    int
+	Price            float64
+	OldPrice         float64
+	DayNum           int
+	GiftNum          int
+	DownloadNum      int
+	DayTips          string
+	PriceTips        string
+	UpdatedAt        string
 }
 
 type UserGroupInput struct {
-	Id     int64 // 更新时用
-	Name   string
-	Rate   int
-	Rights string
-	Remark string
-	Sort   int
-	Status int
+	Id               int64
+	Name             string
+	Rate             int
+	Rights           string
+	Remark           string
+	Sort             int
+	Status           int
+	Img              string
+	TitleHeat        string
+	TitleDescription string
+	TitlePicture     string
+	Level            int
+	PromotionType    int
+	Price            float64
+	OldPrice         float64
+	DayNum           int
+	GiftNum          int
+	DownloadNum      int
+	DayTips          string
+	PriceTips        string
 }
 
 // ---- B5 成长配置 ----
@@ -493,7 +520,7 @@ type IUser interface {
 	AdminAdjustBalance(ctx context.Context, in AdminAdjustBalanceInput) error
 	AdminBalanceLogs(ctx context.Context, userId int64, page, size int) ([]*BalanceLogDTO, int, error)
 	// 后台(B4 用户组定义)
-	AdminGroups(ctx context.Context) ([]*UserGroupDTO, error)
+	AdminGroups(ctx context.Context, name string) ([]*UserGroupDTO, error)
 	AdminCreateGroup(ctx context.Context, in UserGroupInput) (int64, error)
 	AdminUpdateGroup(ctx context.Context, in UserGroupInput) error
 	AdminDeleteGroup(ctx context.Context, id int64) error

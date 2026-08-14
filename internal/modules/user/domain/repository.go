@@ -90,7 +90,7 @@ type Repository interface {
 	AdminAdjustBalance(ctx context.Context, userId int64, target string, amount float64, refId, remark string) error
 	BalanceLogs(ctx context.Context, userId int64, page, size int) ([]*entity.UserBalanceLog, int, error)
 	// 用户组定义(B4)
-	GroupList(ctx context.Context) ([]*entity.UserGroup, error)
+	GroupList(ctx context.Context, name string) ([]*entity.UserGroup, error)
 	GroupFind(ctx context.Context, id int64) (*entity.UserGroup, error)
 	GroupCreate(ctx context.Context, g *entity.UserGroup) (int64, error)
 	GroupUpdate(ctx context.Context, g *entity.UserGroup) error

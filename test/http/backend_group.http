@@ -23,7 +23,7 @@ POST {{baseUrl}}/backend/user-groups
 Authorization: {{adminToken}}
 Content-Type: application/json
 
-{ "name": "E2E黄金会员", "rate": 85, "rights": "{\"ad_free\": true}", "remark": "E2E", "sort": 99, "status": 1 }
+{ "name": "E2E黄金会员", "rate": 85, "day_num": 30, "level": 1, "rights": "{\"ad_free\": true}", "remark": "E2E", "sort": 99, "status": 1 }
 
 > {%
 client.test("创建组成功", function () {
@@ -50,11 +50,11 @@ POST {{baseUrl}}/backend/user-groups
 Authorization: {{adminToken}}
 Content-Type: application/json
 
-{ "name": "坏组", "rate": 120 }
+{ "name": "坏组", "rate": 120, "day_num": 30 }
 
 > {%
 client.test("折扣越界被拒", function () {
-    client.assert(response.body.code !== 0, "应报错: 折扣须在0~100");
+    client.assert(response.body.code !== 0, "应报错: 折扣须在-2~100");
 });
 %}
 
@@ -114,7 +114,7 @@ PUT {{baseUrl}}/backend/user-groups/{{gid}}
 Authorization: {{adminToken}}
 Content-Type: application/json
 
-{ "name": "E2E铂金会员", "rate": 80, "rights": "{\"ad_free\": true}", "remark": "E2E改", "sort": 99, "status": 1 }
+{ "name": "E2E铂金会员", "rate": 80, "day_num": 30, "level": 1, "rights": "{\"ad_free\": true}", "remark": "E2E改", "sort": 99, "status": 1 }
 
 > {%
 client.test("更新组成功", function () {
