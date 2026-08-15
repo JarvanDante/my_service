@@ -11,11 +11,6 @@ import (
 	"github.com/JarvanDante/my_service/internal/modules/user/service"
 )
 
-var userLevelText = map[int]string{
-	1: "普通",
-	2: "普通+暗网",
-}
-
 var promotionTypeText = map[int]string{
 	0: "正常价格",
 	1: "新人专享",
@@ -49,12 +44,6 @@ func checkGroup(in service.UserGroupInput) error {
 	if in.DayNum < 1 {
 		return gerror.New("可用天数必须大于0")
 	}
-	if in.Level == 0 {
-		in.Level = 1
-	}
-	if _, ok := userLevelText[in.Level]; !ok {
-		return gerror.New("等级配置错误")
-	}
 	if _, ok := promotionTypeText[in.PromotionType]; !ok {
 		return gerror.New("促销类型配置错误")
 	}
@@ -69,10 +58,6 @@ func toGroupEntity(in service.UserGroupInput) *entity.UserGroup {
 	if rights == "" {
 		rights = "[]"
 	}
-	level := in.Level
-	if level == 0 {
-		level = 1
-	}
 	return &entity.UserGroup{
 		Id:               in.Id,
 		Name:             in.Name,
@@ -85,7 +70,7 @@ func toGroupEntity(in service.UserGroupInput) *entity.UserGroup {
 		TitleHeat:        in.TitleHeat,
 		TitleDescription: in.TitleDescription,
 		TitlePicture:     in.TitlePicture,
-		Level:            level,
+		Level:            1,
 		PromotionType:    in.PromotionType,
 		Price:            in.Price,
 		OldPrice:         in.OldPrice,
