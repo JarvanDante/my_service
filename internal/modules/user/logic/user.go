@@ -37,8 +37,8 @@ func (s *sUser) Login(ctx context.Context, in service.LoginInput) (*service.Logi
 		return nil, err
 	}
 	if u == nil {
-		// 自动注册。用户名从设备号派生, 但设备可能曾被凭证找回换绑过 ——
-		// 原账号还占着 device_<id> 这个用户名, 撞唯一索引时追加随机后缀。
+		// 自动注册。username 先用设备号占位避免撞唯一索引, 拿到自增 id 后再
+		// 写成 dm 风格公开编号(encodeUserId); 设备可能曾被凭证找回换绑过。
 		username := "device_" + in.DeviceId
 		if exist, e := s.repo.FindByAccount(ctx, username); e != nil {
 			return nil, e
@@ -79,6 +79,7 @@ func (s *sUser) Login(ctx context.Context, in service.LoginInput) (*service.Logi
 		}
 		_ = s.repo.UpdateLoginInfo(ctx, u.Id, in.Ip)
 	}
+	u = s.ensureEncodedUsername(ctx, u)
 	token, err := kit.IssueToken(ctx, u.Id)
 	if err != nil {
 		return nil, err
@@ -126,6 +127,7 @@ func (s *sUser) Restore(ctx context.Context, in service.RestoreInput) (*service.
 	if u, err = s.repo.FindById(ctx, u.Id); err != nil {
 		return nil, err
 	}
+	u = s.ensureEncodedUsername(ctx, u)
 	token, err := kit.IssueToken(ctx, u.Id)
 	if err != nil {
 		return nil, err
@@ -142,6 +144,7 @@ func (s *sUser) Info(ctx context.Context, userId int64) (*service.UserInfoDTO, e
 	if u == nil {
 		return nil, gerror.New("用户不存在")
 	}
+	u = s.ensureEncodedUsername(ctx, u)
 	return toUserInfo(u), nil
 }
 
@@ -161,9 +164,13 @@ func (s *sUser) DisableUser(ctx context.Context, id int64) error {
 }
 
 func toUserInfo(u *entity.Users) *service.UserInfoDTO {
+	username := kit.EncodeUserId(u.Id)
+	if username == "" {
+		username = u.Username
+	}
 	return &service.UserInfoDTO{
 		Id:           u.Id,
-		Username:     u.Username,
+		Username:     username,
 		Nickname:     u.Nickname,
 		Phone:        u.Phone,
 		Img:          u.Img,
@@ -180,6 +187,24 @@ func toUserInfo(u *entity.Users) *service.UserInfoDTO {
 		ChannelName:  u.ChannelName,
 		GroupEndTime: u.GroupEndTime,
 	}
+}
+
+// ensureEncodedUsername 把 username 回写成 dm 风格公开编号(encodeUserId)。
+// 旧账号仍是 device_* 时, 登录/拉资料顺带迁移, 邀请码与前台编号一致。
+func (s *sUser) ensureEncodedUsername(ctx context.Context, u *entity.Users) *entity.Users {
+	if u == nil {
+		return u
+	}
+	code := kit.EncodeUserId(u.Id)
+	if code == "" || u.Username == code {
+		return u
+	}
+	if err := s.repo.UpdateProfile(ctx, u.Id, g.Map{"username": code}); err != nil {
+		g.Log().Warningf(ctx, "回写用户编号失败 id=%d: %v", u.Id, err)
+		return u
+	}
+	u.Username = code
+	return u
 }
 
 // Logout 退出登录: 撤销当前会话 token。
@@ -392,12 +417,24 @@ func (s *sUser) BindParent(ctx context.Context, userId int64, account string) er
 		return err
 	}
 	if inviter == nil {
+		if uid := kit.DecodeUserId(account); uid > 0 {
+			inviter, err = s.repo.FindById(ctx, uid)
+			if err != nil {
+				return err
+			}
+		}
+	}
+	if inviter == nil {
 		return gerror.New("推荐人不存在")
 	}
 	if inviter.Id == userId {
 		return gerror.New("不能绑定自己")
 	}
-	return s.repo.BindInviter(ctx, userId, inviter.Id, inviter.Username)
+	parentName := kit.EncodeUserId(inviter.Id)
+	if parentName == "" {
+		parentName = inviter.Username
+	}
+	return s.repo.BindInviter(ctx, userId, inviter.Id, parentName)
 }
 
 // RedeemCode 使用兑换码。
@@ -467,10 +504,14 @@ func (s *sUser) ShareInfo(ctx context.Context, userId int64) (*service.ShareDTO,
 	if me == nil {
 		return nil, gerror.New("用户不存在")
 	}
+	code := kit.EncodeUserId(me.Id)
+	if code == "" {
+		code = me.Username
+	}
 	// TODO: 域名从配置读取, 海报图后续接图片服务
 	return &service.ShareDTO{
-		ShareCode: me.Username,
-		ShareUrl:  "https://example.com/share?code=" + me.Username,
+		ShareCode: code,
+		ShareUrl:  "https://example.com/share?code=" + code,
 		ShareNum:  me.ShareNum,
 	}, nil
 }
