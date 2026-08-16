@@ -11,6 +11,7 @@ import (
 	"github.com/gogf/gf/v2/util/gconv"
 	"github.com/gogf/gf/v2/util/grand"
 
+	"github.com/JarvanDante/my_service/internal/dao"
 	"github.com/JarvanDante/my_service/internal/model/entity"
 	"github.com/JarvanDante/my_service/internal/modules/user/domain"
 	"github.com/JarvanDante/my_service/internal/modules/user/service"
@@ -686,6 +687,28 @@ func (s *sUser) DoRecharge(ctx context.Context, userId, packageId int64) (*servi
 	}
 	// TODO: 返回真实支付参数(接支付网关); 支付成功回调里再给用户加金币并置订单为已支付。
 	return &service.RechargeOrderDTO{OrderNo: orderNo, Amount: pkg.Amount, Coin: coin}, nil
+}
+
+// MockPay 开发环境模拟支付到账: 仅当未配置 pay.callbackSecret 时可用, 且订单必须属于当前用户。
+func (s *sUser) MockPay(ctx context.Context, userId int64, orderNo string) error {
+	if orderNo == "" {
+		return gerror.New("订单号必填")
+	}
+	secret := g.Cfg().MustGet(ctx, "pay.callbackSecret").String()
+	if secret != "" {
+		return gerror.New("正式环境请走支付回调")
+	}
+	order, err := s.repo.FindRechargeOrder(ctx, orderNo)
+	if err != nil {
+		return err
+	}
+	if order == nil {
+		return gerror.New("订单不存在")
+	}
+	if order.UserId != userId {
+		return gerror.New("订单不属于当前用户")
+	}
+	return dao.NewFinanceRepo().MarkOrderPaid(ctx, orderNo)
 }
 
 func (s *sUser) VipPackages(ctx context.Context) ([]*service.VipPackageDTO, error) {

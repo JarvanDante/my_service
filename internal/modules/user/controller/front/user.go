@@ -441,6 +441,18 @@ func (c *Controller) RechargeDo(ctx context.Context, req *v1.RechargeDoReq) (res
 	return &v1.RechargeDoRes{OrderNo: dto.OrderNo, Amount: dto.Amount, Coin: dto.Coin}, nil
 }
 
+// RechargeMockPay 开发环境 mock 支付到账(需登录, 仅本人订单)。
+func (c *Controller) RechargeMockPay(ctx context.Context, req *v1.RechargeMockPayReq) (res *v1.RechargeMockPayRes, err error) {
+	id, err := uid(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if err = c.user.MockPay(ctx, id, req.OrderNo); err != nil {
+		return nil, err
+	}
+	return &v1.RechargeMockPayRes{}, nil
+}
+
 // Vip VIP套餐(需登录)。
 func (c *Controller) Vip(ctx context.Context, req *v1.VipReq) (res *v1.VipRes, err error) {
 	if _, err = uid(ctx); err != nil {

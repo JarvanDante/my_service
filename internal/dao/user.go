@@ -397,6 +397,12 @@ func (r *userRepo) CreateRechargeOrder(ctx context.Context, orderNo string, user
 	return err
 }
 
+func (r *userRepo) FindRechargeOrder(ctx context.Context, orderNo string) (*entity.RechargeOrder, error) {
+	var o *entity.RechargeOrder
+	err := g.Model("recharge_order").Ctx(ctx).Where("order_no", orderNo).Scan(&o)
+	return o, err
+}
+
 // ---- VIP ----
 
 func (r *userRepo) ListVipPackages(ctx context.Context) ([]*entity.VipPackage, error) {

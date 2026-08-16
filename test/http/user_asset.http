@@ -43,6 +43,20 @@ client.test("发起充值", function () {
     client.assert(response.body.code === 0, "code 应为 0: " + response.body.message);
     client.assert(response.body.data.order_no !== "", "应返回订单号");
 });
+client.global.set("orderNo", response.body.data.order_no);
+%}
+
+### 3b. mock 支付到账(开发环境)
+POST {{baseUrl}}/front/v1/user/recharge/mock-pay
+Authorization: {{token}}
+Content-Type: application/json
+
+{ "order_no": "{{orderNo}}" }
+
+> {%
+client.test("mock 到账", function () {
+    client.assert(response.body.code === 0, "code 应为 0: " + response.body.message);
+});
 %}
 
 ### 4. VIP 套餐 —— 有数据

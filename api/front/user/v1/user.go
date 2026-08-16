@@ -365,6 +365,12 @@ type RechargeDoRes struct {
 	Coin    float64 `json:"coin"`
 }
 
+type RechargeMockPayReq struct {
+	g.Meta  `path:"/user/recharge/mock-pay" method:"post" tags:"Front/User" summary:"开发环境 mock 支付到账"`
+	OrderNo string `json:"order_no" v:"required#订单号必填"`
+}
+type RechargeMockPayRes struct{}
+
 type VipPackage struct {
 	Id    int64   `json:"id"`
 	Name  string  `json:"name"`

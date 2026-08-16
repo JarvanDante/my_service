@@ -498,6 +498,7 @@ type IUser interface {
 	// 资产(充值/VIP/兑换)
 	RechargePackages(ctx context.Context) ([]*RechargePackageDTO, error)
 	DoRecharge(ctx context.Context, userId, packageId int64) (*RechargeOrderDTO, error)
+	MockPay(ctx context.Context, userId int64, orderNo string) error
 	VipPackages(ctx context.Context) ([]*VipPackageDTO, error)
 	DoVip(ctx context.Context, userId, packageId int64) error
 	VipLogs(ctx context.Context, userId int64, page, size int) ([]*VipLogDTO, int, error)
