@@ -36,6 +36,32 @@ func mediaBase(ctx context.Context) (string, error) {
 	return base, nil
 }
 
+func parseEnvelope(raw []byte, out any) error {
+	s := strings.TrimSpace(string(raw))
+	if i := strings.Index(s, "{"); i >= 0 {
+		s = s[i:]
+	}
+	var env envelope
+	if err := json.Unmarshal([]byte(s), &env); err != nil {
+		msg := s
+		if len(msg) > 180 {
+			msg = msg[:180]
+		}
+		return gerror.Newf("媒资中心错误: %s", msg)
+	}
+	if env.Code != 0 {
+		msg := env.Message
+		if msg == "" {
+			msg = fmt.Sprintf("媒资中心错误 %d", env.Code)
+		}
+		return gerror.New(msg)
+	}
+	if out == nil || len(env.Data) == 0 || string(env.Data) == "null" {
+		return nil
+	}
+	return json.Unmarshal(env.Data, out)
+}
+
 func doReq(ctx context.Context, method, path string, headers map[string]string, out any) error {
 	base, err := mediaBase(ctx)
 	if err != nil {
@@ -64,21 +90,7 @@ func doReq(ctx context.Context, method, path string, headers map[string]string, 
 	default:
 		return gerror.New("不支持的方法")
 	}
-	var env envelope
-	if err = json.Unmarshal(raw, &env); err != nil {
-		return gerror.Wrapf(err, "媒资中心响应无法解析: %s", string(raw))
-	}
-	if env.Code != 0 {
-		msg := env.Message
-		if msg == "" {
-			msg = fmt.Sprintf("媒资中心错误 %d", env.Code)
-		}
-		return gerror.New(msg)
-	}
-	if out == nil || len(env.Data) == 0 || string(env.Data) == "null" {
-		return nil
-	}
-	return json.Unmarshal(env.Data, out)
+	return parseEnvelope(raw, out)
 }
 
 func doJSON(ctx context.Context, method, path string, out any) error {
