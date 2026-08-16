@@ -25,6 +25,9 @@ func (r *videoRepo) List(ctx context.Context, f videodomain.ListFilter, page, si
 	if f.Keyword != "" {
 		m = m.WhereLike("title", "%"+f.Keyword+"%")
 	}
+	if f.MediaCode != "" {
+		m = m.Where("media_code", f.MediaCode)
+	}
 	if f.Status != 9 {
 		m = m.Where("status", f.Status)
 	}
@@ -53,11 +56,18 @@ func (r *videoRepo) Find(ctx context.Context, id int64) (*entity.Video, error) {
 	return v, err
 }
 
+func (r *videoRepo) FindByMediaCode(ctx context.Context, code string) (*entity.Video, error) {
+	var v *entity.Video
+	err := g.Model("video").Ctx(ctx).Where("media_code", code).Scan(&v)
+	return v, err
+}
+
 func (r *videoRepo) Create(ctx context.Context, v *entity.Video) (int64, error) {
 	res, err := g.Model("video").Ctx(ctx).Data(g.Map{
 		"title": v.Title, "description": v.Description,
 		"cover_url": v.CoverUrl, "cover_key": v.CoverKey, "cover_media_id": v.CoverMediaId,
 		"source_url": v.SourceUrl, "source_key": v.SourceKey, "source_media_id": v.SourceMediaId,
+		"media_code": v.MediaCode,
 		"duration": v.Duration, "sort": v.Sort, "status": v.Status, "created_by": v.CreatedBy,
 	}).Insert()
 	if err != nil {
@@ -71,6 +81,7 @@ func (r *videoRepo) Update(ctx context.Context, v *entity.Video) error {
 		"title": v.Title, "description": v.Description,
 		"cover_url": v.CoverUrl, "cover_key": v.CoverKey, "cover_media_id": v.CoverMediaId,
 		"source_url": v.SourceUrl, "source_key": v.SourceKey, "source_media_id": v.SourceMediaId,
+		"media_code": v.MediaCode,
 		"duration": v.Duration, "sort": v.Sort, "status": v.Status,
 		"updated_at": gtime.Now(),
 	}).Update()

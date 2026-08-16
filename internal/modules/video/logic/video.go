@@ -10,6 +10,7 @@ import (
 	"github.com/JarvanDante/my_service/internal/model/entity"
 	"github.com/JarvanDante/my_service/internal/modules/video/domain"
 	"github.com/JarvanDante/my_service/internal/modules/video/service"
+	"github.com/JarvanDante/my_service/internal/shared/paas"
 )
 
 type sVideo struct{ repo domain.Repository }
@@ -25,7 +26,7 @@ func (s *sVideo) List(ctx context.Context, in service.ListInput) (*service.ListD
 		size = 20
 	}
 	list, total, err := s.repo.List(ctx, domain.ListFilter{
-		Keyword: strings.TrimSpace(in.Keyword), Status: in.Status,
+		Keyword: strings.TrimSpace(in.Keyword), MediaCode: strings.TrimSpace(in.MediaCode), Status: in.Status,
 	}, page, size)
 	if err != nil {
 		return nil, gerror.WrapCode(gcode.CodeDbOperationError, err, "查询视频失败")
@@ -34,6 +35,7 @@ func (s *sVideo) List(ctx context.Context, in service.ListInput) (*service.ListD
 	for _, v := range list {
 		out = append(out, toDTO(v))
 	}
+	s.overlayMediaURLs(ctx, out)
 	return &service.ListDTO{List: out, Total: total, Page: page, Size: size}, nil
 }
 
@@ -62,6 +64,7 @@ func (s *sVideo) FrontList(ctx context.Context, in service.FrontListInput) (*ser
 	for _, v := range list {
 		out = append(out, toDTO(v))
 	}
+	s.overlayMediaURLs(ctx, out)
 	return &service.ListDTO{List: out, Total: total, Page: page, Size: size}, nil
 }
 
@@ -78,7 +81,9 @@ func (s *sVideo) FrontDetail(ctx context.Context, id int64) (*service.VideoDTO, 
 	if v == nil || v.Id == 0 || v.Status != entity.VideoStatusPublished {
 		return nil, gerror.NewCode(gcode.CodeNotFound, "视频不存在或已下架")
 	}
-	return toDTO(v), nil
+	d := toDTO(v)
+	s.resolvePlay(ctx, d)
+	return d, nil
 }
 
 func (s *sVideo) Create(ctx context.Context, in service.SaveInput) (int64, error) {
@@ -89,6 +94,7 @@ func (s *sVideo) Create(ctx context.Context, in service.SaveInput) (int64, error
 		Title: strings.TrimSpace(in.Title), Description: strings.TrimSpace(in.Description),
 		CoverUrl: in.CoverUrl, CoverKey: in.CoverKey, CoverMediaId: in.CoverMediaId,
 		SourceUrl: in.SourceUrl, SourceKey: in.SourceKey, SourceMediaId: in.SourceMediaId,
+		MediaCode: strings.TrimSpace(in.MediaCode),
 		Duration: in.Duration, Sort: in.Sort, Status: in.Status, CreatedBy: in.OperatorId,
 	})
 }
@@ -111,6 +117,7 @@ func (s *sVideo) Update(ctx context.Context, in service.SaveInput) error {
 		Id: in.Id, Title: strings.TrimSpace(in.Title), Description: strings.TrimSpace(in.Description),
 		CoverUrl: in.CoverUrl, CoverKey: in.CoverKey, CoverMediaId: in.CoverMediaId,
 		SourceUrl: in.SourceUrl, SourceKey: in.SourceKey, SourceMediaId: in.SourceMediaId,
+		MediaCode: strings.TrimSpace(in.MediaCode),
 		Duration: in.Duration, Sort: in.Sort, Status: in.Status,
 	})
 }
@@ -144,8 +151,8 @@ func validateSave(in service.SaveInput) error {
 	if strings.TrimSpace(in.Title) == "" {
 		return gerror.NewCode(gcode.CodeInvalidParameter, "标题必填")
 	}
-	if strings.TrimSpace(in.SourceUrl) == "" && strings.TrimSpace(in.SourceKey) == "" {
-		return gerror.NewCode(gcode.CodeInvalidParameter, "请先上传视频")
+	if strings.TrimSpace(in.SourceUrl) == "" && strings.TrimSpace(in.SourceKey) == "" && strings.TrimSpace(in.MediaCode) == "" {
+		return gerror.NewCode(gcode.CodeInvalidParameter, "请先上传视频或选用媒资")
 	}
 	if in.Status < 0 || in.Status > 2 {
 		return gerror.NewCode(gcode.CodeInvalidParameter, "状态不合法")
@@ -161,6 +168,7 @@ func toDTO(v *entity.Video) *service.VideoDTO {
 		Id: v.Id, Title: v.Title, Description: v.Description,
 		CoverUrl: v.CoverUrl, CoverKey: v.CoverKey, CoverMediaId: v.CoverMediaId,
 		SourceUrl: v.SourceUrl, SourceKey: v.SourceKey, SourceMediaId: v.SourceMediaId,
+		MediaCode: v.MediaCode,
 		Duration: v.Duration, Sort: v.Sort, Status: v.Status, CreatedBy: v.CreatedBy,
 	}
 	if v.CreatedAt != nil {
@@ -170,4 +178,153 @@ func toDTO(v *entity.Video) *service.VideoDTO {
 		d.UpdatedAt = v.UpdatedAt.String()
 	}
 	return d
+}
+
+func (s *sVideo) overlayMediaURLs(ctx context.Context, list []*service.VideoDTO) {
+	need := false
+	for _, d := range list {
+		if d != nil && d.MediaCode != "" {
+			need = true
+			break
+		}
+	}
+	if !need {
+		return
+	}
+	picks, _, err := paas.ListPicks(ctx, 1, 200)
+	if err != nil {
+		return
+	}
+	m := make(map[string]paas.MediaAsset, len(picks))
+	for _, a := range picks {
+		m[a.Id] = a
+	}
+	for _, d := range list {
+		if d == nil || d.MediaCode == "" {
+			continue
+		}
+		if a, ok := m[d.MediaCode]; ok {
+			if a.CoverUrl != "" {
+				d.CoverUrl = a.CoverUrl
+			}
+			if a.PlayUrl != "" {
+				d.SourceUrl = a.PlayUrl
+			}
+		}
+	}
+}
+
+func (s *sVideo) resolvePlay(ctx context.Context, d *service.VideoDTO) {
+	if d == nil || d.MediaCode == "" {
+		return
+	}
+	if a, err := paas.AssetDetail(ctx, d.MediaCode); err == nil && a != nil {
+		if a.CoverUrl != "" {
+			d.CoverUrl = a.CoverUrl
+		}
+		if a.PlayUrl != "" {
+			d.SourceUrl = a.PlayUrl
+		}
+	}
+	if url, err := paas.PlayToken(ctx, d.MediaCode); err == nil && url != "" {
+		d.SourceUrl = url
+	}
+}
+
+func (s *sVideo) ListMediaAssets(ctx context.Context, page, size int, keyword string) ([]service.MediaAssetDTO, int, error) {
+	list, total, err := paas.ListAssets(ctx, page, size, strings.TrimSpace(keyword))
+	if err != nil {
+		return nil, 0, err
+	}
+	out := make([]service.MediaAssetDTO, 0, len(list))
+	for _, a := range list {
+		item := service.MediaAssetDTO{
+			Id: a.Id, Title: a.Title, CoverUrl: a.CoverUrl, PlayUrl: a.PlayUrl,
+			DurationSec: a.DurationSec, Picked: a.Picked,
+		}
+		if local, _ := s.repo.FindByMediaCode(ctx, a.Id); local != nil {
+			item.LocalId = local.Id
+		}
+		out = append(out, item)
+	}
+	return out, total, nil
+}
+
+func (s *sVideo) PickMedia(ctx context.Context, code string, operatorId int64) (int64, error) {
+	code = strings.TrimSpace(code)
+	if code == "" {
+		return 0, gerror.NewCode(gcode.CodeInvalidParameter, "媒资ID必填")
+	}
+	a, err := paas.PickAsset(ctx, code)
+	if err != nil {
+		return 0, err
+	}
+	return s.upsertFromAsset(ctx, a, operatorId)
+}
+
+func (s *sVideo) SyncMedia(ctx context.Context, operatorId int64) (*service.SyncMediaDTO, error) {
+	created, updated, total := 0, 0, 0
+	for page := 1; ; page++ {
+		list, cnt, err := paas.ListAssets(ctx, page, 50, "")
+		if err != nil {
+			return nil, err
+		}
+		if page == 1 {
+			total = cnt
+		}
+		if len(list) == 0 {
+			break
+		}
+		for _, a := range list {
+			picked, err := paas.PickAsset(ctx, a.Id)
+			if err != nil {
+				return nil, err
+			}
+			if picked == nil {
+				picked = &a
+			}
+			existed, _ := s.repo.FindByMediaCode(ctx, a.Id)
+			if _, err = s.upsertFromAsset(ctx, picked, operatorId); err != nil {
+				return nil, err
+			}
+			if existed != nil && existed.Id > 0 {
+				updated++
+			} else {
+				created++
+			}
+		}
+		if page*50 >= cnt {
+			break
+		}
+	}
+	return &service.SyncMediaDTO{Created: created, Updated: updated, Total: total}, nil
+}
+
+func (s *sVideo) upsertFromAsset(ctx context.Context, a *paas.MediaAsset, operatorId int64) (int64, error) {
+	if a == nil || a.Id == "" {
+		return 0, gerror.New("媒资无效")
+	}
+	old, err := s.repo.FindByMediaCode(ctx, a.Id)
+	if err != nil {
+		return 0, err
+	}
+	title := strings.TrimSpace(a.Title)
+	if title == "" {
+		title = a.Id
+	}
+	if old != nil && old.Id > 0 {
+		old.Title = title
+		old.CoverUrl = a.CoverUrl
+		old.SourceUrl = a.PlayUrl
+		old.SourceKey = a.PlayKey
+		old.MediaCode = a.Id
+		if a.DurationSec > 0 {
+			old.Duration = a.DurationSec
+		}
+		return old.Id, s.repo.Update(ctx, old)
+	}
+	return s.repo.Create(ctx, &entity.Video{
+		Title: title, CoverUrl: a.CoverUrl, SourceUrl: a.PlayUrl, SourceKey: a.PlayKey,
+		MediaCode: a.Id, Duration: a.DurationSec, Status: entity.VideoStatusPublished, CreatedBy: operatorId,
+	})
 }

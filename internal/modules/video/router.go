@@ -26,5 +26,5 @@ func RegisterFront(group *ghttp.RouterGroup, repo domain.Repository) {
 // RegisterBackend 后台视频 CRUD(挂权限组)。
 func RegisterBackend(group *ghttp.RouterGroup, repo domain.Repository) {
 	ctrl := backend.New(logic.New(repo))
-	group.Bind(ctrl.List, ctrl.Create, ctrl.Update, ctrl.Delete, ctrl.Status)
+	group.Bind(ctrl.List, ctrl.Create, ctrl.Update, ctrl.Delete, ctrl.Status, ctrl.MediaAssets, ctrl.MediaPick, ctrl.SyncMedia)
 }
