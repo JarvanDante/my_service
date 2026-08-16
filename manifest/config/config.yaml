@@ -82,6 +82,12 @@ paas:
   media_base: "http://127.0.0.1:8004"
   media_admin_token: "488ac147a8b24d2b0541b24f4fdfb5f8b10c20129f6b46fcce6d2091094e872a"
 
+# 播放网关(给浏览器的签名地址, 与 my_media/my_play 一致)
+play_gateway:
+  base_url: "http://127.0.0.1:8006"
+  secret: "dev-play-secret-change-me"
+  token_ttl_sec: 14400
+
 # 前台限流(Redis 固定窗口)。ip_* 登录前按客户端IP; user_* 登录后按用户ID。
 # 阈值按站点真实流量调; 正常用户远达不到, 批量刷接口会触发 429。
 front_ratelimit:

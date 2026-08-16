@@ -33,7 +33,7 @@ func (s *sVideo) List(ctx context.Context, in service.ListInput) (*service.ListD
 	}
 	out := make([]*service.VideoDTO, 0, len(list))
 	for _, v := range list {
-		out = append(out, toDTO(v))
+		out = append(out, toDTO(ctx, v))
 	}
 	s.overlayMediaURLs(ctx, out)
 	return &service.ListDTO{List: out, Total: total, Page: page, Size: size}, nil
@@ -62,7 +62,7 @@ func (s *sVideo) FrontList(ctx context.Context, in service.FrontListInput) (*ser
 	}
 	out := make([]*service.VideoDTO, 0, len(list))
 	for _, v := range list {
-		out = append(out, toDTO(v))
+		out = append(out, toDTO(ctx, v))
 	}
 	s.overlayMediaURLs(ctx, out)
 	return &service.ListDTO{List: out, Total: total, Page: page, Size: size}, nil
@@ -81,7 +81,7 @@ func (s *sVideo) FrontDetail(ctx context.Context, id int64) (*service.VideoDTO, 
 	if v == nil || v.Id == 0 || v.Status != entity.VideoStatusPublished {
 		return nil, gerror.NewCode(gcode.CodeNotFound, "视频不存在或已下架")
 	}
-	d := toDTO(v)
+	d := toDTO(ctx, v)
 	s.resolvePlay(ctx, d)
 	return d, nil
 }
@@ -95,7 +95,7 @@ func (s *sVideo) Create(ctx context.Context, in service.SaveInput) (int64, error
 		CoverUrl: in.CoverUrl, CoverKey: in.CoverKey, CoverMediaId: in.CoverMediaId,
 		SourceUrl: in.SourceUrl, SourceKey: in.SourceKey, SourceMediaId: in.SourceMediaId,
 		MediaCode: strings.TrimSpace(in.MediaCode),
-		Duration: in.Duration, Sort: in.Sort, Status: in.Status, CreatedBy: in.OperatorId,
+		Duration:  in.Duration, Sort: in.Sort, Status: in.Status, CreatedBy: in.OperatorId,
 	})
 }
 
@@ -118,7 +118,7 @@ func (s *sVideo) Update(ctx context.Context, in service.SaveInput) error {
 		CoverUrl: in.CoverUrl, CoverKey: in.CoverKey, CoverMediaId: in.CoverMediaId,
 		SourceUrl: in.SourceUrl, SourceKey: in.SourceKey, SourceMediaId: in.SourceMediaId,
 		MediaCode: strings.TrimSpace(in.MediaCode),
-		Duration: in.Duration, Sort: in.Sort, Status: in.Status,
+		Duration:  in.Duration, Sort: in.Sort, Status: in.Status,
 	})
 }
 
@@ -160,7 +160,7 @@ func validateSave(in service.SaveInput) error {
 	return nil
 }
 
-func toDTO(v *entity.Video) *service.VideoDTO {
+func toDTO(ctx context.Context, v *entity.Video) *service.VideoDTO {
 	if v == nil {
 		return nil
 	}
@@ -169,7 +169,7 @@ func toDTO(v *entity.Video) *service.VideoDTO {
 		CoverUrl: v.CoverUrl, CoverKey: v.CoverKey, CoverMediaId: v.CoverMediaId,
 		SourceUrl: v.SourceUrl, SourceKey: v.SourceKey, SourceMediaId: v.SourceMediaId,
 		MediaCode: v.MediaCode,
-		Duration: v.Duration, Sort: v.Sort, Status: v.Status, CreatedBy: v.CreatedBy,
+		Duration:  v.Duration, Sort: v.Sort, Status: v.Status, CreatedBy: v.CreatedBy,
 	}
 	if v.CreatedAt != nil {
 		d.CreatedAt = v.CreatedAt.String()
@@ -177,6 +177,7 @@ func toDTO(v *entity.Video) *service.VideoDTO {
 	if v.UpdatedAt != nil {
 		d.UpdatedAt = v.UpdatedAt.String()
 	}
+	d.CoverUrl, d.SourceUrl = paas.ApplyGatewayURLs(ctx, d.CoverUrl, d.SourceUrl, d.MediaCode)
 	return d
 }
 
@@ -193,7 +194,7 @@ func (s *sVideo) overlayMediaURLs(ctx context.Context, list []*service.VideoDTO)
 	}
 	picks, _, err := paas.ListPicks(ctx, 1, 200)
 	if err != nil {
-		return
+		picks, _, err = paas.ListAssets(ctx, 1, 200, "")
 	}
 	m := make(map[string]paas.MediaAsset, len(picks))
 	for _, a := range picks {
@@ -211,6 +212,7 @@ func (s *sVideo) overlayMediaURLs(ctx context.Context, list []*service.VideoDTO)
 				d.SourceUrl = a.PlayUrl
 			}
 		}
+		d.CoverUrl, d.SourceUrl = paas.ApplyGatewayURLs(ctx, d.CoverUrl, d.SourceUrl, d.MediaCode)
 	}
 }
 
@@ -229,6 +231,7 @@ func (s *sVideo) resolvePlay(ctx context.Context, d *service.VideoDTO) {
 	if url, err := paas.PlayToken(ctx, d.MediaCode); err == nil && url != "" {
 		d.SourceUrl = url
 	}
+	d.CoverUrl, d.SourceUrl = paas.ApplyGatewayURLs(ctx, d.CoverUrl, d.SourceUrl, d.MediaCode)
 }
 
 func (s *sVideo) ListMediaAssets(ctx context.Context, page, size int, keyword string) ([]service.MediaAssetDTO, int, error) {
@@ -238,8 +241,9 @@ func (s *sVideo) ListMediaAssets(ctx context.Context, page, size int, keyword st
 	}
 	out := make([]service.MediaAssetDTO, 0, len(list))
 	for _, a := range list {
+		cover, play := paas.ApplyGatewayURLs(ctx, a.CoverUrl, a.PlayUrl, a.Id)
 		item := service.MediaAssetDTO{
-			Id: a.Id, Title: a.Title, CoverUrl: a.CoverUrl, PlayUrl: a.PlayUrl,
+			Id: a.Id, Title: a.Title, CoverUrl: cover, PlayUrl: play,
 			DurationSec: a.DurationSec, Picked: a.Picked,
 		}
 		if local, _ := s.repo.FindByMediaCode(ctx, a.Id); local != nil {
