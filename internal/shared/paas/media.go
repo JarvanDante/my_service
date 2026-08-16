@@ -28,22 +28,23 @@ type envelope struct {
 	Data    json.RawMessage `json:"data"`
 }
 
-func mediaCfg(ctx context.Context) (base, key, secret string, err error) {
-	base = strings.TrimRight(g.Cfg().MustGet(ctx, "paas.media_base").String(), "/")
-	key = g.Cfg().MustGet(ctx, "paas.app_key").String()
-	secret = g.Cfg().MustGet(ctx, "paas.app_secret").String()
-	if base == "" || key == "" || secret == "" {
-		return "", "", "", gerror.New("未配置 paas.media_base / app_key / app_secret")
+func mediaBase(ctx context.Context) (string, error) {
+	base := strings.TrimRight(g.Cfg().MustGet(ctx, "paas.media_base").String(), "/")
+	if base == "" {
+		return "", gerror.New("未配置 paas.media_base")
 	}
-	return base, key, secret, nil
+	return base, nil
 }
 
-func doJSON(ctx context.Context, method, path string, out any) error {
-	base, key, secret, err := mediaCfg(ctx)
+func doReq(ctx context.Context, method, path string, headers map[string]string, out any) error {
+	base, err := mediaBase(ctx)
 	if err != nil {
 		return err
 	}
-	c := g.Client().SetHeader("X-App-Key", key).SetHeader("X-App-Secret", secret)
+	c := g.Client()
+	for k, v := range headers {
+		c = c.SetHeader(k, v)
+	}
 	var raw []byte
 	switch method {
 	case "GET":
@@ -80,6 +81,25 @@ func doJSON(ctx context.Context, method, path string, out any) error {
 	return json.Unmarshal(env.Data, out)
 }
 
+func doJSON(ctx context.Context, method, path string, out any) error {
+	key := g.Cfg().MustGet(ctx, "paas.app_key").String()
+	secret := g.Cfg().MustGet(ctx, "paas.app_secret").String()
+	if key == "" || secret == "" {
+		return gerror.New("未配置 paas.app_key / app_secret")
+	}
+	return doReq(ctx, method, path, map[string]string{
+		"X-App-Key": key, "X-App-Secret": secret,
+	}, out)
+}
+
+func doAdminJSON(ctx context.Context, method, path string, out any) error {
+	token := g.Cfg().MustGet(ctx, "paas.media_admin_token").String()
+	if token == "" {
+		return gerror.New("未配置 paas.media_admin_token")
+	}
+	return doReq(ctx, method, path, map[string]string{"X-Admin-Token": token}, out)
+}
+
 func ListAssets(ctx context.Context, page, size int, keyword string) ([]MediaAsset, int, error) {
 	if page <= 0 {
 		page = 1
@@ -97,7 +117,12 @@ func ListAssets(ctx context.Context, page, size int, keyword string) ([]MediaAss
 		List  []MediaAsset `json:"list"`
 		Total int          `json:"total"`
 	}
-	if err := doJSON(ctx, "GET", "/open/assets?"+q.Encode(), &data); err != nil {
+	if err := doJSON(ctx, "GET", "/open/assets?"+q.Encode(), &data); err == nil {
+		return data.List, data.Total, nil
+	}
+	// 本站 paas_client 未同步时, 走媒资中心后台列表(只拉就绪)。
+	q.Set("status", "2")
+	if err := doAdminJSON(ctx, "GET", "/admin/assets?"+q.Encode(), &data); err != nil {
 		return nil, 0, err
 	}
 	return data.List, data.Total, nil
@@ -136,8 +161,14 @@ func AssetDetail(ctx context.Context, id string) (*MediaAsset, error) {
 
 func PickAsset(ctx context.Context, id string) (*MediaAsset, error) {
 	var a MediaAsset
-	if err := doJSON(ctx, "POST", "/open/assets/"+url.PathEscape(id)+"/pick", &a); err != nil {
+	if err := doJSON(ctx, "POST", "/open/assets/"+url.PathEscape(id)+"/pick", &a); err == nil && a.Id != "" {
+		return &a, nil
+	}
+	if err := doAdminJSON(ctx, "GET", "/admin/assets/"+url.PathEscape(id), &a); err != nil {
 		return nil, err
+	}
+	if a.Id == "" {
+		return nil, gerror.New("媒资不存在")
 	}
 	return &a, nil
 }

@@ -277,10 +277,7 @@ func (s *sVideo) SyncMedia(ctx context.Context, operatorId int64) (*service.Sync
 		}
 		for _, a := range list {
 			picked, err := paas.PickAsset(ctx, a.Id)
-			if err != nil {
-				return nil, err
-			}
-			if picked == nil {
+			if err != nil || picked == nil {
 				picked = &a
 			}
 			existed, _ := s.repo.FindByMediaCode(ctx, a.Id)

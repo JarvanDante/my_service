@@ -80,6 +80,7 @@ paas:
   app_key: "ak_baee2346281a74bfb654425b"
   app_secret: "3cdcfe258d1854ed90facfaa9000b9e4a7f2c46f8cbc345ebd939868357880e9"
   media_base: "http://127.0.0.1:8004"
+  media_admin_token: "488ac147a8b24d2b0541b24f4fdfb5f8b10c20129f6b46fcce6d2091094e872a"
 
 # 前台限流(Redis 固定窗口)。ip_* 登录前按客户端IP; user_* 登录后按用户ID。
 # 阈值按站点真实流量调; 正常用户远达不到, 批量刷接口会触发 429。
