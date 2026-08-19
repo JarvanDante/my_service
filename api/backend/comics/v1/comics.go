@@ -22,6 +22,7 @@ type Item struct {
 	Rank         int      `json:"rank"`
 	Status       int      `json:"status"`
 	PublishId    int64    `json:"publish_id"`
+	MediaCode    string   `json:"media_code"`
 	CreatedAt    string   `json:"created_at"`
 }
 
@@ -144,3 +145,34 @@ type ChapterDeleteReq struct {
 	Id     int64 `json:"id" in:"path" v:"required|min:1#ID必填"`
 }
 type ChapterDeleteRes struct{}
+
+type MediaComicsItem struct {
+	Id           string `json:"id"`
+	Title        string `json:"title"`
+	CoverUrl     string `json:"cover_url"`
+	Intro        string `json:"intro"`
+	ChapterCount int    `json:"chapter_count"`
+	Picked       bool   `json:"picked"`
+	LocalId      int64  `json:"local_id"`
+}
+
+type MediaComicsListReq struct {
+	g.Meta  `path:"/media-comics" method:"get" tags:"Backend/Comics" summary:"媒资中心可选用漫画"`
+	Keyword string `json:"keyword"`
+	Page    int    `json:"page"`
+	Size    int    `json:"size"`
+}
+type MediaComicsListRes struct {
+	List  []MediaComicsItem `json:"list"`
+	Total int               `json:"total"`
+	Page  int               `json:"page"`
+	Size  int               `json:"size"`
+}
+
+type MediaComicsPickReq struct {
+	g.Meta `path:"/media-comics/{id}/pick" method:"post" tags:"Backend/Comics" summary:"选用漫画媒资并写入本站列表"`
+	Id     string `json:"id" v:"required#媒资ID必填"`
+}
+type MediaComicsPickRes struct {
+	Id int64 `json:"id"`
+}

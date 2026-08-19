@@ -65,7 +65,8 @@ func toDTO(r *entity.Comics) *service.ComicsDTO {
 		Category: r.Category, Tags: decodeTags(r.Tags), IsVip: r.IsVip, Price: r.Price,
 		FreeChapter: r.FreeChapter, ChapterCount: r.ChapterCount, ViewCount: r.ViewCount,
 		BuyCount: r.BuyCount, LikeCount: r.LikeCount, UpdateStatus: r.UpdateStatus,
-		Rank: r.Rank, Status: r.Status, PublishId: r.PublishId, CreatedAt: fmtTime(r.CreatedAt),
+		Rank: r.Rank, Status: r.Status, PublishId: r.PublishId, MediaCode: r.MediaCode,
+		CreatedAt: fmtTime(r.CreatedAt),
 	}
 }
 
@@ -121,6 +122,7 @@ func (s *sComics) query(ctx context.Context, f service.ListFilter) ([]*service.C
 	for _, r := range list {
 		out = append(out, toDTO(r))
 	}
+	s.hydrateMedia(ctx, out)
 	return out, total, nil
 }
 
@@ -175,6 +177,7 @@ func (s *sComics) Detail(ctx context.Context, userId, id int64) (*service.Detail
 	_, _ = g.Model("comics").Ctx(ctx).Where("id", r.Id).
 		Data(g.Map{"view_count": &gdb.Counter{Field: "view_count", Value: 1}}).Update()
 	d := toDTO(r)
+	s.hydrateMedia(ctx, []*service.ComicsDTO{d})
 	d.IsBuy = acc.IsBuy
 	d.ViewCount++
 	return &service.DetailDTO{
@@ -245,7 +248,7 @@ func (s *sComics) Read(ctx context.Context, userId, chapterId int64) (*service.R
 		Where("seq > ?", c.Seq).OrderAsc("seq").Fields("id").Value()
 	out := &service.ReadDTO{
 		ChapterId: c.Id, ComicsId: c.ComicsId, Seq: c.Seq, Title: c.Title,
-		Pics: decodePics(c.Pics),
+		Pics: s.refreshPics(ctx, r.MediaCode, c.Seq, decodePics(c.Pics)),
 	}
 	if prev != nil {
 		out.PrevId = prev.Int64()
@@ -327,6 +330,9 @@ func normalize(in *service.SaveInput) error {
 	if in.UpdateStatus != 1 && in.UpdateStatus != 2 {
 		in.UpdateStatus = 1
 	}
+	if in.Status == entity.ContentStatusOnline && strings.TrimSpace(in.Category) == "" {
+		return gerror.New("请先选择本站分类后再上架")
+	}
 	return nil
 }
 
@@ -375,6 +381,19 @@ func (s *sComics) Update(ctx context.Context, in service.SaveInput) error {
 	if in.UpdateStatus == 1 || in.UpdateStatus == 2 {
 		data["update_status"] = in.UpdateStatus
 	}
+	if in.Status == entity.ContentStatusOnline {
+		cate := strings.TrimSpace(in.Category)
+		if cate == "" {
+			old, err := s.find(ctx, in.Id, false)
+			if err != nil {
+				return err
+			}
+			cate = strings.TrimSpace(old.Category)
+		}
+		if cate == "" {
+			return gerror.New("请先选择本站分类后再上架")
+		}
+	}
 	_, err := g.Model("comics").Ctx(ctx).
 		Where("site_id", cmSiteId).Where("id", in.Id).Data(data).Update()
 	return err
@@ -398,6 +417,15 @@ func (s *sComics) Delete(ctx context.Context, id int64) error {
 func (s *sComics) Audit(ctx context.Context, id int64, status int) error {
 	if status < 0 || status > 2 {
 		return gerror.New("状态非法")
+	}
+	if status == entity.ContentStatusOnline {
+		r, err := s.find(ctx, id, false)
+		if err != nil {
+			return err
+		}
+		if strings.TrimSpace(r.Category) == "" {
+			return gerror.New("请先编辑并选择本站分类后再上架")
+		}
 	}
 	res, err := g.Model("comics").Ctx(ctx).
 		Where("site_id", cmSiteId).Where("id", id).
@@ -429,8 +457,14 @@ func (s *sComics) ChapterList(ctx context.Context, comicsId int64, page, size in
 		return nil, 0, err
 	}
 	out := make([]*service.ChapterDTO, 0, len(list))
+	mediaCode := ""
+	if r, e := s.find(ctx, comicsId, false); e == nil && r != nil {
+		mediaCode = r.MediaCode
+	}
 	for _, c := range list {
-		out = append(out, toChapterDTO(c))
+		d := toChapterDTO(c)
+		d.Pics = s.refreshPics(ctx, mediaCode, c.Seq, d.Pics)
+		out = append(out, d)
 	}
 	return out, total, nil
 }

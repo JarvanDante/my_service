@@ -13,13 +13,30 @@ import (
 )
 
 type MediaAsset struct {
-	Id          string `json:"id"`
-	Title       string `json:"title"`
-	CoverUrl    string `json:"cover_url"`
-	PlayUrl     string `json:"play_url"`
-	PlayKey     string `json:"play_key"`
-	DurationSec int    `json:"duration_sec"`
-	Picked      bool   `json:"picked"`
+	Id           string         `json:"id"`
+	Title        string         `json:"title"`
+	CoverUrl     string         `json:"cover_url"`
+	PlayUrl      string         `json:"play_url"`
+	PlayKey      string         `json:"play_key"`
+	DurationSec  int            `json:"duration_sec"`
+	Kind         int            `json:"kind"`
+	Intro        string         `json:"intro"`
+	ChapterCount int            `json:"chapter_count"`
+	Picked       bool           `json:"picked"`
+	Chapters     []MediaChapter `json:"chapters"`
+}
+
+type MediaChapter struct {
+	Seq       int         `json:"seq"`
+	Title     string      `json:"title"`
+	PageCount int         `json:"page_count"`
+	Pages     []MediaPage `json:"pages"`
+}
+
+type MediaPage struct {
+	Filename string `json:"filename"`
+	Key      string `json:"key"`
+	Url      string `json:"url"`
 }
 
 type envelope struct {
@@ -112,7 +129,7 @@ func doAdminJSON(ctx context.Context, method, path string, out any) error {
 	return doReq(ctx, method, path, map[string]string{"X-Admin-Token": token}, out)
 }
 
-func ListAssets(ctx context.Context, page, size int, keyword string) ([]MediaAsset, int, error) {
+func ListAssets(ctx context.Context, page, size int, keyword string, kind int) ([]MediaAsset, int, error) {
 	if page <= 0 {
 		page = 1
 	}
@@ -122,6 +139,7 @@ func ListAssets(ctx context.Context, page, size int, keyword string) ([]MediaAss
 	q := url.Values{}
 	q.Set("page", fmt.Sprintf("%d", page))
 	q.Set("size", fmt.Sprintf("%d", size))
+	q.Set("kind", fmt.Sprintf("%d", kind))
 	if keyword != "" {
 		q.Set("keyword", keyword)
 	}

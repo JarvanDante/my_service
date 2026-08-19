@@ -7,6 +7,7 @@ type PicDTO struct {
 	Url    string `json:"url"`
 	Width  int    `json:"width"`
 	Height int    `json:"height"`
+	Key    string `json:"key,omitempty"`
 }
 
 type ComicsDTO struct {
@@ -28,6 +29,7 @@ type ComicsDTO struct {
 	Rank         int
 	Status       int
 	PublishId    int64
+	MediaCode    string
 	CreatedAt    string
 	IsBuy        bool
 }
@@ -124,4 +126,17 @@ type IComics interface {
 	ChapterCreate(ctx context.Context, in ChapterInput) (int64, error)
 	ChapterUpdate(ctx context.Context, in ChapterInput) error
 	ChapterDelete(ctx context.Context, id int64) error
+
+	ListMediaComics(ctx context.Context, page, size int, keyword string) ([]MediaComicsDTO, int, error)
+	PickMedia(ctx context.Context, code string) (int64, error)
+}
+
+type MediaComicsDTO struct {
+	Id           string
+	Title        string
+	CoverUrl     string
+	Intro        string
+	ChapterCount int
+	Picked       bool
+	LocalId      int64
 }

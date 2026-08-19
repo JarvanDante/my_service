@@ -194,7 +194,7 @@ func (s *sVideo) overlayMediaURLs(ctx context.Context, list []*service.VideoDTO)
 	}
 	picks, _, err := paas.ListPicks(ctx, 1, 200)
 	if err != nil {
-		picks, _, err = paas.ListAssets(ctx, 1, 200, "")
+		picks, _, err = paas.ListAssets(ctx, 1, 200, "", 0)
 	}
 	m := make(map[string]paas.MediaAsset, len(picks))
 	for _, a := range picks {
@@ -235,7 +235,7 @@ func (s *sVideo) resolvePlay(ctx context.Context, d *service.VideoDTO) {
 }
 
 func (s *sVideo) ListMediaAssets(ctx context.Context, page, size int, keyword string) ([]service.MediaAssetDTO, int, error) {
-	list, total, err := paas.ListAssets(ctx, page, size, strings.TrimSpace(keyword))
+	list, total, err := paas.ListAssets(ctx, page, size, strings.TrimSpace(keyword), 0)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -269,7 +269,7 @@ func (s *sVideo) PickMedia(ctx context.Context, code string, operatorId int64) (
 func (s *sVideo) SyncMedia(ctx context.Context, operatorId int64) (*service.SyncMediaDTO, error) {
 	created, updated, total := 0, 0, 0
 	for page := 1; ; page++ {
-		list, cnt, err := paas.ListAssets(ctx, page, 50, "")
+		list, cnt, err := paas.ListAssets(ctx, page, 50, "", 0)
 		if err != nil {
 			return nil, err
 		}

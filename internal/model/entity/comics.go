@@ -30,6 +30,7 @@ type Comics struct {
 	Rank         int         `json:"rank"         orm:"rank"`
 	Status       int         `json:"status"       orm:"status"`
 	PublishId    int64       `json:"publishId"    orm:"publish_id"`
+	MediaCode    string      `json:"mediaCode"    orm:"media_code"`
 	CreatedAt    *gtime.Time `json:"createdAt"    orm:"created_at"`
 	UpdatedAt    *gtime.Time `json:"updatedAt"    orm:"updated_at"`
 }
