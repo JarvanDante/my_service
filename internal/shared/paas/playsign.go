@@ -65,6 +65,42 @@ func CoverURL(ctx context.Context, code string) string {
 	return playURL(code, siteCode(ctx), "cover.jpg")
 }
 
+// PageURL 漫画页图走 my_play。objectKey 形如 comics/{code}/ch001/page_001.jpg。
+func PageURL(ctx context.Context, code, objectKey string) string {
+	rel := comicRelPath(code, objectKey)
+	if rel == "" {
+		return ""
+	}
+	return playURL(code, siteCode(ctx), rel)
+}
+
+func comicRelPath(code, key string) string {
+	key = strings.TrimLeft(strings.TrimSpace(key), "/")
+	if i := strings.Index(key, "?"); i >= 0 {
+		key = key[:i]
+	}
+	if code == "" || key == "" {
+		return ""
+	}
+	prefix := "comics/" + code + "/"
+	if !strings.HasPrefix(key, prefix) {
+		if j := strings.Index(key, "/"+prefix); j >= 0 {
+			key = key[j+1:]
+		}
+	}
+	if !strings.HasPrefix(key, prefix) {
+		return ""
+	}
+	rel := key[len(prefix):]
+	if rel == "" || strings.Contains(rel, "..") {
+		return ""
+	}
+	if strings.Count(rel, "/") > 1 {
+		return ""
+	}
+	return rel
+}
+
 // PlaylistURL 媒资播放地址走 my_play 签名清单。
 func PlaylistURL(ctx context.Context, code, raw string) string {
 	file := "master.m3u8"

@@ -177,24 +177,34 @@ func (s *sComics) hydrateMedia(ctx context.Context, list []*service.ComicsDTO) {
 }
 
 func (s *sComics) refreshPics(ctx context.Context, mediaCode string, seq int, fallback []service.PicDTO) []service.PicDTO {
+	pics := fallback
+	if mediaCode != "" {
+		if a, err := paas.AssetDetail(ctx, mediaCode); err == nil && a != nil {
+			for _, ch := range a.Chapters {
+				if ch.Seq != seq || len(ch.Pages) == 0 {
+					continue
+				}
+				pics = make([]service.PicDTO, 0, len(ch.Pages))
+				for _, p := range ch.Pages {
+					pics = append(pics, service.PicDTO{Url: p.Url, Key: p.Key})
+				}
+				break
+			}
+		}
+	}
 	if mediaCode == "" {
-		return fallback
+		return pics
 	}
-	a, err := paas.AssetDetail(ctx, mediaCode)
-	if err != nil || a == nil {
-		return fallback
+	out := make([]service.PicDTO, 0, len(pics))
+	for _, p := range pics {
+		key := p.Key
+		if key == "" {
+			key = p.Url
+		}
+		if u := paas.PageURL(ctx, mediaCode, key); u != "" {
+			p.Url = u
+		}
+		out = append(out, p)
 	}
-	for _, ch := range a.Chapters {
-		if ch.Seq != seq {
-			continue
-		}
-		out := make([]service.PicDTO, 0, len(ch.Pages))
-		for _, p := range ch.Pages {
-			out = append(out, service.PicDTO{Url: p.Url, Key: p.Key})
-		}
-		if len(out) > 0 {
-			return out
-		}
-	}
-	return fallback
+	return out
 }
