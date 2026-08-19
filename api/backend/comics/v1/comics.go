@@ -10,6 +10,7 @@ type Item struct {
 	Cover        string   `json:"cover"`
 	Intro        string   `json:"intro"`
 	Category     string   `json:"category"`
+	Categories   []string `json:"categories"`
 	Tags         []string `json:"tags"`
 	IsVip        int      `json:"is_vip"`
 	Price        float64  `json:"price"`
@@ -46,6 +47,7 @@ type CreateReq struct {
 	Cover        string   `json:"cover"`
 	Intro        string   `json:"intro"`
 	Category     string   `json:"category"`
+	Categories   []string `json:"categories"`
 	Tags         []string `json:"tags"`
 	IsVip        int      `json:"is_vip" v:"in:0,1#VIP标记非法"`
 	Price        float64  `json:"price"`
@@ -66,6 +68,7 @@ type UpdateReq struct {
 	Cover        string   `json:"cover"`
 	Intro        string   `json:"intro"`
 	Category     string   `json:"category"`
+	Categories   []string `json:"categories"`
 	Tags         []string `json:"tags"`
 	IsVip        int      `json:"is_vip" v:"in:0,1#VIP标记非法"`
 	Price        float64  `json:"price"`

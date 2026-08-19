@@ -17,6 +17,7 @@ type ComicsDTO struct {
 	Cover        string
 	Intro        string
 	Category     string
+	Categories   []string
 	Tags         []string
 	IsVip        int
 	Price        float64
@@ -74,6 +75,7 @@ type SaveInput struct {
 	Cover        string
 	Intro        string
 	Category     string
+	Categories   []string
 	Tags         []string
 	IsVip        int
 	Price        float64

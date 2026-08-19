@@ -38,7 +38,7 @@ func uid(ctx context.Context) (int64, error) {
 func toItem(d *service.ComicsDTO) v1.Item {
 	return v1.Item{
 		Id: d.Id, Title: d.Title, Author: d.Author, Cover: d.Cover, Intro: d.Intro,
-		Category: d.Category, Tags: d.Tags, IsVip: d.IsVip, Price: d.Price,
+		Category: d.Category, Categories: d.Categories, Tags: d.Tags, IsVip: d.IsVip, Price: d.Price,
 		FreeChapter: d.FreeChapter, ChapterCount: d.ChapterCount, ViewCount: d.ViewCount,
 		LikeCount: d.LikeCount, UpdateStatus: d.UpdateStatus, IsBuy: d.IsBuy,
 		CreatedAt: d.CreatedAt,

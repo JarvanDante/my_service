@@ -10,6 +10,7 @@ type Item struct {
 	Cover        string   `json:"cover"`
 	Intro        string   `json:"intro"`
 	Category     string   `json:"category"`
+	Categories   []string `json:"categories"`
 	Tags         []string `json:"tags"`
 	IsVip        int      `json:"is_vip"`
 	Price        float64  `json:"price"`

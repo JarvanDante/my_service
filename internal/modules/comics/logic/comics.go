@@ -59,10 +59,43 @@ func fmtTime(t *gtime.Time) string {
 	return t.String()
 }
 
+func parseCategories(raw string) []string {
+	raw = strings.ReplaceAll(strings.TrimSpace(raw), "，", ",")
+	if raw == "" {
+		return []string{}
+	}
+	seen := map[string]struct{}{}
+	out := make([]string, 0, 4)
+	for _, p := range strings.Split(raw, ",") {
+		p = strings.TrimSpace(p)
+		if p == "" {
+			continue
+		}
+		if _, ok := seen[p]; ok {
+			continue
+		}
+		seen[p] = struct{}{}
+		out = append(out, p)
+	}
+	return out
+}
+
+func joinCategories(list []string) string {
+	return strings.Join(parseCategories(strings.Join(list, ",")), ",")
+}
+
+func resolveCategory(in *service.SaveInput) string {
+	if in.Categories != nil {
+		return joinCategories(in.Categories)
+	}
+	return joinCategories(parseCategories(in.Category))
+}
+
 func toDTO(r *entity.Comics) *service.ComicsDTO {
+	cates := parseCategories(r.Category)
 	return &service.ComicsDTO{
 		Id: r.Id, Title: r.Title, Author: r.Author, Cover: r.Cover, Intro: r.Intro,
-		Category: r.Category, Tags: decodeTags(r.Tags), IsVip: r.IsVip, Price: r.Price,
+		Category: r.Category, Categories: cates, Tags: decodeTags(r.Tags), IsVip: r.IsVip, Price: r.Price,
 		FreeChapter: r.FreeChapter, ChapterCount: r.ChapterCount, ViewCount: r.ViewCount,
 		BuyCount: r.BuyCount, LikeCount: r.LikeCount, UpdateStatus: r.UpdateStatus,
 		Rank: r.Rank, Status: r.Status, PublishId: r.PublishId, MediaCode: r.MediaCode,
@@ -90,7 +123,7 @@ func (s *sComics) query(ctx context.Context, f service.ListFilter) ([]*service.C
 		base = base.Where("status", f.Status)
 	}
 	if f.Category != "" {
-		base = base.Where("category", f.Category)
+		base = base.Where("string_to_array(replace(category, '，', ','), ',') @> ARRAY[?]::text[]", f.Category)
 	}
 	if f.Tag != "" {
 		base = base.Where("tags @> ?::jsonb", encodeJSON([]string{f.Tag}))
@@ -292,7 +325,7 @@ func (s *sComics) MayLike(ctx context.Context, id int64, size int) ([]*service.C
 		if r, err := s.find(ctx, id, true); err == nil {
 			m = m.Where("id != ?", id)
 			if r.Category != "" {
-				m = m.Where("category", r.Category)
+				m = m.Where("string_to_array(replace(category, '，', ','), ',') && string_to_array(?, ',')", r.Category)
 			}
 		}
 	}
@@ -318,6 +351,7 @@ func normalize(in *service.SaveInput) error {
 	if in.Title == "" {
 		return gerror.New("标题不能为空")
 	}
+	in.Category = resolveCategory(in)
 	if in.IsVip == 1 && in.Price > 0 {
 		return gerror.New("VIP专享与金币定价互斥, 只能二选一")
 	}
@@ -330,7 +364,7 @@ func normalize(in *service.SaveInput) error {
 	if in.UpdateStatus != 1 && in.UpdateStatus != 2 {
 		in.UpdateStatus = 1
 	}
-	if in.Status == entity.ContentStatusOnline && strings.TrimSpace(in.Category) == "" {
+	if in.Status == entity.ContentStatusOnline && in.Category == "" {
 		return gerror.New("请先选择本站分类后再上架")
 	}
 	return nil
@@ -356,9 +390,10 @@ func (s *sComics) Update(ctx context.Context, in service.SaveInput) error {
 	if in.IsVip == 1 && in.Price > 0 {
 		return gerror.New("VIP专享与金币定价互斥, 只能二选一")
 	}
+	in.Category = resolveCategory(&in)
 	data := g.Map{
 		"is_vip": in.IsVip, "price": in.Price, "free_chapter": in.FreeChapter,
-		"rank": in.Rank, "status": in.Status, "updated_at": gtime.Now(),
+		"rank": in.Rank, "status": in.Status, "category": in.Category, "updated_at": gtime.Now(),
 	}
 	if in.Title != "" {
 		data["title"] = in.Title
@@ -372,9 +407,6 @@ func (s *sComics) Update(ctx context.Context, in service.SaveInput) error {
 	if in.Intro != "" {
 		data["intro"] = in.Intro
 	}
-	if in.Category != "" {
-		data["category"] = in.Category
-	}
 	if in.Tags != nil {
 		data["tags"] = encodeJSON(in.Tags)
 	}
@@ -382,15 +414,15 @@ func (s *sComics) Update(ctx context.Context, in service.SaveInput) error {
 		data["update_status"] = in.UpdateStatus
 	}
 	if in.Status == entity.ContentStatusOnline {
-		cate := strings.TrimSpace(in.Category)
-		if cate == "" {
+		if in.Category == "" {
 			old, err := s.find(ctx, in.Id, false)
 			if err != nil {
 				return err
 			}
-			cate = strings.TrimSpace(old.Category)
+			in.Category = strings.TrimSpace(old.Category)
+			data["category"] = in.Category
 		}
-		if cate == "" {
+		if in.Category == "" {
 			return gerror.New("请先选择本站分类后再上架")
 		}
 	}
