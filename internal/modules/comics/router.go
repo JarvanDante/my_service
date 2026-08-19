@@ -12,10 +12,10 @@ import (
 
 // RegisterFront 列表/详情/目录/阅读公开(带 token 则识别已购与解锁态); 购买需登录。
 func RegisterFront(group *ghttp.RouterGroup) {
-	ctrl := front.New(logic.New())
+	ctrl := front.New(logic.New(), logic.NewCategory())
 	group.Group("/", func(pub *ghttp.RouterGroup) {
 		pub.Middleware(middleware.AuthOptional)
-		pub.Bind(ctrl.List, ctrl.Detail, ctrl.Chapters, ctrl.Read, ctrl.MayLike)
+		pub.Bind(ctrl.List, ctrl.Detail, ctrl.Chapters, ctrl.Read, ctrl.MayLike, ctrl.CategoryList)
 	})
 	group.Group("/", func(auth *ghttp.RouterGroup) {
 		auth.Middleware(middleware.Auth, middleware.UserRateLimit)
@@ -23,11 +23,12 @@ func RegisterFront(group *ghttp.RouterGroup) {
 	})
 }
 
-// RegisterBackend 作品 CRUD + 上下架 + 章节 CRUD(挂权限组)。
+// RegisterBackend 作品 CRUD + 上下架 + 章节 CRUD + 分类 CRUD(挂权限组)。
 func RegisterBackend(group *ghttp.RouterGroup) {
-	ctrl := backend.New(logic.New())
+	ctrl := backend.New(logic.New(), logic.NewCategory())
 	group.Bind(
 		ctrl.List, ctrl.Create, ctrl.Update, ctrl.Delete, ctrl.Audit,
 		ctrl.Chapters, ctrl.ChapterCreate, ctrl.ChapterUpdate, ctrl.ChapterDelete,
+		ctrl.CategoryList, ctrl.CategoryCreate, ctrl.CategoryUpdate, ctrl.CategoryDelete,
 	)
 }

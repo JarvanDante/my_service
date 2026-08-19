@@ -9,9 +9,14 @@ import (
 	"github.com/JarvanDante/my_service/internal/modules/comics/service"
 )
 
-type Controller struct{ svc service.IComics }
+type Controller struct {
+	svc service.IComics
+	cat service.ICategory
+}
 
-func New(svc service.IComics) *Controller { return &Controller{svc: svc} }
+func New(svc service.IComics, cat service.ICategory) *Controller {
+	return &Controller{svc: svc, cat: cat}
+}
 
 func toPicDTO(in []v1.Pic) []service.PicDTO {
 	if in == nil {

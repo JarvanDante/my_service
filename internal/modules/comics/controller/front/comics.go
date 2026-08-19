@@ -13,9 +13,14 @@ import (
 	"github.com/JarvanDante/my_service/internal/shared/consts"
 )
 
-type Controller struct{ svc service.IComics }
+type Controller struct {
+	svc service.IComics
+	cat service.ICategory
+}
 
-func New(svc service.IComics) *Controller { return &Controller{svc: svc} }
+func New(svc service.IComics, cat service.ICategory) *Controller {
+	return &Controller{svc: svc, cat: cat}
+}
 
 // optionalUid 公开接口: 带 token 就取到用户, 不带返回 0(用于标记 is_buy/解锁态)。
 func optionalUid(ctx context.Context) int64 {
@@ -116,6 +121,18 @@ func (c *Controller) MayLike(ctx context.Context, req *v1.MayLikeReq) (res *v1.M
 	res = &v1.MayLikeRes{List: make([]v1.Item, 0, len(list))}
 	for _, d := range list {
 		res.List = append(res.List, toItem(d))
+	}
+	return res, nil
+}
+
+func (c *Controller) CategoryList(ctx context.Context, _ *v1.CategoryListReq) (res *v1.CategoryListRes, err error) {
+	list, err := c.cat.Repo(ctx)
+	if err != nil {
+		return nil, err
+	}
+	res = &v1.CategoryListRes{List: make([]v1.FrontCategoryItem, 0, len(list))}
+	for _, d := range list {
+		res.List = append(res.List, v1.FrontCategoryItem{Id: d.Id, Name: d.Name, Kind: d.Kind})
 	}
 	return res, nil
 }
