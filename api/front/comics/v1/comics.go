@@ -30,6 +30,7 @@ type ListReq struct {
 	Tag      string `json:"tag"`
 	Keyword  string `json:"keyword"`
 	Sort     int    `json:"sort"`
+	Recommend int   `json:"recommend"` // 1=仅推荐栏
 	Page     int    `json:"page"`
 	Size     int    `json:"size"`
 }

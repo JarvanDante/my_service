@@ -98,7 +98,7 @@ func toDTO(r *entity.Comics) *service.ComicsDTO {
 		Category: r.Category, Categories: cates, Tags: decodeTags(r.Tags), IsVip: r.IsVip, Price: r.Price,
 		FreeChapter: r.FreeChapter, ChapterCount: r.ChapterCount, ViewCount: r.ViewCount,
 		BuyCount: r.BuyCount, LikeCount: r.LikeCount, UpdateStatus: r.UpdateStatus,
-		Rank: r.Rank, Status: r.Status, PublishId: r.PublishId, MediaCode: r.MediaCode,
+		Rank: r.Rank, IsRecommend: r.IsRecommend, Status: r.Status, PublishId: r.PublishId, MediaCode: r.MediaCode,
 		CreatedAt: fmtTime(r.CreatedAt),
 	}
 }
@@ -132,6 +132,12 @@ func (s *sComics) query(ctx context.Context, f service.ListFilter) ([]*service.C
 		kw := "%" + f.Keyword + "%"
 		base = base.Where("(title ILIKE ? OR author ILIKE ?)", kw, kw)
 	}
+	if f.OnlyRecommend {
+		base = base.Where("is_recommend", 1)
+	}
+	if f.Sort == 1 {
+		base = base.Where("view_count > 0")
+	}
 	total, err := base.Clone().Count()
 	if err != nil {
 		return nil, 0, err
@@ -141,7 +147,7 @@ func (s *sComics) query(ctx context.Context, f service.ListFilter) ([]*service.C
 	case 1:
 		m = m.OrderDesc("view_count")
 	case 2:
-		m = m.OrderDesc("id")
+		m = m.OrderDesc("updated_at").OrderDesc("id")
 	case 3:
 		m = m.OrderDesc("like_count")
 	default:
@@ -364,6 +370,9 @@ func normalize(in *service.SaveInput) error {
 	if in.UpdateStatus != 1 && in.UpdateStatus != 2 {
 		in.UpdateStatus = 1
 	}
+	if in.IsRecommend != 1 {
+		in.IsRecommend = 0
+	}
 	if in.Status == entity.ContentStatusOnline && in.Category == "" {
 		return gerror.New("请先选择本站分类后再上架")
 	}
@@ -378,7 +387,7 @@ func (s *sComics) Create(ctx context.Context, in service.SaveInput) (int64, erro
 		"site_id": cmSiteId, "title": in.Title, "author": in.Author, "cover": in.Cover,
 		"intro": in.Intro, "category": in.Category, "tags": encodeJSON(in.Tags),
 		"is_vip": in.IsVip, "price": in.Price, "free_chapter": in.FreeChapter,
-		"update_status": in.UpdateStatus, "rank": in.Rank, "status": in.Status,
+		"update_status": in.UpdateStatus, "rank": in.Rank, "is_recommend": in.IsRecommend, "status": in.Status,
 		"publish_id": in.PublishId,
 	}).InsertAndGetId()
 }
@@ -390,10 +399,13 @@ func (s *sComics) Update(ctx context.Context, in service.SaveInput) error {
 	if in.IsVip == 1 && in.Price > 0 {
 		return gerror.New("VIP专享与金币定价互斥, 只能二选一")
 	}
+	if in.IsRecommend != 1 {
+		in.IsRecommend = 0
+	}
 	in.Category = resolveCategory(&in)
 	data := g.Map{
 		"is_vip": in.IsVip, "price": in.Price, "free_chapter": in.FreeChapter,
-		"rank": in.Rank, "status": in.Status, "category": in.Category, "updated_at": gtime.Now(),
+		"rank": in.Rank, "is_recommend": in.IsRecommend, "status": in.Status, "category": in.Category, "updated_at": gtime.Now(),
 	}
 	if in.Title != "" {
 		data["title"] = in.Title

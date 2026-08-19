@@ -21,6 +21,7 @@ type Item struct {
 	LikeCount    int64    `json:"like_count"`
 	UpdateStatus int      `json:"update_status"`
 	Rank         int      `json:"rank"`
+	IsRecommend  int      `json:"is_recommend"`
 	Status       int      `json:"status"`
 	PublishId    int64    `json:"publish_id"`
 	MediaCode    string   `json:"media_code"`
@@ -54,6 +55,7 @@ type CreateReq struct {
 	FreeChapter  int      `json:"free_chapter"`
 	UpdateStatus int      `json:"update_status" v:"in:0,1,2#连载状态非法"`
 	Rank         int      `json:"rank"`
+	IsRecommend  int      `json:"is_recommend" v:"in:0,1#推荐标记非法"`
 	Status       int      `json:"status" v:"in:0,1,2#状态非法"`
 }
 type CreateRes struct {
@@ -75,6 +77,7 @@ type UpdateReq struct {
 	FreeChapter  int      `json:"free_chapter"`
 	UpdateStatus int      `json:"update_status" v:"in:0,1,2#连载状态非法"`
 	Rank         int      `json:"rank"`
+	IsRecommend  int      `json:"is_recommend" v:"in:0,1#推荐标记非法"`
 	Status       int      `json:"status" v:"in:0,1,2#状态非法"`
 }
 type UpdateRes struct{}

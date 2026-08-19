@@ -28,6 +28,7 @@ type Comics struct {
 	LikeCount    int64       `json:"likeCount"    orm:"like_count"`
 	UpdateStatus int         `json:"updateStatus" orm:"update_status"`
 	Rank         int         `json:"rank"         orm:"rank"`
+	IsRecommend  int         `json:"isRecommend"  orm:"is_recommend"`
 	Status       int         `json:"status"       orm:"status"`
 	PublishId    int64       `json:"publishId"    orm:"publish_id"`
 	MediaCode    string      `json:"mediaCode"    orm:"media_code"`

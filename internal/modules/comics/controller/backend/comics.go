@@ -58,7 +58,7 @@ func (c *Controller) List(ctx context.Context, req *v1.ListReq) (res *v1.ListRes
 			Category: d.Category, Categories: d.Categories, Tags: d.Tags, IsVip: d.IsVip, Price: d.Price,
 			FreeChapter: d.FreeChapter, ChapterCount: d.ChapterCount, ViewCount: d.ViewCount,
 			BuyCount: d.BuyCount, LikeCount: d.LikeCount, UpdateStatus: d.UpdateStatus,
-			Rank: d.Rank, Status: d.Status, PublishId: d.PublishId, MediaCode: d.MediaCode, CreatedAt: d.CreatedAt,
+			Rank: d.Rank, IsRecommend: d.IsRecommend, Status: d.Status, PublishId: d.PublishId, MediaCode: d.MediaCode, CreatedAt: d.CreatedAt,
 		})
 	}
 	return res, nil
@@ -69,7 +69,7 @@ func (c *Controller) Create(ctx context.Context, req *v1.CreateReq) (res *v1.Cre
 		Title: req.Title, Author: req.Author, Cover: req.Cover, Intro: req.Intro,
 		Category: req.Category, Categories: req.Categories, Tags: req.Tags, IsVip: req.IsVip, Price: req.Price,
 		FreeChapter: req.FreeChapter, UpdateStatus: req.UpdateStatus,
-		Rank: req.Rank, Status: req.Status,
+		Rank: req.Rank, IsRecommend: req.IsRecommend, Status: req.Status,
 	})
 	if err != nil {
 		return nil, err
@@ -82,7 +82,7 @@ func (c *Controller) Update(ctx context.Context, req *v1.UpdateReq) (res *v1.Upd
 		Id: req.Id, Title: req.Title, Author: req.Author, Cover: req.Cover, Intro: req.Intro,
 		Category: req.Category, Categories: req.Categories, Tags: req.Tags, IsVip: req.IsVip, Price: req.Price,
 		FreeChapter: req.FreeChapter, UpdateStatus: req.UpdateStatus,
-		Rank: req.Rank, Status: req.Status,
+		Rank: req.Rank, IsRecommend: req.IsRecommend, Status: req.Status,
 	}); err != nil {
 		return nil, err
 	}
