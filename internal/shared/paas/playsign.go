@@ -86,7 +86,10 @@ func PlaylistURL(ctx context.Context, code, raw string) string {
 }
 
 func isMinioHls(u string) bool {
-	return strings.Contains(u, ":19000/") || strings.Contains(u, "/my-media/media/hls/")
+	return strings.Contains(u, ":19000/") ||
+		strings.Contains(u, "host.docker.internal") ||
+		strings.Contains(u, "/my-media/media/hls/") ||
+		strings.Contains(u, "/my-media/comics/")
 }
 
 // ApplyGatewayURLs 有媒资短码时封面/播放一律改写为网关签名地址。

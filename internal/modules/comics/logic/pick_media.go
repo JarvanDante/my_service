@@ -162,6 +162,10 @@ func (s *sComics) hydrateMedia(ctx context.Context, list []*service.ComicsDTO) {
 		if d == nil || d.MediaCode == "" {
 			continue
 		}
+		if u := paas.CoverURL(ctx, d.MediaCode); u != "" {
+			d.Cover = u
+			continue
+		}
 		a, err := paas.AssetDetail(ctx, d.MediaCode)
 		if err != nil || a == nil {
 			continue

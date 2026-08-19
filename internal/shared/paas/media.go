@@ -180,7 +180,10 @@ func ListPicks(ctx context.Context, page, size int) ([]MediaAsset, int, error) {
 
 func AssetDetail(ctx context.Context, id string) (*MediaAsset, error) {
 	var a MediaAsset
-	if err := doJSON(ctx, "GET", "/open/assets/"+url.PathEscape(id), &a); err != nil {
+	if err := doJSON(ctx, "GET", "/open/assets/"+url.PathEscape(id), &a); err == nil && a.Id != "" {
+		return &a, nil
+	}
+	if err := doAdminJSON(ctx, "GET", "/admin/assets/"+url.PathEscape(id), &a); err != nil {
 		return nil, err
 	}
 	if a.Id == "" {
