@@ -9,7 +9,7 @@ import (
 	"strings"
 )
 
-const DefaultKey = "525202f9149e061d"
+const DefaultKey = "dafb787c76b5ce8a"
 const Key = DefaultKey
 const Ext = ".bnc"
 
