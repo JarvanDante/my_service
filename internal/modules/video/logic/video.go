@@ -2,6 +2,7 @@ package logic
 
 import (
 	"context"
+	"encoding/json"
 	"strings"
 
 	"github.com/gogf/gf/v2/errors/gcode"
@@ -12,6 +13,54 @@ import (
 	"github.com/JarvanDante/my_service/internal/modules/video/service"
 	"github.com/JarvanDante/my_service/internal/shared/paas"
 )
+
+func decodeTags(raw string) []string {
+	out := []string{}
+	if raw != "" {
+		_ = json.Unmarshal([]byte(raw), &out)
+	}
+	return out
+}
+
+func encodeJSON(v interface{}) string {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return "[]"
+	}
+	return string(b)
+}
+
+func parseCategories(raw string) []string {
+	raw = strings.ReplaceAll(strings.TrimSpace(raw), "，", ",")
+	if raw == "" {
+		return []string{}
+	}
+	seen := map[string]struct{}{}
+	out := make([]string, 0, 4)
+	for _, p := range strings.Split(raw, ",") {
+		p = strings.TrimSpace(p)
+		if p == "" {
+			continue
+		}
+		if _, ok := seen[p]; ok {
+			continue
+		}
+		seen[p] = struct{}{}
+		out = append(out, p)
+	}
+	return out
+}
+
+func joinCategories(list []string) string {
+	return strings.Join(parseCategories(strings.Join(list, ",")), ",")
+}
+
+func resolveCategory(in *service.SaveInput) string {
+	if in.Categories != nil {
+		return joinCategories(in.Categories)
+	}
+	return joinCategories(parseCategories(in.Category))
+}
 
 type sVideo struct{ repo domain.Repository }
 
@@ -87,6 +136,7 @@ func (s *sVideo) FrontDetail(ctx context.Context, id int64) (*service.VideoDTO, 
 }
 
 func (s *sVideo) Create(ctx context.Context, in service.SaveInput) (int64, error) {
+	in.Category = resolveCategory(&in)
 	if err := validateSave(in); err != nil {
 		return 0, err
 	}
@@ -94,8 +144,8 @@ func (s *sVideo) Create(ctx context.Context, in service.SaveInput) (int64, error
 		Title: strings.TrimSpace(in.Title), Description: strings.TrimSpace(in.Description),
 		CoverUrl: in.CoverUrl, CoverKey: in.CoverKey, CoverMediaId: in.CoverMediaId,
 		SourceUrl: in.SourceUrl, SourceKey: in.SourceKey, SourceMediaId: in.SourceMediaId,
-		MediaCode: strings.TrimSpace(in.MediaCode),
-		Duration:  in.Duration, Sort: in.Sort, Status: in.Status, CreatedBy: in.OperatorId,
+		MediaCode: strings.TrimSpace(in.MediaCode), Category: in.Category, Tags: encodeJSON(in.Tags),
+		Duration: in.Duration, Sort: in.Sort, Status: in.Status, CreatedBy: in.OperatorId,
 	})
 }
 
@@ -103,6 +153,7 @@ func (s *sVideo) Update(ctx context.Context, in service.SaveInput) error {
 	if in.Id <= 0 {
 		return gerror.NewCode(gcode.CodeInvalidParameter, "ID必填")
 	}
+	in.Category = resolveCategory(&in)
 	if err := validateSave(in); err != nil {
 		return err
 	}
@@ -117,8 +168,8 @@ func (s *sVideo) Update(ctx context.Context, in service.SaveInput) error {
 		Id: in.Id, Title: strings.TrimSpace(in.Title), Description: strings.TrimSpace(in.Description),
 		CoverUrl: in.CoverUrl, CoverKey: in.CoverKey, CoverMediaId: in.CoverMediaId,
 		SourceUrl: in.SourceUrl, SourceKey: in.SourceKey, SourceMediaId: in.SourceMediaId,
-		MediaCode: strings.TrimSpace(in.MediaCode),
-		Duration:  in.Duration, Sort: in.Sort, Status: in.Status,
+		MediaCode: strings.TrimSpace(in.MediaCode), Category: in.Category, Tags: encodeJSON(in.Tags),
+		Duration: in.Duration, Sort: in.Sort, Status: in.Status,
 	})
 }
 
@@ -144,6 +195,9 @@ func (s *sVideo) SetStatus(ctx context.Context, id int64, status int) error {
 	if old == nil || old.Id == 0 {
 		return gerror.NewCode(gcode.CodeNotFound, "视频不存在")
 	}
+	if status == entity.VideoStatusPublished && strings.TrimSpace(old.Category) == "" {
+		return gerror.NewCode(gcode.CodeInvalidParameter, "请先编辑并选择本站分类后再上架")
+	}
 	return s.repo.SetStatus(ctx, id, status)
 }
 
@@ -157,6 +211,9 @@ func validateSave(in service.SaveInput) error {
 	if in.Status < 0 || in.Status > 2 {
 		return gerror.NewCode(gcode.CodeInvalidParameter, "状态不合法")
 	}
+	if in.Status == entity.VideoStatusPublished && in.Category == "" {
+		return gerror.NewCode(gcode.CodeInvalidParameter, "上架前请选择本站分类")
+	}
 	return nil
 }
 
@@ -168,8 +225,8 @@ func toDTO(ctx context.Context, v *entity.Video) *service.VideoDTO {
 		Id: v.Id, Title: v.Title, Description: v.Description,
 		CoverUrl: v.CoverUrl, CoverKey: v.CoverKey, CoverMediaId: v.CoverMediaId,
 		SourceUrl: v.SourceUrl, SourceKey: v.SourceKey, SourceMediaId: v.SourceMediaId,
-		MediaCode: v.MediaCode,
-		Duration:  v.Duration, Sort: v.Sort, Status: v.Status, CreatedBy: v.CreatedBy,
+		MediaCode: v.MediaCode, Category: v.Category, Categories: parseCategories(v.Category), Tags: decodeTags(v.Tags),
+		Duration: v.Duration, Sort: v.Sort, Status: v.Status, CreatedBy: v.CreatedBy,
 	}
 	if v.CreatedAt != nil {
 		d.CreatedAt = v.CreatedAt.String()
@@ -326,6 +383,7 @@ func (s *sVideo) upsertFromAsset(ctx context.Context, a *paas.MediaAsset, operat
 	}
 	return s.repo.Create(ctx, &entity.Video{
 		Title: title, CoverUrl: a.CoverUrl, SourceUrl: a.PlayUrl, SourceKey: a.PlayKey,
-		MediaCode: a.Id, Duration: a.DurationSec, Status: entity.VideoStatusPublished, CreatedBy: operatorId,
+		MediaCode: a.Id, Category: "", Tags: "[]", Duration: a.DurationSec,
+		Status: entity.VideoStatusDraft, CreatedBy: operatorId,
 	})
 }

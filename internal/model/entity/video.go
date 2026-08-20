@@ -20,6 +20,8 @@ type Video struct {
 	SourceKey     string      `json:"sourceKey"     orm:"source_key"`
 	SourceMediaId int64       `json:"sourceMediaId" orm:"source_media_id"`
 	MediaCode     string      `json:"mediaCode"     orm:"media_code"`
+	Category      string      `json:"category"      orm:"category"`
+	Tags          string      `json:"tags"          orm:"tags"` // jsonb 原文
 	Duration      int         `json:"duration"      orm:"duration"`
 	Sort          int         `json:"sort"          orm:"sort"`
 	Status        int         `json:"status"        orm:"status"`

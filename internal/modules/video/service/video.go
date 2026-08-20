@@ -13,6 +13,9 @@ type VideoDTO struct {
 	SourceKey     string
 	SourceMediaId int64
 	MediaCode     string
+	Category      string
+	Categories    []string
+	Tags          []string
 	Duration      int
 	Sort          int
 	Status        int
@@ -56,6 +59,9 @@ type SaveInput struct {
 	SourceKey     string
 	SourceMediaId int64
 	MediaCode     string
+	Category      string
+	Categories    []string
+	Tags          []string
 	Duration      int
 	Sort          int
 	Status        int

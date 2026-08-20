@@ -13,13 +13,16 @@ type VideoItem struct {
 	SourceUrl     string `json:"source_url"`
 	SourceKey     string `json:"source_key"`
 	SourceMediaId int64  `json:"source_media_id"`
-	MediaCode     string `json:"media_code"`
-	Duration      int    `json:"duration"`
-	Sort          int    `json:"sort"`
-	Status        int    `json:"status"`
-	CreatedBy     int64  `json:"created_by"`
-	CreatedAt     string `json:"created_at"`
-	UpdatedAt     string `json:"updated_at"`
+	MediaCode     string   `json:"media_code"`
+	Category      string   `json:"category"`
+	Categories    []string `json:"categories"`
+	Tags          []string `json:"tags"`
+	Duration      int      `json:"duration"`
+	Sort          int      `json:"sort"`
+	Status        int      `json:"status"`
+	CreatedBy     int64    `json:"created_by"`
+	CreatedAt     string   `json:"created_at"`
+	UpdatedAt     string   `json:"updated_at"`
 }
 
 type ListReq struct {
@@ -47,10 +50,13 @@ type CreateReq struct {
 	SourceUrl     string `json:"source_url"`
 	SourceKey     string `json:"source_key"`
 	SourceMediaId int64  `json:"source_media_id"`
-	MediaCode     string `json:"media_code"`
-	Duration      int    `json:"duration" v:"min:0#时长不合法"`
-	Sort          int    `json:"sort"`
-	Status        int    `json:"status" v:"in:0,1,2#status 仅支持 0/1/2"`
+	MediaCode     string   `json:"media_code"`
+	Category      string   `json:"category"`
+	Categories    []string `json:"categories"`
+	Tags          []string `json:"tags"`
+	Duration      int      `json:"duration" v:"min:0#时长不合法"`
+	Sort          int      `json:"sort"`
+	Status        int      `json:"status" v:"in:0,1,2#status 仅支持 0/1/2"`
 }
 type CreateRes struct {
 	Id int64 `json:"id"`
@@ -67,10 +73,13 @@ type UpdateReq struct {
 	SourceUrl     string `json:"source_url"`
 	SourceKey     string `json:"source_key"`
 	SourceMediaId int64  `json:"source_media_id"`
-	MediaCode     string `json:"media_code"`
-	Duration      int    `json:"duration" v:"min:0#时长不合法"`
-	Sort          int    `json:"sort"`
-	Status        int    `json:"status" v:"in:0,1,2#status 仅支持 0/1/2"`
+	MediaCode     string   `json:"media_code"`
+	Category      string   `json:"category"`
+	Categories    []string `json:"categories"`
+	Tags          []string `json:"tags"`
+	Duration      int      `json:"duration" v:"min:0#时长不合法"`
+	Sort          int      `json:"sort"`
+	Status        int      `json:"status" v:"in:0,1,2#status 仅支持 0/1/2"`
 }
 type UpdateRes struct{}
 
