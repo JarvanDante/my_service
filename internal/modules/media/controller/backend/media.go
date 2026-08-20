@@ -9,12 +9,37 @@ import (
 
 	v1 "github.com/JarvanDante/my_service/api/backend/media/v1"
 	"github.com/JarvanDante/my_service/internal/modules/media/service"
+	"github.com/JarvanDante/my_service/internal/shared/aesbnc"
 	"github.com/JarvanDante/my_service/internal/shared/consts"
 )
 
 type Controller struct{ media service.IMedia }
 
 func New(svc service.IMedia) *Controller { return &Controller{media: svc} }
+
+func (c *Controller) Preview(ctx context.Context, req *v1.PreviewReq) (res *v1.PreviewRes, err error) {
+	data, name, err := c.media.ReadObject(ctx, req.Url, req.ObjectKey)
+	if err != nil {
+		return nil, err
+	}
+	out := data
+	if aesbnc.IsEncryptedName(name) || !aesbnc.LooksLikeImage(data) {
+		dec, derr := aesbnc.Decrypt(data)
+		if derr == nil {
+			out = dec
+		}
+	}
+	ct := aesbnc.SniffContentType(out)
+	if ct == "application/octet-stream" {
+		ct = "image/jpeg"
+	}
+	r := ghttp.RequestFromCtx(ctx)
+	r.Response.Header().Set("Content-Type", ct)
+	r.Response.Header().Set("Cache-Control", "private, max-age=120")
+	r.Response.Write(out)
+	r.ExitAll()
+	return nil, nil
+}
 
 func operatorId(ctx context.Context) (int64, error) {
 	id := ghttp.RequestFromCtx(ctx).GetCtxVar(consts.CtxAdminId).Int64()

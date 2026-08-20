@@ -1,4 +1,3 @@
-// Package v1 后台媒体上传接口契约。
 package v1
 
 import (
@@ -6,11 +5,10 @@ import (
 	"github.com/gogf/gf/v2/net/ghttp"
 )
 
-// UploadReq 上传媒体到 MinIO。
 type UploadReq struct {
-	g.Meta  `path:"/media/upload" method:"post" tags:"Backend/Media" mime:"multipart/form-data" summary:"上传媒体文件"`
+	g.Meta  `path:"/media/upload" method:"post" tags:"Front/Media" mime:"multipart/form-data" summary:"上传图片(服务端加密为 .bnc)"`
 	File    *ghttp.UploadFile `json:"file" type:"file" v:"required#文件必填"`
-	Purpose string            `json:"purpose" d:"image" dc:"用途: image/cover/video/avatar"`
+	Purpose string            `json:"purpose" d:"image" dc:"用途: image/avatar"`
 }
 
 type UploadRes struct {
@@ -23,10 +21,10 @@ type UploadRes struct {
 	Size        int64  `json:"size"`
 }
 
-type PreviewReq struct {
-	g.Meta    `path:"/media/preview" method:"get" tags:"Backend/Media" summary:"解密预览本站 .bnc 图片"`
-	Url       string `json:"u" in:"query" dc:"图片地址"`
+type ObjectReq struct {
+	g.Meta    `path:"/media/object" method:"get" tags:"Front/Media" summary:"读取本站已上传图片(密文原样)"`
+	Url       string `json:"u" in:"query" dc:"MinIO 地址"`
 	ObjectKey string `json:"object_key" in:"query"`
 }
 
-type PreviewRes struct{}
+type ObjectRes struct{}

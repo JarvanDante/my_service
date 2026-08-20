@@ -100,6 +100,59 @@ func (c *Client) PublicURL(objectKey string) string {
 	return fmt.Sprintf("%s/%s/%s", c.publicURL, c.bucket, key)
 }
 
+// Get 读取对象全文(预览/前台拉密文用)。
+func (c *Client) Get(ctx context.Context, objectKey string) ([]byte, error) {
+	key := strings.TrimLeft(objectKey, "/")
+	if key == "" || strings.Contains(key, "..") {
+		return nil, fmt.Errorf("对象路径无效")
+	}
+	obj, err := c.mc.GetObject(ctx, c.bucket, key, minio.GetObjectOptions{})
+	if err != nil {
+		return nil, fmt.Errorf("读取对象失败: %w", err)
+	}
+	defer obj.Close()
+	return io.ReadAll(obj)
+}
+
+// ObjectKeyFromURL 从本桶 publicURL 解析 object key; 非法外链返回空。
+func (c *Client) ObjectKeyFromURL(raw string) string {
+	u := strings.TrimSpace(raw)
+	if u == "" {
+		return ""
+	}
+	if i := strings.IndexAny(u, "?#"); i >= 0 {
+		u = u[:i]
+	}
+	if !strings.Contains(u, "://") {
+		key := strings.TrimLeft(u, "/")
+		if strings.HasPrefix(key, c.bucket+"/") {
+			key = key[len(c.bucket)+1:]
+		}
+		if key == "" || strings.Contains(key, "..") {
+			return ""
+		}
+		return key
+	}
+	prefix := strings.TrimRight(c.publicURL, "/") + "/" + c.bucket + "/"
+	if strings.HasPrefix(u, prefix) {
+		key := strings.TrimLeft(u[len(prefix):], "/")
+		if key == "" || strings.Contains(key, "..") {
+			return ""
+		}
+		return key
+	}
+	// 兼容 host.docker.internal / minio 内网 host, 只认 /{bucket}/ 路径
+	marker := "/" + c.bucket + "/"
+	if i := strings.Index(u, marker); i >= 0 {
+		key := strings.TrimLeft(u[i+len(marker):], "/")
+		if key == "" || strings.Contains(key, "..") {
+			return ""
+		}
+		return key
+	}
+	return ""
+}
+
 // Put 上传对象(流式, 不整文件进内存)。
 func (c *Client) Put(ctx context.Context, objectKey string, r io.Reader, size int64, contentType string) (string, error) {
 	key := strings.TrimLeft(objectKey, "/")

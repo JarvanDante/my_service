@@ -1,8 +1,10 @@
 package logic
 
 import (
+	"bytes"
 	"context"
 	"fmt"
+	"io"
 	"mime"
 	"path/filepath"
 	"strings"
@@ -17,6 +19,7 @@ import (
 	"github.com/JarvanDante/my_service/internal/model/entity"
 	"github.com/JarvanDante/my_service/internal/modules/media/domain"
 	"github.com/JarvanDante/my_service/internal/modules/media/service"
+	"github.com/JarvanDante/my_service/internal/shared/aesbnc"
 	"github.com/JarvanDante/my_service/internal/shared/storage"
 )
 
@@ -77,7 +80,22 @@ func (s *sMedia) Upload(ctx context.Context, in service.UploadInput) (*service.U
 	}
 	defer f.Close()
 
-	url, err := client.Put(ctx, objectKey, f, size, contentType)
+	raw, err := io.ReadAll(f)
+	if err != nil {
+		return nil, gerror.WrapCode(gcode.CodeInternalError, err, "读取上传文件失败")
+	}
+	if aesbnc.ShouldEncryptPurpose(purpose) {
+		enc, err := aesbnc.Encrypt(raw)
+		if err != nil {
+			return nil, gerror.WrapCode(gcode.CodeInternalError, err, "图片加密失败")
+		}
+		raw = enc
+		objectKey = aesbnc.ToBncKey(objectKey)
+		contentType = "application/octet-stream"
+		size = int64(len(raw))
+	}
+
+	url, err := client.Put(ctx, objectKey, bytes.NewReader(raw), size, contentType)
 	if err != nil {
 		return nil, gerror.WrapCode(gcode.CodeInternalError, err, "上传失败")
 	}
@@ -98,6 +116,31 @@ func (s *sMedia) Upload(ctx context.Context, in service.UploadInput) (*service.U
 		Id: id, Url: url, ObjectKey: objectKey, Bucket: client.Bucket(),
 		Purpose: purpose, ContentType: contentType, Size: size,
 	}, nil
+}
+
+func (s *sMedia) ReadObject(ctx context.Context, rawURL, objectKey string) ([]byte, string, error) {
+	client, err := storage.Get(ctx)
+	if err != nil {
+		return nil, "", gerror.WrapCode(gcode.CodeInternalError, err, "对象存储不可用")
+	}
+	key := strings.TrimSpace(objectKey)
+	if key == "" {
+		key = client.ObjectKeyFromURL(rawURL)
+	} else if strings.Contains(key, "..") {
+		key = ""
+	}
+	if key == "" {
+		return nil, "", gerror.NewCode(gcode.CodeInvalidParameter, "无法识别的图片地址")
+	}
+	data, err := client.Get(ctx, key)
+	if err != nil {
+		return nil, "", gerror.WrapCode(gcode.CodeNotFound, err, "对象不存在")
+	}
+	name := key
+	if rawURL != "" {
+		name = rawURL
+	}
+	return data, name, nil
 }
 
 func (s *sMedia) validateMime(ctx context.Context, purpose, contentType string) error {

@@ -69,6 +69,7 @@ func mountFront(s *ghttp.Server) {
 		lotterymod.RegisterFront(group)
 		aimod.RegisterFront(group)
 		videomod.RegisterFront(group, dao.NewVideoRepo())
+		mediamod.RegisterFront(group, dao.NewMediaRepo())
 	})
 
 	// ---- v2(将来大改时启用; 老的 v1 继续并存)----
@@ -83,6 +84,8 @@ func mountBackend(s *ghttp.Server) {
 	s.Group("/backend", func(group *ghttp.RouterGroup) {
 		// 公开: 管理员登录
 		adminmod.RegisterPublic(group, dao.NewAdminRepo())
+		// 公开: .bnc 解密预览(仅本桶, 给后台 <img>)
+		mediamod.RegisterPublic(group, dao.NewMediaRepo())
 		// 公开: 支付回调(网关调用, 签名校验在 logic)
 		finmod.RegisterCallback(group, dao.NewFinanceRepo())
 		// 公开: AI 供应商生成结果回调(验签在 logic, 幂等)

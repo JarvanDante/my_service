@@ -60,9 +60,10 @@ func playURL(code, site, file string) string {
 		pc.base, url.PathEscape(code), file, exp, url.QueryEscape(site), now, playSign(code, site, exp, 0, "", now))
 }
 
-// CoverURL 媒资封面走 my_play 签名地址, 由网关代理直出 JPEG, 避免 MinIO 私有桶直链 403。
+// CoverURL 媒资封面走 my_play 签名地址, 下发 cover.bnc(AES 密文)。
+// 后台预览把路径改成 cover.jpg 即可, 网关会解密直出; 签名不含文件名。
 func CoverURL(ctx context.Context, code string) string {
-	return playURL(code, siteCode(ctx), "cover.jpg")
+	return playURL(code, siteCode(ctx), "cover.bnc")
 }
 
 // PageURL 漫画页图走 my_play。objectKey 形如 comics/{code}/ch001/page_001.jpg。
@@ -134,7 +135,10 @@ func ApplyGatewayURLs(ctx context.Context, cover, play, code string) (string, st
 	if code == "" {
 		return cover, play
 	}
-	if u := CoverURL(ctx, code); u != "" && (cover == "" || isMinioHls(cover) || strings.Contains(cover, "/hls/"+code+"/cover.jpg")) {
+	if u := CoverURL(ctx, code); u != "" && (cover == "" || isMinioHls(cover) ||
+		strings.Contains(cover, "/hls/"+code+"/cover.jpg") ||
+		strings.Contains(cover, "/hls/"+code+"/cover.bnc") ||
+		strings.Contains(cover, "/comics/"+code+"/cover.")) {
 		cover = u
 	}
 	if u := PlaylistURL(ctx, code, play); u != "" && (play == "" || isMinioHls(play) || strings.Contains(play, "/hls/"+code+"/")) {

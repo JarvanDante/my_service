@@ -86,6 +86,7 @@ type MultipartAbortInput struct {
 
 type IMedia interface {
 	Upload(ctx context.Context, in UploadInput) (*UploadDTO, error)
+	ReadObject(ctx context.Context, rawURL, objectKey string) ([]byte, string, error)
 	MultipartInit(ctx context.Context, in MultipartInitInput) (*MultipartInitDTO, error)
 	MultipartPresign(ctx context.Context, in MultipartPresignInput) ([]MultipartPresignItemDTO, error)
 	MultipartParts(ctx context.Context, uploadId string, operatorId int64) (*MultipartPartsDTO, error)
