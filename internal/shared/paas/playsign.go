@@ -125,6 +125,7 @@ func isMinioHls(u string) bool {
 	return strings.Contains(u, ":19000/") ||
 		strings.Contains(u, "host.docker.internal") ||
 		strings.Contains(u, "/my-media/media/hls/") ||
+		strings.Contains(u, "/my-media/cartoon/") ||
 		strings.Contains(u, "/my-media/comics/")
 }
 
