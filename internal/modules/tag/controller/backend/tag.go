@@ -22,7 +22,8 @@ func (c *Controller) List(ctx context.Context, req *v1.ListReq) (res *v1.ListRes
 		}
 	}
 	list, total, err := c.svc.List(ctx, service.ListFilter{
-		ContentType: req.ContentType, Status: statusFilter, Page: req.Page, Size: req.Size,
+		ContentType: req.ContentType, Status: statusFilter, Keyword: req.Keyword,
+		Page: req.Page, Size: req.Size,
 	})
 	if err != nil {
 		return nil, err

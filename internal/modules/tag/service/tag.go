@@ -35,6 +35,7 @@ type UpdateInput struct {
 type ListFilter struct {
 	ContentType int
 	Status      int // -1=全部  0=只看禁用  1=只看启用
+	Keyword     string
 	Page        int
 	Size        int
 }

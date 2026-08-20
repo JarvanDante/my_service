@@ -16,6 +16,7 @@ type ListReq struct {
 	g.Meta      `path:"/tag" method:"get" tags:"Backend/Tag" summary:"标签列表"`
 	ContentType int    `json:"content_type"` // 0/空=全部
 	Status      string `json:"status"`       // 空=全部  0=只看禁用  1=只看启用
+	Keyword     string `json:"keyword"`      // 标签名模糊
 	Page        int    `json:"page"`
 	Size        int    `json:"size"`
 }

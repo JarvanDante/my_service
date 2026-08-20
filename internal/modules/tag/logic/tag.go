@@ -65,6 +65,9 @@ func (s *sTag) List(ctx context.Context, f service.ListFilter) ([]*service.ItemD
 	if f.Status >= 0 { // -1 = 全部; 0/1 = 精确过滤
 		m = m.Where("status", f.Status)
 	}
+	if f.Keyword != "" {
+		m = m.WhereLike("name", "%"+f.Keyword+"%")
+	}
 	total, err := m.Clone().Count()
 	if err != nil {
 		return nil, 0, err
