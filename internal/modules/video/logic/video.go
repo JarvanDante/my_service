@@ -75,7 +75,8 @@ func (s *sVideo) List(ctx context.Context, in service.ListInput) (*service.ListD
 		size = 20
 	}
 	list, total, err := s.repo.List(ctx, domain.ListFilter{
-		Keyword: strings.TrimSpace(in.Keyword), MediaCode: strings.TrimSpace(in.MediaCode), Status: in.Status,
+		Keyword: strings.TrimSpace(in.Keyword), MediaCode: strings.TrimSpace(in.MediaCode),
+		Kind: normalizeKind(in.Kind), Status: in.Status,
 	}, page, size)
 	if err != nil {
 		return nil, gerror.WrapCode(gcode.CodeDbOperationError, err, "查询视频失败")
@@ -103,6 +104,7 @@ func (s *sVideo) FrontList(ctx context.Context, in service.FrontListInput) (*ser
 	}
 	list, total, err := s.repo.List(ctx, domain.ListFilter{
 		Keyword: strings.TrimSpace(in.Keyword),
+		Kind:    entity.VideoKindVideo,
 		Status:  entity.VideoStatusPublished,
 		Sort:    in.Sort,
 	}, page, size)
@@ -144,7 +146,7 @@ func (s *sVideo) Create(ctx context.Context, in service.SaveInput) (int64, error
 		Title: strings.TrimSpace(in.Title), Description: strings.TrimSpace(in.Description),
 		CoverUrl: in.CoverUrl, CoverKey: in.CoverKey, CoverMediaId: in.CoverMediaId,
 		SourceUrl: in.SourceUrl, SourceKey: in.SourceKey, SourceMediaId: in.SourceMediaId,
-		MediaCode: strings.TrimSpace(in.MediaCode), Category: in.Category, Tags: encodeJSON(in.Tags),
+		MediaCode: strings.TrimSpace(in.MediaCode), Kind: normalizeKind(in.Kind), Category: in.Category, Tags: encodeJSON(in.Tags),
 		Duration: in.Duration, Sort: in.Sort, Status: in.Status, CreatedBy: in.OperatorId,
 	})
 }
@@ -168,7 +170,7 @@ func (s *sVideo) Update(ctx context.Context, in service.SaveInput) error {
 		Id: in.Id, Title: strings.TrimSpace(in.Title), Description: strings.TrimSpace(in.Description),
 		CoverUrl: in.CoverUrl, CoverKey: in.CoverKey, CoverMediaId: in.CoverMediaId,
 		SourceUrl: in.SourceUrl, SourceKey: in.SourceKey, SourceMediaId: in.SourceMediaId,
-		MediaCode: strings.TrimSpace(in.MediaCode), Category: in.Category, Tags: encodeJSON(in.Tags),
+		MediaCode: strings.TrimSpace(in.MediaCode), Kind: old.Kind, Category: in.Category, Tags: encodeJSON(in.Tags),
 		Duration: in.Duration, Sort: in.Sort, Status: in.Status,
 	})
 }
@@ -291,8 +293,16 @@ func (s *sVideo) resolvePlay(ctx context.Context, d *service.VideoDTO) {
 	d.CoverUrl, d.SourceUrl = paas.ApplyGatewayURLs(ctx, d.CoverUrl, d.SourceUrl, d.MediaCode)
 }
 
-func (s *sVideo) ListMediaAssets(ctx context.Context, page, size int, keyword string) ([]service.MediaAssetDTO, int, error) {
-	list, total, err := paas.ListAssets(ctx, page, size, strings.TrimSpace(keyword), 0)
+func normalizeKind(kind int) int {
+	if kind == entity.VideoKindCartoon {
+		return entity.VideoKindCartoon
+	}
+	return entity.VideoKindVideo
+}
+
+func (s *sVideo) ListMediaAssets(ctx context.Context, page, size int, keyword string, kind int) ([]service.MediaAssetDTO, int, error) {
+	kind = normalizeKind(kind)
+	list, total, err := paas.ListAssets(ctx, page, size, strings.TrimSpace(keyword), kind)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -303,7 +313,7 @@ func (s *sVideo) ListMediaAssets(ctx context.Context, page, size int, keyword st
 			Id: a.Id, Title: a.Title, CoverUrl: cover, PlayUrl: play,
 			DurationSec: a.DurationSec, Picked: a.Picked,
 		}
-		if local, _ := s.repo.FindByMediaCode(ctx, a.Id); local != nil {
+		if local, _ := s.repo.FindByMediaCode(ctx, a.Id, kind); local != nil {
 			item.LocalId = local.Id
 		}
 		out = append(out, item)
@@ -311,7 +321,7 @@ func (s *sVideo) ListMediaAssets(ctx context.Context, page, size int, keyword st
 	return out, total, nil
 }
 
-func (s *sVideo) PickMedia(ctx context.Context, code string, operatorId int64) (int64, error) {
+func (s *sVideo) PickMedia(ctx context.Context, code string, operatorId int64, kind int) (int64, error) {
 	code = strings.TrimSpace(code)
 	if code == "" {
 		return 0, gerror.NewCode(gcode.CodeInvalidParameter, "媒资ID必填")
@@ -320,13 +330,14 @@ func (s *sVideo) PickMedia(ctx context.Context, code string, operatorId int64) (
 	if err != nil {
 		return 0, err
 	}
-	return s.upsertFromAsset(ctx, a, operatorId)
+	return s.upsertFromAsset(ctx, a, operatorId, normalizeKind(kind))
 }
 
-func (s *sVideo) SyncMedia(ctx context.Context, operatorId int64) (*service.SyncMediaDTO, error) {
+func (s *sVideo) SyncMedia(ctx context.Context, operatorId int64, kind int) (*service.SyncMediaDTO, error) {
+	kind = normalizeKind(kind)
 	created, updated, total := 0, 0, 0
 	for page := 1; ; page++ {
-		list, cnt, err := paas.ListAssets(ctx, page, 50, "", 0)
+		list, cnt, err := paas.ListAssets(ctx, page, 50, "", kind)
 		if err != nil {
 			return nil, err
 		}
@@ -341,8 +352,8 @@ func (s *sVideo) SyncMedia(ctx context.Context, operatorId int64) (*service.Sync
 			if err != nil || picked == nil {
 				picked = &a
 			}
-			existed, _ := s.repo.FindByMediaCode(ctx, a.Id)
-			if _, err = s.upsertFromAsset(ctx, picked, operatorId); err != nil {
+			existed, _ := s.repo.FindByMediaCode(ctx, a.Id, kind)
+			if _, err = s.upsertFromAsset(ctx, picked, operatorId, kind); err != nil {
 				return nil, err
 			}
 			if existed != nil && existed.Id > 0 {
@@ -358,11 +369,12 @@ func (s *sVideo) SyncMedia(ctx context.Context, operatorId int64) (*service.Sync
 	return &service.SyncMediaDTO{Created: created, Updated: updated, Total: total}, nil
 }
 
-func (s *sVideo) upsertFromAsset(ctx context.Context, a *paas.MediaAsset, operatorId int64) (int64, error) {
+func (s *sVideo) upsertFromAsset(ctx context.Context, a *paas.MediaAsset, operatorId int64, kind int) (int64, error) {
 	if a == nil || a.Id == "" {
 		return 0, gerror.New("媒资无效")
 	}
-	old, err := s.repo.FindByMediaCode(ctx, a.Id)
+	kind = normalizeKind(kind)
+	old, err := s.repo.FindByMediaCode(ctx, a.Id, kind)
 	if err != nil {
 		return 0, err
 	}
@@ -383,7 +395,7 @@ func (s *sVideo) upsertFromAsset(ctx context.Context, a *paas.MediaAsset, operat
 	}
 	return s.repo.Create(ctx, &entity.Video{
 		Title: title, CoverUrl: a.CoverUrl, SourceUrl: a.PlayUrl, SourceKey: a.PlayKey,
-		MediaCode: a.Id, Category: "", Tags: "[]", Duration: a.DurationSec,
+		MediaCode: a.Id, Kind: kind, Category: "", Tags: "[]", Duration: a.DurationSec,
 		Status: entity.VideoStatusDraft, CreatedBy: operatorId,
 	})
 }

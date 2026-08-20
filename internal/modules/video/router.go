@@ -25,10 +25,11 @@ func RegisterFront(group *ghttp.RouterGroup, repo domain.Repository) {
 
 // RegisterBackend 后台视频 CRUD + 分类 CRUD(挂权限组)。
 func RegisterBackend(group *ghttp.RouterGroup, repo domain.Repository) {
-	ctrl := backend.New(logic.New(repo), logic.NewCategory())
+	ctrl := backend.New(logic.New(repo), logic.NewCategory(), logic.NewCategoryTable("cartoon_category"))
 	group.Bind(
 		ctrl.List, ctrl.Create, ctrl.Update, ctrl.Delete, ctrl.Status,
 		ctrl.MediaAssets, ctrl.MediaPick, ctrl.SyncMedia,
 		ctrl.CategoryList, ctrl.CategoryCreate, ctrl.CategoryUpdate, ctrl.CategoryDelete,
+		ctrl.CartoonCategoryList, ctrl.CartoonCategoryCreate, ctrl.CartoonCategoryUpdate, ctrl.CartoonCategoryDelete,
 	)
 }

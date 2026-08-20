@@ -61,3 +61,46 @@ func (c *Controller) CategoryDelete(ctx context.Context, req *v1.CategoryDeleteR
 	}
 	return &v1.CategoryDeleteRes{}, nil
 }
+
+func (c *Controller) CartoonCategoryList(ctx context.Context, req *v1.CartoonCategoryListReq) (res *v1.CartoonCategoryListRes, err error) {
+	list, total, err := c.cartoonCat.List(ctx, service.CategoryFilter{
+		Kind: parseOptionalInt(req.Kind), Status: parseOptionalInt(req.Status),
+		Page: req.Page, Size: req.Size,
+	})
+	if err != nil {
+		return nil, err
+	}
+	res = &v1.CartoonCategoryListRes{Total: total, List: make([]v1.CategoryItem, 0, len(list))}
+	for _, d := range list {
+		res.List = append(res.List, v1.CategoryItem{
+			Id: d.Id, Name: d.Name, Kind: d.Kind, Rank: d.Rank, Status: d.Status, CreatedAt: d.CreatedAt,
+		})
+	}
+	return res, nil
+}
+
+func (c *Controller) CartoonCategoryCreate(ctx context.Context, req *v1.CartoonCategoryCreateReq) (res *v1.CartoonCategoryCreateRes, err error) {
+	id, err := c.cartoonCat.Create(ctx, service.CategoryInput{
+		Name: req.Name, Kind: req.Kind, Rank: req.Rank, Status: req.Status,
+	})
+	if err != nil {
+		return nil, err
+	}
+	return &v1.CartoonCategoryCreateRes{Id: id}, nil
+}
+
+func (c *Controller) CartoonCategoryUpdate(ctx context.Context, req *v1.CartoonCategoryUpdateReq) (res *v1.CartoonCategoryUpdateRes, err error) {
+	if err = c.cartoonCat.Update(ctx, service.CategoryInput{
+		Id: req.Id, Name: req.Name, Kind: req.Kind, Rank: req.Rank, Status: req.Status,
+	}); err != nil {
+		return nil, err
+	}
+	return &v1.CartoonCategoryUpdateRes{}, nil
+}
+
+func (c *Controller) CartoonCategoryDelete(ctx context.Context, req *v1.CartoonCategoryDeleteReq) (res *v1.CartoonCategoryDeleteRes, err error) {
+	if err = c.cartoonCat.Delete(ctx, req.Id); err != nil {
+		return nil, err
+	}
+	return &v1.CartoonCategoryDeleteRes{}, nil
+}

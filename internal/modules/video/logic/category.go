@@ -13,9 +13,16 @@ import (
 
 const vdSiteId = 1
 
-type sCategory struct{}
+type sCategory struct{ table string }
 
-func NewCategory() service.ICategory { return &sCategory{} }
+func NewCategory() service.ICategory { return NewCategoryTable("video_category") }
+
+func NewCategoryTable(table string) service.ICategory {
+	if table == "" {
+		table = "video_category"
+	}
+	return &sCategory{table: table}
+}
 
 func (s *sCategory) List(ctx context.Context, f service.CategoryFilter) ([]*service.CategoryDTO, int, error) {
 	if f.Page <= 0 {
@@ -24,7 +31,7 @@ func (s *sCategory) List(ctx context.Context, f service.CategoryFilter) ([]*serv
 	if f.Size <= 0 {
 		f.Size = 20
 	}
-	m := g.Model("video_category").Ctx(ctx).Where("site_id", vdSiteId)
+	m := g.Model(s.table).Ctx(ctx).Where("site_id", vdSiteId)
 	if f.Kind >= 0 {
 		m = m.Where("kind", f.Kind)
 	}
@@ -62,7 +69,7 @@ func (s *sCategory) Create(ctx context.Context, in service.CategoryInput) (int64
 	if in.Status != 0 && in.Status != 1 {
 		in.Status = 1
 	}
-	cnt, err := g.Model("video_category").Ctx(ctx).
+	cnt, err := g.Model(s.table).Ctx(ctx).
 		Where("site_id", vdSiteId).Where("name", in.Name).Count()
 	if err != nil {
 		return 0, err
@@ -70,7 +77,7 @@ func (s *sCategory) Create(ctx context.Context, in service.CategoryInput) (int64
 	if cnt > 0 {
 		return 0, gerror.New("已存在同名分类")
 	}
-	return g.Model("video_category").Ctx(ctx).Data(g.Map{
+	return g.Model(s.table).Ctx(ctx).Data(g.Map{
 		"site_id": vdSiteId, "name": in.Name, "kind": in.Kind,
 		"rank": in.Rank, "status": in.Status,
 	}).InsertAndGetId()
@@ -81,7 +88,7 @@ func (s *sCategory) Update(ctx context.Context, in service.CategoryInput) error 
 		return gerror.New("分类ID非法")
 	}
 	if in.Name != "" {
-		cnt, err := g.Model("video_category").Ctx(ctx).
+		cnt, err := g.Model(s.table).Ctx(ctx).
 			Where("site_id", vdSiteId).Where("name", in.Name).WhereNot("id", in.Id).Count()
 		if err != nil {
 			return err
@@ -97,7 +104,7 @@ func (s *sCategory) Update(ctx context.Context, in service.CategoryInput) error 
 	if in.Status == 0 || in.Status == 1 {
 		data["status"] = in.Status
 	}
-	_, err := g.Model("video_category").Ctx(ctx).
+	_, err := g.Model(s.table).Ctx(ctx).
 		Where("site_id", vdSiteId).Where("id", in.Id).Data(data).Update()
 	return err
 }
@@ -106,7 +113,7 @@ func (s *sCategory) Delete(ctx context.Context, id int64) error {
 	if id <= 0 {
 		return gerror.New("分类ID非法")
 	}
-	_, err := g.Model("video_category").Ctx(ctx).
+	_, err := g.Model(s.table).Ctx(ctx).
 		Where("site_id", vdSiteId).Where("id", id).Delete()
 	return err
 }

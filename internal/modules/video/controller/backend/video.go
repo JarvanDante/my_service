@@ -13,12 +13,13 @@ import (
 )
 
 type Controller struct {
-	video service.IVideo
-	cat   service.ICategory
+	video      service.IVideo
+	cat        service.ICategory
+	cartoonCat service.ICategory
 }
 
-func New(svc service.IVideo, cat service.ICategory) *Controller {
-	return &Controller{video: svc, cat: cat}
+func New(svc service.IVideo, cat, cartoonCat service.ICategory) *Controller {
+	return &Controller{video: svc, cat: cat, cartoonCat: cartoonCat}
 }
 
 func operatorId(ctx context.Context) (int64, error) {
@@ -31,7 +32,7 @@ func operatorId(ctx context.Context) (int64, error) {
 
 func (c *Controller) List(ctx context.Context, req *v1.ListReq) (res *v1.ListRes, err error) {
 	dto, err := c.video.List(ctx, service.ListInput{
-		Keyword: req.Keyword, MediaCode: req.MediaCode, Status: req.Status, Page: req.Page, Size: req.Size,
+		Keyword: req.Keyword, MediaCode: req.MediaCode, Kind: req.Kind, Status: req.Status, Page: req.Page, Size: req.Size,
 	})
 	if err != nil {
 		return nil, err
@@ -52,7 +53,7 @@ func (c *Controller) Create(ctx context.Context, req *v1.CreateReq) (res *v1.Cre
 		Title: req.Title, Description: req.Description,
 		CoverUrl: req.CoverUrl, CoverKey: req.CoverKey, CoverMediaId: req.CoverMediaId,
 		SourceUrl: req.SourceUrl, SourceKey: req.SourceKey, SourceMediaId: req.SourceMediaId,
-		MediaCode: req.MediaCode, Category: req.Category, Categories: req.Categories, Tags: req.Tags,
+		MediaCode: req.MediaCode, Kind: req.Kind, Category: req.Category, Categories: req.Categories, Tags: req.Tags,
 		Duration: req.Duration, Sort: req.Sort, Status: req.Status, OperatorId: op,
 	})
 	if err != nil {
@@ -92,7 +93,7 @@ func (c *Controller) MediaAssets(ctx context.Context, req *v1.MediaAssetListReq)
 	if size <= 0 {
 		size = 20
 	}
-	list, total, err := c.video.ListMediaAssets(ctx, page, size, req.Keyword)
+	list, total, err := c.video.ListMediaAssets(ctx, page, size, req.Keyword, req.Kind)
 	if err != nil {
 		return nil, err
 	}
@@ -111,7 +112,7 @@ func (c *Controller) MediaPick(ctx context.Context, req *v1.MediaPickReq) (res *
 	if err != nil {
 		return nil, err
 	}
-	id, err := c.video.PickMedia(ctx, req.Id, op)
+	id, err := c.video.PickMedia(ctx, req.Id, op, req.Kind)
 	if err != nil {
 		return nil, err
 	}
@@ -123,7 +124,7 @@ func (c *Controller) SyncMedia(ctx context.Context, req *v1.SyncMediaReq) (res *
 	if err != nil {
 		return nil, err
 	}
-	dto, err := c.video.SyncMedia(ctx, op)
+	dto, err := c.video.SyncMedia(ctx, op, req.Kind)
 	if err != nil {
 		return nil, err
 	}

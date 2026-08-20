@@ -27,6 +27,7 @@ type VideoDTO struct {
 type ListInput struct {
 	Keyword   string
 	MediaCode string
+	Kind      int
 	Status    int
 	Page      int
 	Size      int
@@ -59,6 +60,7 @@ type SaveInput struct {
 	SourceKey     string
 	SourceMediaId int64
 	MediaCode     string
+	Kind          int
 	Category      string
 	Categories    []string
 	Tags          []string
@@ -79,9 +81,9 @@ type IVideo interface {
 	Update(ctx context.Context, in SaveInput) error
 	Delete(ctx context.Context, id int64) error
 	SetStatus(ctx context.Context, id int64, status int) error
-	ListMediaAssets(ctx context.Context, page, size int, keyword string) ([]MediaAssetDTO, int, error)
-	PickMedia(ctx context.Context, code string, operatorId int64) (int64, error)
-	SyncMedia(ctx context.Context, operatorId int64) (*SyncMediaDTO, error)
+	ListMediaAssets(ctx context.Context, page, size int, keyword string, kind int) ([]MediaAssetDTO, int, error)
+	PickMedia(ctx context.Context, code string, operatorId int64, kind int) (int64, error)
+	SyncMedia(ctx context.Context, operatorId int64, kind int) (*SyncMediaDTO, error)
 }
 
 type MediaAssetDTO struct {
