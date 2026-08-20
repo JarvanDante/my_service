@@ -8,9 +8,9 @@ type OperateReq struct {
 	g.Meta    `path:"/collect/operate" method:"post" tags:"Front/Collect" summary:"添加/取消收藏点赞"`
 	Id        int64   `json:"id"`
 	Ids       []int64 `json:"ids"`
-	MediaType int     `json:"media_type" v:"required|in:1,2#资源类型必填|资源类型非法"` // 1视频 2帖子
-	Flag      bool    `json:"flag"`                                         // true=添加 false=取消
-	Type      int     `json:"type" v:"required|in:1,2,3#操作类型必填|操作类型非法"`     // 1收藏 2点赞 3踩
+	MediaType int     `json:"media_type" v:"required|in:1,2,3,4,5#资源类型必填|资源类型非法"` // 1视频 2帖子 3漫画 4小说 5图集
+	Flag      bool    `json:"flag"`                                                      // true=添加 false=取消
+	Type      int     `json:"type" v:"required|in:1,2,3#操作类型必填|操作类型非法"`          // 1收藏 2点赞 3踩
 }
 type OperateRes struct{}
 
@@ -18,7 +18,7 @@ type OperateRes struct{}
 type DeleteReq struct {
 	g.Meta    `path:"/collect/delete" method:"post" tags:"Front/Collect" summary:"批量取消收藏"`
 	Ids       []int64 `json:"ids" v:"required#ids必填"`
-	MediaType int     `json:"media_type" v:"required|in:1,2#资源类型必填|资源类型非法"`
+	MediaType int     `json:"media_type" v:"required|in:1,2,3,4,5#资源类型必填|资源类型非法"`
 	Type      int     `json:"type" v:"required|in:1,2,3#操作类型必填|操作类型非法"`
 }
 type DeleteRes struct{}
