@@ -28,6 +28,9 @@ func (r *videoRepo) List(ctx context.Context, f videodomain.ListFilter, page, si
 	if f.MediaCode != "" {
 		m = m.Where("media_code", f.MediaCode)
 	}
+	if f.Category != "" {
+		m = m.Where("string_to_array(replace(category, '，', ','), ',') @> ARRAY[?]::text[]", f.Category)
+	}
 	m = m.Where("kind", f.Kind)
 	if f.Status != 9 {
 		m = m.Where("status", f.Status)

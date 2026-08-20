@@ -103,10 +103,11 @@ func (s *sVideo) FrontList(ctx context.Context, in service.FrontListInput) (*ser
 		size = 100
 	}
 	list, total, err := s.repo.List(ctx, domain.ListFilter{
-		Keyword: strings.TrimSpace(in.Keyword),
-		Kind:    entity.VideoKindVideo,
-		Status:  entity.VideoStatusPublished,
-		Sort:    in.Sort,
+		Keyword:  strings.TrimSpace(in.Keyword),
+		Category: strings.TrimSpace(in.Category),
+		Kind:     normalizeKind(in.Kind),
+		Status:   entity.VideoStatusPublished,
+		Sort:     in.Sort,
 	}, page, size)
 	if err != nil {
 		return nil, gerror.WrapCode(gcode.CodeDbOperationError, err, "查询视频失败")

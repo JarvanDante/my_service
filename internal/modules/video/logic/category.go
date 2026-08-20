@@ -24,6 +24,27 @@ func NewCategoryTable(table string) service.ICategory {
 	return &sCategory{table: table}
 }
 
+func (s *sCategory) Repo(ctx context.Context) ([]*service.CategoryDTO, error) {
+	var list []*entity.VideoCategory
+	err := g.Model(s.table).Ctx(ctx).
+		Where("site_id", vdSiteId).Where("status", 1).
+		OrderDesc("rank").OrderDesc("id").Scan(&list)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]*service.CategoryDTO, 0, len(list))
+	for _, r := range list {
+		created := ""
+		if r.CreatedAt != nil {
+			created = r.CreatedAt.String()
+		}
+		out = append(out, &service.CategoryDTO{
+			Id: r.Id, Name: r.Name, Kind: r.Kind, Rank: r.Rank, Status: r.Status, CreatedAt: created,
+		})
+	}
+	return out, nil
+}
+
 func (s *sCategory) List(ctx context.Context, f service.CategoryFilter) ([]*service.CategoryDTO, int, error) {
 	if f.Page <= 0 {
 		f.Page = 1

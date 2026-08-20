@@ -27,6 +27,8 @@ type CategoryFilter struct {
 }
 
 type ICategory interface {
+	// Repo 前台: 启用分类, rank desc。
+	Repo(ctx context.Context) ([]*CategoryDTO, error)
 	List(ctx context.Context, f CategoryFilter) ([]*CategoryDTO, int, error)
 	Create(ctx context.Context, in CategoryInput) (int64, error)
 	Update(ctx context.Context, in CategoryInput) error

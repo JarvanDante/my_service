@@ -6,13 +6,15 @@ package v1
 import "github.com/gogf/gf/v2/frame/g"
 
 type Item struct {
-	Id          int64  `json:"id"`
-	Title       string `json:"title"`
-	Description string `json:"description"`
-	CoverUrl    string `json:"cover_url"`
-	SourceUrl   string `json:"source_url"`
-	Duration    int    `json:"duration"`
-	CreatedAt   string `json:"created_at"`
+	Id          int64    `json:"id"`
+	Title       string   `json:"title"`
+	Description string   `json:"description"`
+	CoverUrl    string   `json:"cover_url"`
+	SourceUrl   string   `json:"source_url"`
+	Category    string   `json:"category"`
+	Categories  []string `json:"categories"`
+	Duration    int      `json:"duration"`
+	CreatedAt   string   `json:"created_at"`
 }
 
 // ListReq 视频列表(公开, 只出已上架)。

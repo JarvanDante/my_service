@@ -9,8 +9,9 @@ import (
 type ListFilter struct {
 	Keyword   string
 	MediaCode string
-	Kind      int // 0视频 2动漫
-	Status    int // 9=全部
+	Category  string // 作品分类名, 命中 category 逗号列表中的一项
+	Kind      int    // 0视频 2动漫
+	Status    int    // 9=全部
 	// Sort 排序方式: 0综合(人工 sort 权重, 后台与前台默认) 1最新 2时长。
 	// 加在仓储层而不是在 logic 里排内存, 是因为分页必须由 SQL 完成 ——
 	// 内存排序只能排当前这一页, 结果是错的。
