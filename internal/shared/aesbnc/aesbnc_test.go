@@ -48,6 +48,26 @@ func TestKnownVector(t *testing.T) {
 	}
 }
 
+func TestSetKeyFallback(t *testing.T) {
+	defer SetKey(DefaultKey)
+	SetKey("short")
+	if ActiveKey() != DefaultKey {
+		t.Fatal(ActiveKey())
+	}
+	SetKey("1234567890123456")
+	if ActiveKey() != "1234567890123456" {
+		t.Fatal(ActiveKey())
+	}
+	enc, err := Encrypt([]byte("hello-cover"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	SetKey(DefaultKey)
+	if _, err := Decrypt(enc); err == nil {
+		t.Fatal("old ciphertext must fail with default key")
+	}
+}
+
 func TestToBncKey(t *testing.T) {
 	if ToBncKey("a/cover.jpg") != "a/cover.bnc" {
 		t.Fatal(ToBncKey("a/cover.jpg"))

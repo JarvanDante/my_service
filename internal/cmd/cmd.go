@@ -9,6 +9,7 @@ import (
 	"github.com/gogf/gf/v2/os/gcmd"
 	"github.com/gogf/gf/v2/os/gfile"
 
+	"github.com/JarvanDante/my_service/internal/boot"
 	"github.com/JarvanDante/my_service/internal/shared/middleware"
 )
 
@@ -37,6 +38,7 @@ var Main = gcmd.Command{
 	Name:  "main",
 	Brief: "漫隐 API · 一体化开发入口",
 	Func: func(ctx context.Context, parser *gcmd.Parser) error {
+		boot.LoadImageAES(ctx)
 		s := g.Server()
 		mountStatic(ctx, s)
 		s.Use(middleware.CORS, ghttp.MiddlewareHandlerResponse)

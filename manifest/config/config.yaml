@@ -88,6 +88,10 @@ play_gateway:
   secret: "dev-play-secret-change-me"
   token_ttl_sec: 14400
 
+# 封面/用户图 AES-128-ECB, 必须 16 字节, 与 H5 VITE_AES_BNC_KEY 相同
+image_aes:
+  key: "525202f9149e061d"
+
 # 前台限流(Redis 固定窗口)。ip_* 登录前按客户端IP; user_* 登录后按用户ID。
 # 阈值按站点真实流量调; 正常用户远达不到, 批量刷接口会触发 429。
 front_ratelimit:

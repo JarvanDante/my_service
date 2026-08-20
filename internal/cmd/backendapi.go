@@ -7,6 +7,7 @@ import (
 	"github.com/gogf/gf/v2/net/ghttp"
 	"github.com/gogf/gf/v2/os/gcmd"
 
+	"github.com/JarvanDante/my_service/internal/boot"
 	"github.com/JarvanDante/my_service/internal/shared/middleware"
 )
 
@@ -15,6 +16,7 @@ var BackendAPI = gcmd.Command{
 	Name:  "backendapi",
 	Brief: "后台 API(运营/管理)",
 	Func: func(ctx context.Context, parser *gcmd.Parser) error {
+		boot.LoadImageAES(ctx)
 		s := g.Server("backendapi")
 		s.SetAddr(cfgAddr(ctx, "backendapi.address", ":8002"))
 		mountStatic(ctx, s)
