@@ -12,9 +12,14 @@ import (
 	"github.com/JarvanDante/my_service/internal/shared/consts"
 )
 
-type Controller struct{ video service.IVideo }
+type Controller struct {
+	video service.IVideo
+	cat   service.ICategory
+}
 
-func New(svc service.IVideo) *Controller { return &Controller{video: svc} }
+func New(svc service.IVideo, cat service.ICategory) *Controller {
+	return &Controller{video: svc, cat: cat}
+}
 
 func operatorId(ctx context.Context) (int64, error) {
 	id := ghttp.RequestFromCtx(ctx).GetCtxVar(consts.CtxAdminId).Int64()
