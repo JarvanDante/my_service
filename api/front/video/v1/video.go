@@ -17,14 +17,23 @@ type Item struct {
 	CreatedAt   string   `json:"created_at"`
 }
 
-// ListReq 视频列表(公开, 只出已上架)。
+// CategoryListReq 启用中的视频分类, 按权重倒序(公开)。
+type CategoryListReq struct {
+	g.Meta `path:"/video/categories" method:"get" tags:"Front/Video" summary:"视频分类"`
+}
+type CategoryListRes struct {
+	List []FrontCategoryItem `json:"list"`
+}
+
+// ListReq 视频列表(公开, 只出已上架 kind=0)。
 // sort: 0综合(人工 sort 权重) 1最新 2时长。
 type ListReq struct {
-	g.Meta  `path:"/video/list" method:"get" tags:"Front/Video" summary:"视频列表"`
-	Keyword string `json:"keyword"`
-	Sort    int    `json:"sort" v:"in:0,1,2#排序方式非法"`
-	Page    int    `json:"page"`
-	Size    int    `json:"size"`
+	g.Meta   `path:"/video/list" method:"get" tags:"Front/Video" summary:"视频列表"`
+	Keyword  string `json:"keyword"`
+	Category string `json:"category"`
+	Sort     int    `json:"sort" v:"in:0,1,2#排序方式非法"`
+	Page     int    `json:"page"`
+	Size     int    `json:"size"`
 }
 type ListRes struct {
 	List  []Item `json:"list"`

@@ -10,12 +10,13 @@ import (
 )
 
 type Controller struct {
-	svc service.IVideo
-	cat service.ICategory
+	svc        service.IVideo
+	videoCat   service.ICategory
+	cartoonCat service.ICategory
 }
 
-func New(svc service.IVideo, cat service.ICategory) *Controller {
-	return &Controller{svc: svc, cat: cat}
+func New(svc service.IVideo, videoCat, cartoonCat service.ICategory) *Controller {
+	return &Controller{svc: svc, videoCat: videoCat, cartoonCat: cartoonCat}
 }
 
 // toItem 只挑前台需要的字段, cover_key/source_key/created_by/status 不外发。
@@ -31,9 +32,25 @@ func toItem(v *service.VideoDTO) v1.Item {
 	}
 }
 
+func (c *Controller) CategoryList(ctx context.Context, _ *v1.CategoryListReq) (res *v1.CategoryListRes, err error) {
+	if c.videoCat == nil {
+		return &v1.CategoryListRes{List: []v1.FrontCategoryItem{}}, nil
+	}
+	list, err := c.videoCat.Repo(ctx)
+	if err != nil {
+		return nil, err
+	}
+	res = &v1.CategoryListRes{List: make([]v1.FrontCategoryItem, 0, len(list))}
+	for _, d := range list {
+		res.List = append(res.List, v1.FrontCategoryItem{Id: d.Id, Name: d.Name, Kind: d.Kind})
+	}
+	return res, nil
+}
+
 func (c *Controller) List(ctx context.Context, req *v1.ListReq) (res *v1.ListRes, err error) {
 	dto, err := c.svc.FrontList(ctx, service.FrontListInput{
-		Keyword: req.Keyword, Sort: req.Sort, Page: req.Page, Size: req.Size,
+		Keyword: req.Keyword, Category: req.Category, Kind: entity.VideoKindVideo,
+		Sort: req.Sort, Page: req.Page, Size: req.Size,
 	})
 	if err != nil {
 		return nil, err
@@ -54,10 +71,10 @@ func (c *Controller) Detail(ctx context.Context, req *v1.DetailReq) (res *v1.Det
 }
 
 func (c *Controller) CartoonCategoryList(ctx context.Context, _ *v1.CartoonCategoryListReq) (res *v1.CartoonCategoryListRes, err error) {
-	if c.cat == nil {
+	if c.cartoonCat == nil {
 		return &v1.CartoonCategoryListRes{List: []v1.FrontCategoryItem{}}, nil
 	}
-	list, err := c.cat.Repo(ctx)
+	list, err := c.cartoonCat.Repo(ctx)
 	if err != nil {
 		return nil, err
 	}
