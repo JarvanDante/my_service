@@ -41,15 +41,19 @@ func toDTO(r *entity.Post) *service.PostDTO {
 	if r.Pics != "" {
 		_ = json.Unmarshal([]byte(r.Pics), &pics)
 	}
+	topics := []string{}
+	if r.Topics != "" {
+		_ = json.Unmarshal([]byte(r.Topics), &topics)
+	}
 	created := ""
 	if r.CreatedAt != nil {
 		created = r.CreatedAt.String()
 	}
 	return &service.PostDTO{
 		Id: r.Id, UserId: r.UserId, Title: r.Title, Content: r.Content, Pics: pics,
-		MediaId: r.MediaId, ViewCount: r.ViewCount, LikeCount: r.LikeCount,
-		CommentCount: r.CommentCount, Status: r.Status, RejectReason: r.RejectReason,
-		CreatedAt: created,
+		Topics: topics, VideoUrl: r.VideoUrl, MediaId: r.MediaId, ViewCount: r.ViewCount,
+		LikeCount: r.LikeCount, CommentCount: r.CommentCount, Status: r.Status,
+		RejectReason: r.RejectReason, CreatedAt: created,
 	}
 }
 
@@ -90,28 +94,59 @@ func fillAuthors(ctx context.Context, list []*service.PostDTO) {
 
 func (s *sPost) Create(ctx context.Context, in service.CreateInput) (int64, error) {
 	title := strings.TrimSpace(in.Title)
+	content := strings.TrimSpace(in.Content)
 	if title == "" {
 		return 0, gerror.New("标题不能为空")
 	}
-	if hit, err := hitFilterWord(ctx, title+" "+in.Content); err != nil {
+	if content == "" {
+		return 0, gerror.New("请输入内容")
+	}
+	topics := trimTopics(in.Topics)
+	if len(topics) == 0 {
+		return 0, gerror.New("请选择话题")
+	}
+	if len(in.Pics) == 0 {
+		return 0, gerror.New("请上传图片")
+	}
+	if len(in.Pics) > 9 {
+		return 0, gerror.New("最多上传9张图片")
+	}
+	if hit, err := hitFilterWord(ctx, title+" "+content); err != nil {
 		return 0, err
 	} else if hit != "" {
 		return 0, gerror.New("内容包含违禁词, 请修改后重试")
 	}
-	picsJSON := "[]"
-	if len(in.Pics) > 0 {
-		if b, e := json.Marshal(in.Pics); e == nil {
-			picsJSON = string(b)
-		}
-	}
+	picsJSON, _ := json.Marshal(in.Pics)
+	topicsJSON, _ := json.Marshal(topics)
 	id, err := g.Model("post").Ctx(ctx).Data(g.Map{
 		"site_id": postSiteId, "user_id": in.UserId, "title": title,
-		"content": in.Content, "pics": picsJSON, "media_id": in.MediaId, "status": 0,
+		"content": content, "pics": string(picsJSON), "topics": string(topicsJSON),
+		"video_url": strings.TrimSpace(in.VideoUrl), "media_id": in.MediaId, "status": 0,
 	}).InsertAndGetId()
 	if err != nil {
 		return 0, err
 	}
 	return id, nil
+}
+
+func trimTopics(in []string) []string {
+	out := make([]string, 0, len(in))
+	seen := map[string]struct{}{}
+	for _, raw := range in {
+		name := strings.TrimSpace(raw)
+		if name == "" {
+			continue
+		}
+		if _, ok := seen[name]; ok {
+			continue
+		}
+		seen[name] = struct{}{}
+		out = append(out, name)
+		if len(out) >= 3 {
+			break
+		}
+	}
+	return out
 }
 
 func (s *sPost) FrontList(ctx context.Context, f service.ListFilter) ([]*service.PostDTO, int, error) {

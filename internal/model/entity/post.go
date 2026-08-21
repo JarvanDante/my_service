@@ -10,6 +10,8 @@ type Post struct {
 	Title        string      `json:"title"        orm:"title"`
 	Content      string      `json:"content"      orm:"content"`
 	Pics         string      `json:"pics"         orm:"pics"` // 原始 JSON 数组文本
+	Topics       string      `json:"topics"       orm:"topics"` // 话题名 JSON 数组
+	VideoUrl     string      `json:"videoUrl"     orm:"video_url"`
 	MediaId      int64       `json:"mediaId"      orm:"media_id"`
 	ViewCount    int64       `json:"viewCount"    orm:"view_count"`
 	LikeCount    int         `json:"likeCount"    orm:"like_count"`

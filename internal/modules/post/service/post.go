@@ -11,6 +11,8 @@ type PostDTO struct {
 	Title        string
 	Content      string
 	Pics         []string
+	Topics       []string
+	VideoUrl     string
 	MediaId      int64
 	ViewCount    int64
 	LikeCount    int
@@ -21,11 +23,13 @@ type PostDTO struct {
 }
 
 type CreateInput struct {
-	UserId  int64
-	Title   string
-	Content string
-	Pics    []string
-	MediaId int64
+	UserId   int64
+	Title    string
+	Content  string
+	Pics     []string
+	Topics   []string
+	VideoUrl string
+	MediaId  int64
 }
 
 type ListFilter struct {

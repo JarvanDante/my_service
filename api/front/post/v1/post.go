@@ -11,6 +11,8 @@ type Item struct {
 	Title        string   `json:"title"`
 	Content      string   `json:"content"`
 	Pics         []string `json:"pics"`
+	Topics       []string `json:"topics"`
+	VideoUrl     string   `json:"video_url"`
 	MediaId      int64    `json:"media_id"`
 	ViewCount    int64    `json:"view_count"`
 	LikeCount    int      `json:"like_count"`
@@ -26,11 +28,13 @@ type Item struct {
 
 // CreateReq 发帖(需登录, 过敏感词, 待审核)。
 type CreateReq struct {
-	g.Meta  `path:"/post/create" method:"post" tags:"Front/Post" summary:"发帖"`
-	Title   string   `json:"title" v:"required|max-length:128#标题必填|标题过长"`
-	Content string   `json:"content" v:"max-length:5000#内容过长"`
-	Pics    []string `json:"pics"`
-	MediaId int64    `json:"media_id"`
+	g.Meta   `path:"/post/create" method:"post" tags:"Front/Post" summary:"发帖"`
+	Title    string   `json:"title" v:"required|max-length:128#标题必填|标题过长"`
+	Content  string   `json:"content" v:"required|max-length:5000#内容必填|内容过长"`
+	Pics     []string `json:"pics" v:"required#请上传图片"`
+	Topics   []string `json:"topics" v:"required#请选择话题"`
+	VideoUrl string   `json:"video_url"`
+	MediaId  int64    `json:"media_id"`
 }
 type CreateRes struct {
 	Id int64 `json:"id"`

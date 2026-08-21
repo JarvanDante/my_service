@@ -53,9 +53,9 @@ func (c *Controller) Upload(ctx context.Context, req *v1.UploadReq) (res *v1.Upl
 		purpose = "image"
 	}
 	switch purpose {
-	case "image", "avatar":
+	case "image", "avatar", "video":
 	default:
-		return nil, gerror.NewCode(gcode.CodeInvalidParameter, "前台仅支持上传 image/avatar")
+		return nil, gerror.NewCode(gcode.CodeInvalidParameter, "前台仅支持上传 image/avatar/video")
 	}
 	dto, err := c.media.Upload(ctx, service.UploadInput{
 		File: req.File, Purpose: purpose, OperatorId: userId,

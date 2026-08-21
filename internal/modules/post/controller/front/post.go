@@ -32,9 +32,9 @@ func optionalUid(ctx context.Context) int64 {
 func itemOf(d *service.PostDTO, withAudit bool) v1.Item {
 	it := v1.Item{
 		Id: d.Id, UserId: d.UserId, Nickname: d.Nickname, Img: d.Img,
-		Title: d.Title, Content: d.Content, Pics: d.Pics,
-		MediaId: d.MediaId, ViewCount: d.ViewCount, LikeCount: d.LikeCount,
-		CommentCount: d.CommentCount, CreatedAt: d.CreatedAt,
+		Title: d.Title, Content: d.Content, Pics: d.Pics, Topics: d.Topics,
+		VideoUrl: d.VideoUrl, MediaId: d.MediaId, ViewCount: d.ViewCount,
+		LikeCount: d.LikeCount, CommentCount: d.CommentCount, CreatedAt: d.CreatedAt,
 	}
 	if withAudit {
 		it.Status, it.RejectReason = d.Status, d.RejectReason
@@ -49,7 +49,7 @@ func (c *Controller) Create(ctx context.Context, req *v1.CreateReq) (res *v1.Cre
 	}
 	id, err := c.svc.Create(ctx, service.CreateInput{
 		UserId: userId, Title: req.Title, Content: req.Content,
-		Pics: req.Pics, MediaId: req.MediaId,
+		Pics: req.Pics, Topics: req.Topics, VideoUrl: req.VideoUrl, MediaId: req.MediaId,
 	})
 	if err != nil {
 		return nil, err

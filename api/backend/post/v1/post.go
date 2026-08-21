@@ -9,6 +9,8 @@ type Item struct {
 	Title        string   `json:"title"`
 	Content      string   `json:"content"`
 	Pics         []string `json:"pics"`
+	Topics       []string `json:"topics"`
+	VideoUrl     string   `json:"video_url"`
 	MediaId      int64    `json:"media_id"`
 	ViewCount    int64    `json:"view_count"`
 	LikeCount    int      `json:"like_count"`
