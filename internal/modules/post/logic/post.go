@@ -157,6 +157,9 @@ func (s *sPost) FrontList(ctx context.Context, f service.ListFilter) ([]*service
 		f.Size = 20
 	}
 	m := g.Model("post").Ctx(ctx).Where("site_id", postSiteId).Where("status", 1)
+	if f.UserId > 0 {
+		m = m.Where("user_id", f.UserId)
+	}
 	if f.Keyword != "" {
 		m = m.Where("title ILIKE ?", "%"+f.Keyword+"%")
 	}

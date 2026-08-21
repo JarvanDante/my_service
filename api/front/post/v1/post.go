@@ -45,6 +45,7 @@ type ListReq struct {
 	g.Meta  `path:"/post/list" method:"get" tags:"Front/Post" summary:"帖子列表"`
 	Sort    string `json:"sort"`    // new(默认)/hot
 	Keyword string `json:"keyword"` // 标题模糊
+	UserId  int64  `json:"user_id"` // 0=全部, >0 该用户已通过帖子
 	Page    int    `json:"page"`
 	Size    int    `json:"size"`
 }

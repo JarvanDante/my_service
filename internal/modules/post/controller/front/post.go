@@ -59,7 +59,7 @@ func (c *Controller) Create(ctx context.Context, req *v1.CreateReq) (res *v1.Cre
 
 func (c *Controller) List(ctx context.Context, req *v1.ListReq) (res *v1.ListRes, err error) {
 	list, total, err := c.svc.FrontList(ctx, service.ListFilter{
-		Sort: req.Sort, Keyword: req.Keyword, Page: req.Page, Size: req.Size,
+		Sort: req.Sort, Keyword: req.Keyword, UserId: req.UserId, Page: req.Page, Size: req.Size,
 	})
 	if err != nil {
 		return nil, err
