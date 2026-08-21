@@ -4,6 +4,7 @@ package comment
 import (
 	"github.com/gogf/gf/v2/net/ghttp"
 
+	"github.com/JarvanDante/my_service/internal/modules/comment/controller/backend"
 	"github.com/JarvanDante/my_service/internal/modules/comment/controller/front"
 	"github.com/JarvanDante/my_service/internal/modules/comment/logic"
 	"github.com/JarvanDante/my_service/internal/shared/middleware"
@@ -17,4 +18,10 @@ func RegisterFront(group *ghttp.RouterGroup) {
 		auth.Middleware(middleware.Auth, middleware.UserRateLimit)
 		auth.Bind(ctrl.Add)
 	})
+}
+
+// RegisterBackend 后台评论审核(挂在权限组)。
+func RegisterBackend(group *ghttp.RouterGroup) {
+	ctrl := backend.New(logic.New())
+	group.Bind(ctrl.List, ctrl.Audit)
 }

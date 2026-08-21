@@ -30,14 +30,14 @@ func (c *Controller) Add(ctx context.Context, req *v1.AddReq) (res *v1.AddRes, e
 	if err != nil {
 		return nil, err
 	}
-	id, err := c.svc.Add(ctx, service.AddInput{
+	id, status, err := c.svc.Add(ctx, service.AddInput{
 		UserId: userId, MediaType: req.MediaType, ContentId: req.ContentId,
 		ParentId: req.ParentId, Content: req.Content,
 	})
 	if err != nil {
 		return nil, err
 	}
-	return &v1.AddRes{Id: id}, nil
+	return &v1.AddRes{Id: id, Status: status}, nil
 }
 
 func itemOf(d service.ItemDTO) v1.Item {

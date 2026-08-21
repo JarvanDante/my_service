@@ -1,6 +1,7 @@
 // Package logic 评论业务(移植自 tianbi comment)。
 // 树形: parent_id 保留树结构, root_id 反范式化到顶层, 列表两查合并, 无需递归 CTE。
 // UGC 过滤: 命中 filter_word 直接拒绝。
+// 上墙规则(社区二期): VIP 评论/回复直接上墙; 普通用户待审。
 package logic
 
 import (
@@ -10,12 +11,20 @@ import (
 	"github.com/gogf/gf/v2/database/gdb"
 	"github.com/gogf/gf/v2/errors/gerror"
 	"github.com/gogf/gf/v2/frame/g"
+	"github.com/gogf/gf/v2/os/gtime"
 
 	"github.com/JarvanDante/my_service/internal/model/entity"
 	"github.com/JarvanDante/my_service/internal/modules/comment/service"
+	"github.com/JarvanDante/my_service/internal/shared/paywall"
 )
 
 const cmtSiteId = 1 // 单站点样板
+
+const (
+	statusPending = 0
+	statusLive    = 1
+	statusReject  = 2
+)
 
 type sComment struct{}
 
@@ -36,67 +45,82 @@ func hitFilterWord(ctx context.Context, text string) (string, error) {
 	return "", nil
 }
 
-func (s *sComment) Add(ctx context.Context, in service.AddInput) (int64, error) {
+func (s *sComment) Add(ctx context.Context, in service.AddInput) (int64, int, error) {
 	content := strings.TrimSpace(in.Content)
 	if content == "" {
-		return 0, gerror.New("评论内容不能为空")
+		return 0, 0, gerror.New("评论内容不能为空")
 	}
 	if hit, err := hitFilterWord(ctx, content); err != nil {
-		return 0, err
+		return 0, 0, err
 	} else if hit != "" {
-		return 0, gerror.New("内容包含违禁词, 请修改后重试")
+		return 0, 0, gerror.New("内容包含违禁词, 请修改后重试")
 	}
 	rootId := int64(0)
 	if in.ParentId > 0 {
 		var parent *entity.Comment
 		if err := g.Model("comment").Ctx(ctx).
-			Where("site_id", cmtSiteId).Where("id", in.ParentId).Where("status", 1).
+			Where("site_id", cmtSiteId).Where("id", in.ParentId).Where("status", statusLive).
 			Scan(&parent); err != nil {
-			return 0, err
+			return 0, 0, err
 		}
 		if parent == nil {
-			return 0, gerror.New("被回复的评论不存在")
+			return 0, 0, gerror.New("被回复的评论不存在")
 		}
 		if parent.MediaType != in.MediaType || parent.ContentId != in.ContentId {
-			return 0, gerror.New("回复目标与内容不匹配")
+			return 0, 0, gerror.New("回复目标与内容不匹配")
 		}
 		rootId = parent.Id
 		if parent.RootId > 0 { // 回复的回复, 锚到同一顶层
 			rootId = parent.RootId
 		}
 	}
+	isVip, err := paywall.IsVipActive(ctx, in.UserId)
+	if err != nil {
+		return 0, 0, err
+	}
+	status := statusPending
+	if isVip {
+		status = statusLive
+	}
 	var newId int64
-	err := g.DB().Transaction(ctx, func(ctx context.Context, tx gdb.TX) error {
+	err = g.DB().Transaction(ctx, func(ctx context.Context, tx gdb.TX) error {
 		id, err := tx.Model("comment").Ctx(ctx).Data(g.Map{
 			"site_id": cmtSiteId, "user_id": in.UserId, "media_type": in.MediaType,
 			"content_id": in.ContentId, "parent_id": in.ParentId, "root_id": rootId,
-			"content": content, "status": 1,
+			"content": content, "status": status,
 		}).InsertAndGetId()
 		if err != nil {
 			return err
 		}
 		newId = id
-		if rootId > 0 { // 顶层评论回复数+1
-			if _, err := tx.Model("comment").Ctx(ctx).Where("id", rootId).
-				Data(g.Map{"reply_count": &gdb.Counter{Field: "reply_count", Value: 1}}).
-				Update(); err != nil {
-				return err
-			}
-		}
-		if in.MediaType == 2 { // 帖子评论数+1
-			if _, err := tx.Model("post").Ctx(ctx).
-				Where("site_id", cmtSiteId).Where("id", in.ContentId).
-				Data(g.Map{"comment_count": &gdb.Counter{Field: "comment_count", Value: 1}}).
-				Update(); err != nil {
-				return err
-			}
+		if status == statusLive {
+			return bumpLiveCounts(ctx, tx, in.MediaType, in.ContentId, rootId)
 		}
 		return nil
 	})
 	if err != nil {
-		return 0, err
+		return 0, 0, err
 	}
-	return newId, nil
+	return newId, status, nil
+}
+
+func bumpLiveCounts(ctx context.Context, tx gdb.TX, mediaType int, contentId, rootId int64) error {
+	if rootId > 0 {
+		if _, err := tx.Model("comment").Ctx(ctx).Where("id", rootId).
+			Data(g.Map{"reply_count": &gdb.Counter{Field: "reply_count", Value: 1}}).
+			Update(); err != nil {
+			return err
+		}
+	}
+	if mediaType == 2 {
+		if _, err := tx.Model("post").Ctx(ctx).
+			Where("site_id", cmtSiteId).Where("id", contentId).
+			Data(g.Map{"comment_count": &gdb.Counter{Field: "comment_count", Value: 1}}).
+			Update(); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func toDTO(r *entity.Comment) service.ItemDTO {
@@ -120,7 +144,7 @@ func (s *sComment) List(ctx context.Context, mediaType int, contentId int64, pag
 	}
 	base := g.Model("comment").Ctx(ctx).
 		Where("site_id", cmtSiteId).Where("media_type", mediaType).
-		Where("content_id", contentId).Where("status", 1)
+		Where("content_id", contentId).Where("status", statusLive)
 	// 顶层分页
 	top := base.Clone().Where("root_id", 0)
 	total, err := top.Clone().Count()
@@ -134,7 +158,7 @@ func (s *sComment) List(ctx context.Context, mediaType int, contentId int64, pag
 	if len(tops) == 0 {
 		return []service.ItemDTO{}, total, nil
 	}
-	// 本页顶层的全部回复(一查带回, parent_id 保留树形)
+	// 本页顶层的全部已上墙回复
 	rootIds := make([]int64, 0, len(tops))
 	for _, t := range tops {
 		rootIds = append(rootIds, t.Id)
@@ -154,4 +178,128 @@ func (s *sComment) List(ctx context.Context, mediaType int, contentId int64, pag
 		out = append(out, d)
 	}
 	return out, total, nil
+}
+
+func (s *sComment) AdminList(ctx context.Context, f service.AdminListFilter) ([]*service.AdminItemDTO, int, error) {
+	if f.Page <= 0 {
+		f.Page = 1
+	}
+	if f.Size <= 0 {
+		f.Size = 20
+	}
+	m := g.Model("comment").Ctx(ctx).Where("site_id", cmtSiteId)
+	if f.Status >= 0 {
+		m = m.Where("status", f.Status)
+	}
+	switch f.Kind {
+	case "main":
+		m = m.Where("parent_id", 0)
+	case "reply":
+		m = m.Where("parent_id > ?", 0)
+	}
+	if f.Keyword != "" {
+		m = m.Where("content ILIKE ?", "%"+f.Keyword+"%")
+	}
+	if f.UserId > 0 {
+		m = m.Where("user_id", f.UserId)
+	}
+	if f.MediaType > 0 {
+		m = m.Where("media_type", f.MediaType)
+	}
+	total, err := m.Clone().Count()
+	if err != nil {
+		return nil, 0, err
+	}
+	var list []*entity.Comment
+	if err := m.Clone().OrderDesc("id").Page(f.Page, f.Size).Scan(&list); err != nil {
+		return nil, 0, err
+	}
+	out := make([]*service.AdminItemDTO, 0, len(list))
+	for _, r := range list {
+		created := ""
+		if r.CreatedAt != nil {
+			created = r.CreatedAt.String()
+		}
+		out = append(out, &service.AdminItemDTO{
+			Id: r.Id, UserId: r.UserId, MediaType: r.MediaType, ContentId: r.ContentId,
+			ParentId: r.ParentId, RootId: r.RootId, Content: r.Content,
+			LikeCount: r.LikeCount, ReplyCount: r.ReplyCount, Status: r.Status,
+			CreatedAt: created,
+		})
+	}
+	fillAdminUsers(ctx, out)
+	return out, total, nil
+}
+
+func fillAdminUsers(ctx context.Context, list []*service.AdminItemDTO) {
+	ids := make([]int64, 0, len(list))
+	seen := map[int64]struct{}{}
+	for _, d := range list {
+		if d == nil || d.UserId <= 0 {
+			continue
+		}
+		if _, ok := seen[d.UserId]; ok {
+			continue
+		}
+		seen[d.UserId] = struct{}{}
+		ids = append(ids, d.UserId)
+	}
+	if len(ids) == 0 {
+		return
+	}
+	rows, err := g.Model("users").Ctx(ctx).WhereIn("id", ids).Fields("id,nickname,img").All()
+	if err != nil {
+		return
+	}
+	type author struct{ nickname, img string }
+	m := map[int64]author{}
+	for _, row := range rows {
+		m[row["id"].Int64()] = author{row["nickname"].String(), row["img"].String()}
+	}
+	vipSet := map[int64]bool{}
+	now := gtime.Now().Unix()
+	vipRows, _ := g.Model("vip_log").Ctx(ctx).
+		Where("site_id", cmtSiteId).WhereIn("user_id", ids).
+		Where("end_at > ?", now).Fields("user_id").All()
+	for _, row := range vipRows {
+		vipSet[row["user_id"].Int64()] = true
+	}
+	for _, d := range list {
+		if d == nil {
+			continue
+		}
+		if a, ok := m[d.UserId]; ok {
+			d.Nickname, d.Img = a.nickname, a.img
+		}
+		d.IsVip = vipSet[d.UserId]
+	}
+}
+
+func (s *sComment) Audit(ctx context.Context, id int64, pass bool) error {
+	if id <= 0 {
+		return gerror.New("ID非法")
+	}
+	newStatus := statusLive
+	if !pass {
+		newStatus = statusReject
+	}
+	return g.DB().Transaction(ctx, func(ctx context.Context, tx gdb.TX) error {
+		var row *entity.Comment
+		if err := tx.Model("comment").Ctx(ctx).
+			Where("site_id", cmtSiteId).Where("id", id).Where("status", statusPending).
+			LockUpdate().Scan(&row); err != nil {
+			return err
+		}
+		if row == nil {
+			return gerror.New("评论不存在或已审核过")
+		}
+		if _, err := tx.Model("comment").Ctx(ctx).Where("id", id).
+			Data(g.Map{"status": newStatus}).Update(); err != nil {
+			return err
+		}
+		if newStatus == statusLive {
+			return bumpLiveCounts(ctx, tx, row.MediaType, row.ContentId, row.RootId)
+		}
+		return nil
+	})
 }

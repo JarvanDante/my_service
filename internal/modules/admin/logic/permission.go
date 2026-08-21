@@ -188,10 +188,17 @@ func buildMenuTree(menus []*entity.AdminPermission) []*service.MenuNodeDTO {
 			roots = append(roots, node)
 		}
 	}
-	// 纯目录(自身无 component)才重定向到首个子菜单
+	// 纯目录(自身无 component)才重定向到首个可见子菜单
 	for _, n := range nodeMap {
-		if len(n.Children) > 0 && n.Component == "" {
-			n.Redirect = n.Children[0].Path
+		if len(n.Children) == 0 || n.Component != "" {
+			continue
+		}
+		n.Redirect = n.Children[0].Path
+		for _, c := range n.Children {
+			if !c.HideInMenu {
+				n.Redirect = c.Path
+				break
+			}
 		}
 	}
 	return roots

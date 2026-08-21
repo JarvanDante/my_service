@@ -114,6 +114,7 @@ func mountBackend(s *ghttp.Server) {
 			msgmod.RegisterBackend(perm)
 			opsmod.RegisterBackend(perm)
 			postmod.RegisterBackend(perm)
+			commentmod.RegisterBackend(perm)
 			ranksmod.RegisterBackend(perm)
 			rgmod.RegisterBackend(perm)
 			walletmod.RegisterBackend(perm)

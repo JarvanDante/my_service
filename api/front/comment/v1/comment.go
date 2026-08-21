@@ -24,7 +24,8 @@ type AddReq struct {
 	Content   string `json:"content" v:"required|max-length:1000#内容必填|内容过长"`
 }
 type AddRes struct {
-	Id int64 `json:"id"`
+	Id     int64 `json:"id"`
+	Status int   `json:"status"` // 0待审 1已上墙(VIP 直接上墙)
 }
 
 // ListReq 评论列表(顶层分页, 每条带回复; 公开)。
