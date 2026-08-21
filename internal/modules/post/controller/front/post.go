@@ -31,7 +31,8 @@ func optionalUid(ctx context.Context) int64 {
 
 func itemOf(d *service.PostDTO, withAudit bool) v1.Item {
 	it := v1.Item{
-		Id: d.Id, UserId: d.UserId, Title: d.Title, Content: d.Content, Pics: d.Pics,
+		Id: d.Id, UserId: d.UserId, Nickname: d.Nickname, Img: d.Img,
+		Title: d.Title, Content: d.Content, Pics: d.Pics,
 		MediaId: d.MediaId, ViewCount: d.ViewCount, LikeCount: d.LikeCount,
 		CommentCount: d.CommentCount, CreatedAt: d.CreatedAt,
 	}

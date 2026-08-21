@@ -6,6 +6,8 @@ import "context"
 type PostDTO struct {
 	Id           int64
 	UserId       int64
+	Nickname     string
+	Img          string
 	Title        string
 	Content      string
 	Pics         []string

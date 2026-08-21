@@ -6,6 +6,8 @@ import "github.com/gogf/gf/v2/frame/g"
 type Item struct {
 	Id           int64    `json:"id"`
 	UserId       int64    `json:"user_id"`
+	Nickname     string   `json:"nickname"`
+	Img          string   `json:"img"`
 	Title        string   `json:"title"`
 	Content      string   `json:"content"`
 	Pics         []string `json:"pics"`

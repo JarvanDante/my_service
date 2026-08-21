@@ -53,6 +53,41 @@ func toDTO(r *entity.Post) *service.PostDTO {
 	}
 }
 
+func fillAuthors(ctx context.Context, list []*service.PostDTO) {
+	ids := make([]int64, 0, len(list))
+	seen := map[int64]struct{}{}
+	for _, d := range list {
+		if d == nil || d.UserId <= 0 {
+			continue
+		}
+		if _, ok := seen[d.UserId]; ok {
+			continue
+		}
+		seen[d.UserId] = struct{}{}
+		ids = append(ids, d.UserId)
+	}
+	if len(ids) == 0 {
+		return
+	}
+	rows, err := g.Model("users").Ctx(ctx).WhereIn("id", ids).Fields("id,nickname,img").All()
+	if err != nil {
+		return
+	}
+	type author struct{ nickname, img string }
+	m := map[int64]author{}
+	for _, row := range rows {
+		m[row["id"].Int64()] = author{row["nickname"].String(), row["img"].String()}
+	}
+	for _, d := range list {
+		if d == nil {
+			continue
+		}
+		if a, ok := m[d.UserId]; ok {
+			d.Nickname, d.Img = a.nickname, a.img
+		}
+	}
+}
+
 func (s *sPost) Create(ctx context.Context, in service.CreateInput) (int64, error) {
 	title := strings.TrimSpace(in.Title)
 	if title == "" {
@@ -110,6 +145,7 @@ func (s *sPost) FrontList(ctx context.Context, f service.ListFilter) ([]*service
 		d.Status, d.RejectReason = 0, "" // 前台流不暴露审核态
 		out = append(out, d)
 	}
+	fillAuthors(ctx, out)
 	return out, total, nil
 }
 
@@ -129,6 +165,7 @@ func (s *sPost) Detail(ctx context.Context, id, viewerId int64) (*service.PostDT
 		Data(g.Map{"view_count": &gdb.Counter{Field: "view_count", Value: 1}}).Update()
 	d := toDTO(r)
 	d.ViewCount++
+	fillAuthors(ctx, []*service.PostDTO{d})
 	return d, nil
 }
 
@@ -153,6 +190,7 @@ func (s *sPost) My(ctx context.Context, userId int64, page, size int) ([]*servic
 	for _, r := range list {
 		out = append(out, toDTO(r))
 	}
+	fillAuthors(ctx, out)
 	return out, total, nil
 }
 
