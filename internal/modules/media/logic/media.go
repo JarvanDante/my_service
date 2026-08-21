@@ -34,7 +34,10 @@ var purposeDefaults = map[string]struct {
 	"image":  {[]string{"image/jpeg", "image/jpg", "image/png", "image/gif", "image/webp"}, 5120},
 	"cover":  {[]string{"image/jpeg", "image/jpg", "image/png", "image/gif", "image/webp"}, 5120},
 	"avatar": {[]string{"image/jpeg", "image/jpg", "image/png", "image/webp"}, 2048},
-	"video":  {[]string{"video/mp4", "video/quicktime", "video/x-matroska", "video/webm"}, 2097152},
+	"video": {[]string{
+		"video/mp4", "video/quicktime", "video/x-matroska", "video/webm",
+		"video/3gpp", "video/3gpp2", "video/x-m4v",
+	}, 2097152},
 }
 
 func (s *sMedia) Upload(ctx context.Context, in service.UploadInput) (*service.UploadDTO, error) {
@@ -80,22 +83,23 @@ func (s *sMedia) Upload(ctx context.Context, in service.UploadInput) (*service.U
 	}
 	defer f.Close()
 
-	raw, err := io.ReadAll(f)
-	if err != nil {
-		return nil, gerror.WrapCode(gcode.CodeInternalError, err, "读取上传文件失败")
-	}
+	var reader io.Reader = f
 	if aesbnc.ShouldEncryptPurpose(purpose) {
+		raw, err := io.ReadAll(f)
+		if err != nil {
+			return nil, gerror.WrapCode(gcode.CodeInternalError, err, "读取上传文件失败")
+		}
 		enc, err := aesbnc.Encrypt(raw)
 		if err != nil {
 			return nil, gerror.WrapCode(gcode.CodeInternalError, err, "图片加密失败")
 		}
-		raw = enc
+		reader = bytes.NewReader(enc)
 		objectKey = aesbnc.ToBncKey(objectKey)
 		contentType = "application/octet-stream"
-		size = int64(len(raw))
+		size = int64(len(enc))
 	}
 
-	url, err := client.Put(ctx, objectKey, bytes.NewReader(raw), size, contentType)
+	url, err := client.Put(ctx, objectKey, reader, size, contentType)
 	if err != nil {
 		return nil, gerror.WrapCode(gcode.CodeInternalError, err, "上传失败")
 	}
@@ -194,6 +198,10 @@ func detectContentType(filename, headerType string) string {
 			return "video/x-matroska"
 		case ".webm":
 			return "video/webm"
+		case ".3gp", ".3gpp":
+			return "video/3gpp"
+		case ".m4v":
+			return "video/x-m4v"
 		}
 	}
 	return "application/octet-stream"

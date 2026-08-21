@@ -5,6 +5,8 @@ server:
   address:     ":8000"
   openapiPath: "/api.json"
   swaggerPath: "/swagger"
+  # 默认 8MB; 发帖视频上限 600M。超限会以纯文本 r.ParseMultipartForm 返回, H5 JSON 解析失败
+  clientMaxBodySize: 734003200
 
 frontapi:
   address: ":8001"
@@ -71,7 +73,7 @@ upload:
     mime: ["image/jpeg", "image/jpg", "image/png", "image/webp"]
     maxSize: 2048
   video:
-    mime: ["video/mp4", "video/quicktime", "video/x-matroska", "video/webm"]
+    mime: ["video/mp4", "video/quicktime", "video/x-matroska", "video/webm", "video/3gpp", "video/3gpp2", "video/x-m4v"]
     maxSize: 2097152
   multipart:
     partSize: 8388608
