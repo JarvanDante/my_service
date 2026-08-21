@@ -142,7 +142,7 @@ func trimTopics(in []string) []string {
 		}
 		seen[name] = struct{}{}
 		out = append(out, name)
-		if len(out) >= 3 {
+		if len(out) >= 10 {
 			break
 		}
 	}
