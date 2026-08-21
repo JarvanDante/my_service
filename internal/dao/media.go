@@ -2,6 +2,8 @@ package dao
 
 import (
 	"context"
+	"database/sql"
+	"errors"
 
 	"github.com/gogf/gf/v2/frame/g"
 	"github.com/gogf/gf/v2/os/gtime"
@@ -54,6 +56,22 @@ func (r *mediaRepo) MultipartCreate(ctx context.Context, m *entity.MediaMultipar
 func (r *mediaRepo) MultipartFindByUploadId(ctx context.Context, uploadId string) (*entity.MediaMultipart, error) {
 	var m *entity.MediaMultipart
 	err := g.Model("media_multipart").Ctx(ctx).Where("upload_id", uploadId).Scan(&m)
+	return m, err
+}
+
+func (r *mediaRepo) MultipartFindActive(ctx context.Context, operatorId int64, filename string, size int64) (*entity.MediaMultipart, error) {
+	var m *entity.MediaMultipart
+	err := g.Model("media_multipart").Ctx(ctx).
+		Where("created_by", operatorId).
+		Where("filename", filename).
+		Where("size", size).
+		Where("status", entity.MultipartStatusUploading).
+		OrderDesc("id").
+		Limit(1).
+		Scan(&m)
+	if err != nil && errors.Is(err, sql.ErrNoRows) {
+		return nil, nil
+	}
 	return m, err
 }
 

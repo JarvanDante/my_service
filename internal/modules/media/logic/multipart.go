@@ -39,6 +39,16 @@ func (s *sMedia) MultipartInit(ctx context.Context, in service.MultipartInitInpu
 		return nil, gerror.NewCode(gcode.CodeInvalidParameter, "文件名必填")
 	}
 
+	if in.Resume && in.OperatorId > 0 {
+		exist, err := s.repo.MultipartFindActive(ctx, in.OperatorId, filename, in.Size)
+		if err != nil {
+			return nil, gerror.WrapCode(gcode.CodeDbOperationError, err, "查询分片会话失败")
+		}
+		if exist != nil && exist.Id > 0 {
+			return multipartInitFromSession(exist), nil
+		}
+	}
+
 	contentType := detectContentType(filename, in.ContentType)
 	if err := s.validateMime(ctx, purpose, contentType); err != nil {
 		return nil, err
@@ -100,6 +110,53 @@ func (s *sMedia) MultipartInit(ctx context.Context, in service.MultipartInitInpu
 		Purpose: purpose, ContentType: contentType, Size: in.Size,
 		PartSize: partSize, PartCount: partCount,
 	}, nil
+}
+
+func multipartInitFromSession(sess *entity.MediaMultipart) *service.MultipartInitDTO {
+	return &service.MultipartInitDTO{
+		UploadId: sess.UploadId, ObjectKey: sess.ObjectKey, Bucket: sess.Bucket,
+		Purpose: sess.Purpose, ContentType: sess.ContentType, Size: sess.Size,
+		PartSize: sess.PartSize, PartCount: sess.PartCount,
+	}
+}
+
+func (s *sMedia) MultipartUploadPart(ctx context.Context, in service.MultipartUploadPartInput) (*service.MultipartPartDTO, error) {
+	sess, err := s.loadUploadingSession(ctx, in.UploadId, in.OperatorId)
+	if err != nil {
+		return nil, err
+	}
+	if in.PartNumber < 1 || in.PartNumber > sess.PartCount {
+		return nil, gerror.NewCodef(gcode.CodeInvalidParameter, "分片号 %d 超出范围 1~%d", in.PartNumber, sess.PartCount)
+	}
+	if in.File == nil || in.File.FileHeader == nil {
+		return nil, gerror.NewCode(gcode.CodeInvalidParameter, "分片文件必填")
+	}
+	size := in.File.Size
+	if size <= 0 {
+		return nil, gerror.NewCode(gcode.CodeInvalidParameter, "分片大小无效")
+	}
+	if in.PartNumber < sess.PartCount && size != sess.PartSize {
+		return nil, gerror.NewCodef(gcode.CodeInvalidParameter, "非末片大小应为 %d 字节", sess.PartSize)
+	}
+	if in.PartNumber == sess.PartCount && size > sess.PartSize {
+		return nil, gerror.NewCodef(gcode.CodeInvalidParameter, "末片不能超过 %d 字节", sess.PartSize)
+	}
+
+	client, err := storage.Get(ctx)
+	if err != nil {
+		return nil, gerror.WrapCode(gcode.CodeInternalError, err, "对象存储不可用")
+	}
+	f, err := in.File.Open()
+	if err != nil {
+		return nil, gerror.WrapCode(gcode.CodeInternalError, err, "打开分片失败")
+	}
+	defer f.Close()
+
+	etag, err := client.PutObjectPart(ctx, sess.ObjectKey, sess.MinioUploadId, in.PartNumber, f, size)
+	if err != nil {
+		return nil, gerror.WrapCode(gcode.CodeInternalError, err, "上传分片失败")
+	}
+	return &service.MultipartPartDTO{PartNumber: in.PartNumber, Etag: etag, Size: size}, nil
 }
 
 func (s *sMedia) MultipartPresign(ctx context.Context, in service.MultipartPresignInput) ([]service.MultipartPresignItemDTO, error) {

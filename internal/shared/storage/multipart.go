@@ -3,6 +3,7 @@ package storage
 import (
 	"context"
 	"fmt"
+	"io"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -51,6 +52,20 @@ func (c *Client) PresignUploadPart(ctx context.Context, objectKey, uploadID stri
 		return "", fmt.Errorf("预签名分片失败: %w", err)
 	}
 	return u.String(), nil
+}
+
+// PutObjectPart 服务端代传一片(H5 不直连 MinIO, 避免 CORS / 内网地址问题)。
+func (c *Client) PutObjectPart(ctx context.Context, objectKey, uploadID string, partNumber int, r io.Reader, size int64) (string, error) {
+	if partNumber < 1 {
+		return "", fmt.Errorf("partNumber 无效")
+	}
+	key := strings.TrimLeft(objectKey, "/")
+	core := minio.Core{Client: c.mc}
+	part, err := core.PutObjectPart(ctx, c.bucket, key, uploadID, partNumber, r, size, minio.PutObjectPartOptions{})
+	if err != nil {
+		return "", fmt.Errorf("上传分片失败: %w", err)
+	}
+	return strings.Trim(part.ETag, `"`), nil
 }
 
 // ListParts 列出已上传分片(用于断点续传)。

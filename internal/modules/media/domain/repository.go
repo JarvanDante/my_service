@@ -11,5 +11,6 @@ type Repository interface {
 
 	MultipartCreate(ctx context.Context, m *entity.MediaMultipart) (int64, error)
 	MultipartFindByUploadId(ctx context.Context, uploadId string) (*entity.MediaMultipart, error)
+	MultipartFindActive(ctx context.Context, operatorId int64, filename string, size int64) (*entity.MediaMultipart, error)
 	MultipartUpdateStatus(ctx context.Context, uploadId string, status int, mediaId int64) error
 }

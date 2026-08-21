@@ -29,6 +29,14 @@ type MultipartInitInput struct {
 	Size        int64
 	PartSize    int64
 	OperatorId  int64
+	Resume      bool // 同用户+文件名+大小未完成会话则复用
+}
+
+type MultipartUploadPartInput struct {
+	UploadId   string
+	PartNumber int
+	File       *ghttp.UploadFile
+	OperatorId int64
 }
 
 type MultipartInitDTO struct {
@@ -89,6 +97,7 @@ type IMedia interface {
 	ReadObject(ctx context.Context, rawURL, objectKey string) ([]byte, string, error)
 	MultipartInit(ctx context.Context, in MultipartInitInput) (*MultipartInitDTO, error)
 	MultipartPresign(ctx context.Context, in MultipartPresignInput) ([]MultipartPresignItemDTO, error)
+	MultipartUploadPart(ctx context.Context, in MultipartUploadPartInput) (*MultipartPartDTO, error)
 	MultipartParts(ctx context.Context, uploadId string, operatorId int64) (*MultipartPartsDTO, error)
 	MultipartComplete(ctx context.Context, in MultipartCompleteInput) (*UploadDTO, error)
 	MultipartAbort(ctx context.Context, in MultipartAbortInput) error

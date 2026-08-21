@@ -11,13 +11,20 @@ import (
 	"github.com/JarvanDante/my_service/internal/shared/middleware"
 )
 
-// RegisterFront 前台用户上传(需登录, 仅 image/avatar, 服务端加密为 .bnc)。
+// RegisterFront 前台用户上传(需登录)。图走整文件加密; 视频走分片续传。
 func RegisterFront(group *ghttp.RouterGroup, repo domain.Repository) {
 	ctrl := front.New(logic.New(repo))
 	group.Bind(ctrl.Object)
 	group.Group("/", func(auth *ghttp.RouterGroup) {
 		auth.Middleware(middleware.Auth, middleware.UserRateLimit)
-		auth.Bind(ctrl.Upload)
+		auth.Bind(
+			ctrl.Upload,
+			ctrl.MultipartInit,
+			ctrl.MultipartPart,
+			ctrl.MultipartParts,
+			ctrl.MultipartComplete,
+			ctrl.MultipartAbort,
+		)
 	})
 }
 
