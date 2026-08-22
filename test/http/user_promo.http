@@ -29,7 +29,7 @@ Authorization: {{token}}
 client.test("分享信息", function () {
     client.assert(response.body.code === 0, "code 应为 0");
     client.assert(response.body.data.share_code !== "", "应返回分享码");
-    client.assert(response.body.data.share_url.indexOf("http") === 0, "应返回分享链接");
+    client.assert(!/^\d+$/.test(response.body.data.share_code), "分享码不能是纯数字 id");
 });
 %}
 

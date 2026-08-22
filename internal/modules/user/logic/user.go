@@ -508,6 +508,14 @@ func (s *sUser) BindParent(ctx context.Context, userId int64, account string) er
 		}
 	}
 	if inviter == nil {
+		if uid := kit.DecodePublicId(account); uid > 0 {
+			inviter, err = s.repo.FindById(ctx, uid)
+			if err != nil {
+				return err
+			}
+		}
+	}
+	if inviter == nil {
 		return gerror.New("推荐人不存在")
 	}
 	if inviter.Id == userId {
@@ -587,14 +595,13 @@ func (s *sUser) ShareInfo(ctx context.Context, userId int64) (*service.ShareDTO,
 	if me == nil {
 		return nil, gerror.New("用户不存在")
 	}
-	code := kit.EncodeUserId(me.Id)
+	code := kit.EncodePublicId(me.Id)
 	if code == "" {
 		code = me.Username
 	}
-	// TODO: 域名从配置读取, 海报图后续接图片服务
 	return &service.ShareDTO{
 		ShareCode: code,
-		ShareUrl:  "https://example.com/share?code=" + code,
+		ShareUrl:  "",
 		ShareNum:  me.ShareNum,
 	}, nil
 }
@@ -632,9 +639,9 @@ func (s *sUser) Invitees(ctx context.Context, userId int64, page, size int) ([]*
 	}
 	out := make([]*service.InviteeDTO, 0, len(list))
 	for _, u := range list {
-		code := kit.EncodeUserId(u.Id)
-		if u.Username != "" && !strings.HasPrefix(u.Username, "device_") {
-			code = u.Username
+		code := kit.EncodePublicId(u.Id)
+		if code == "" {
+			code = kit.EncodeUserId(u.Id)
 		}
 		name := strings.TrimSpace(u.Nickname)
 		if name == "" {
