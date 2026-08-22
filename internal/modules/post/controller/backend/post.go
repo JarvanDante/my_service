@@ -9,9 +9,14 @@ import (
 	"github.com/JarvanDante/my_service/internal/modules/post/service"
 )
 
-type Controller struct{ svc service.IPost }
+type Controller struct {
+	svc service.IPost
+	cat service.ICategory
+}
 
-func New(svc service.IPost) *Controller { return &Controller{svc: svc} }
+func New(svc service.IPost, cat service.ICategory) *Controller {
+	return &Controller{svc: svc, cat: cat}
+}
 
 func (c *Controller) List(ctx context.Context, req *v1.ListReq) (res *v1.ListRes, err error) {
 	statusFilter := -1

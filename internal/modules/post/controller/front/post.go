@@ -13,9 +13,29 @@ import (
 	"github.com/JarvanDante/my_service/internal/shared/consts"
 )
 
-type Controller struct{ svc service.IPost }
+type Controller struct {
+	svc service.IPost
+	cat service.ICategory
+}
 
-func New(svc service.IPost) *Controller { return &Controller{svc: svc} }
+func New(svc service.IPost, cat service.ICategory) *Controller {
+	return &Controller{svc: svc, cat: cat}
+}
+
+func (c *Controller) CategoryList(ctx context.Context, _ *v1.CategoryListReq) (res *v1.CategoryListRes, err error) {
+	if c.cat == nil {
+		return &v1.CategoryListRes{List: []v1.FrontCategoryItem{}}, nil
+	}
+	list, err := c.cat.Repo(ctx)
+	if err != nil {
+		return nil, err
+	}
+	res = &v1.CategoryListRes{List: make([]v1.FrontCategoryItem, 0, len(list))}
+	for _, d := range list {
+		res.List = append(res.List, v1.FrontCategoryItem{Id: d.Id, Name: d.Name, Kind: d.Kind})
+	}
+	return res, nil
+}
 
 func uid(ctx context.Context) (int64, error) {
 	id := ghttp.RequestFromCtx(ctx).GetCtxVar(consts.CtxUserId).Int64()

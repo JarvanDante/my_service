@@ -12,8 +12,8 @@ import (
 
 // RegisterFront 列表/详情公开; 发帖/我的/删除需登录。
 func RegisterFront(group *ghttp.RouterGroup) {
-	ctrl := front.New(logic.New())
-	group.Bind(ctrl.List, ctrl.Detail)
+	ctrl := front.New(logic.New(), logic.NewCategory())
+	group.Bind(ctrl.List, ctrl.Detail, ctrl.CategoryList)
 	group.Group("/", func(auth *ghttp.RouterGroup) {
 		auth.Middleware(middleware.Auth, middleware.UserRateLimit)
 		auth.Bind(ctrl.Create, ctrl.My, ctrl.Delete)
@@ -22,6 +22,9 @@ func RegisterFront(group *ghttp.RouterGroup) {
 
 // RegisterBackend 后台审核/管理(挂在权限组)。
 func RegisterBackend(group *ghttp.RouterGroup) {
-	ctrl := backend.New(logic.New())
-	group.Bind(ctrl.List, ctrl.Audit, ctrl.Delete)
+	ctrl := backend.New(logic.New(), logic.NewCategory())
+	group.Bind(
+		ctrl.List, ctrl.Audit, ctrl.Delete,
+		ctrl.CategoryList, ctrl.CategoryCreate, ctrl.CategoryUpdate, ctrl.CategoryDelete,
+	)
 }
