@@ -34,6 +34,7 @@ type ListFilter struct {
 	Size   int
 	Status int
 	Type   int
+	UserId int64
 }
 
 type IFeedback interface {

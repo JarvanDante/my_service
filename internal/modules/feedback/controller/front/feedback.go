@@ -39,3 +39,24 @@ func (c *Controller) Add(ctx context.Context, req *v1.AddReq) (res *v1.AddRes, e
 	}
 	return &v1.AddRes{Id: newId}, nil
 }
+
+func (c *Controller) My(ctx context.Context, req *v1.MyReq) (res *v1.MyRes, err error) {
+	userId, err := uid(ctx)
+	if err != nil {
+		return nil, err
+	}
+	list, total, err := c.svc.List(ctx, service.ListFilter{
+		UserId: userId, Page: req.Page, Size: req.Size,
+	})
+	if err != nil {
+		return nil, err
+	}
+	res = &v1.MyRes{Total: total, List: make([]v1.MyItem, 0, len(list))}
+	for _, r := range list {
+		res.List = append(res.List, v1.MyItem{
+			Id: r.Id, ProblemType: r.ProblemType, Content: r.Content,
+			Status: r.Status, Reply: r.Reply, CreatedAt: r.CreatedAt,
+		})
+	}
+	return res, nil
+}

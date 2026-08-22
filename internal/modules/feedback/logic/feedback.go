@@ -4,6 +4,7 @@ package logic
 import (
 	"context"
 	"encoding/json"
+	"strings"
 	"time"
 
 	"github.com/gogf/gf/v2/errors/gerror"
@@ -12,6 +13,8 @@ import (
 
 	"github.com/JarvanDante/my_service/internal/model/entity"
 	"github.com/JarvanDante/my_service/internal/modules/feedback/service"
+	msglogic "github.com/JarvanDante/my_service/internal/modules/message/logic"
+	msgsvc "github.com/JarvanDante/my_service/internal/modules/message/service"
 )
 
 const feedbackSiteId = 1 // 单站点样板
@@ -69,6 +72,9 @@ func (s *sFeedback) List(ctx context.Context, f service.ListFilter) ([]*service.
 	if f.Type > 0 {
 		m = m.Where("type", f.Type)
 	}
+	if f.UserId > 0 {
+		m = m.Where("user_id", f.UserId)
+	}
 	total, err := m.Clone().Count()
 	if err != nil {
 		return nil, 0, err
@@ -100,8 +106,40 @@ func (s *sFeedback) Handle(ctx context.Context, id int64, reply string, status i
 	if status != 1 && status != 2 {
 		status = 2
 	}
+	var row entity.Feedback
+	if err := g.Model("feedback").Ctx(ctx).Where("id", id).Scan(&row); err != nil {
+		return err
+	}
+	if row.Id == 0 {
+		return gerror.New("反馈不存在")
+	}
 	_, err := g.Model("feedback").Ctx(ctx).Where("id", id).Data(g.Map{
 		"reply": reply, "status": status, "updated_at": gtime.Now(),
 	}).Update()
-	return err
+	if err != nil {
+		return err
+	}
+	notifyFeedbackReply(ctx, row.UserId, row.Content, reply)
+	return nil
+}
+
+func notifyFeedbackReply(ctx context.Context, userId int64, content, reply string) {
+	reply = strings.TrimSpace(reply)
+	if userId <= 0 || reply == "" {
+		return
+	}
+	runes := []rune(strings.TrimSpace(content))
+	snippet := string(runes)
+	if len(runes) > 40 {
+		snippet = string(runes[:40]) + "…"
+	}
+	body := "客服回复：" + reply
+	if snippet != "" {
+		body = "您的反馈：" + snippet + "\n" + body
+	}
+	if _, err := msglogic.New().Create(ctx, msgsvc.CreateInput{
+		UserId: userId, Type: 1, Title: "反馈已处理", Content: body,
+	}); err != nil {
+		g.Log().Warningf(ctx, "feedback reply notify user=%d: %v", userId, err)
+	}
 }

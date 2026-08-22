@@ -16,3 +16,22 @@ type AddReq struct {
 type AddRes struct {
 	Id int64 `json:"id"`
 }
+
+type MyItem struct {
+	Id          int64  `json:"id"`
+	ProblemType int    `json:"problem_type"`
+	Content     string `json:"content"`
+	Status      int    `json:"status"` // 1处理中 2已处理
+	Reply       string `json:"reply"`
+	CreatedAt   string `json:"created_at"`
+}
+
+type MyReq struct {
+	g.Meta `path:"/feedback/my" method:"get" tags:"Front/Feedback" summary:"我的反馈"`
+	Page   int `json:"page"`
+	Size   int `json:"size"`
+}
+type MyRes struct {
+	List  []MyItem `json:"list"`
+	Total int      `json:"total"`
+}
