@@ -69,6 +69,37 @@ func (c *Controller) Upload(ctx context.Context, req *v1.UploadReq) (res *v1.Upl
 	}, nil
 }
 
+func (c *Controller) StorageInit(ctx context.Context, req *v1.StorageInitReq) (res *v1.StorageInitRes, err error) {
+	if _, err = uid(ctx); err != nil {
+		return nil, err
+	}
+	dto, err := c.media.InitStorageUpload(ctx, service.StorageInitInput{
+		Filename: req.Filename, Purpose: req.Purpose,
+		ContentType: req.ContentType, Size: req.Size,
+	})
+	if err != nil {
+		return nil, err
+	}
+	return &v1.StorageInitRes{
+		Id: dto.Id, UploadUrl: dto.UploadUrl, Method: dto.Method, Bucket: dto.Bucket,
+		ObjectKey: dto.ObjectKey, ExpireSec: dto.ExpireSec, PublicUrl: dto.PublicUrl,
+		ContentType: dto.ContentType,
+	}, nil
+}
+
+func (c *Controller) StorageConfirm(ctx context.Context, req *v1.StorageConfirmReq) (res *v1.StorageConfirmRes, err error) {
+	if _, err = uid(ctx); err != nil {
+		return nil, err
+	}
+	dto, err := c.media.ConfirmStorageUpload(ctx, req.Id)
+	if err != nil {
+		return nil, err
+	}
+	return &v1.StorageConfirmRes{
+		Id: dto.Id, Url: dto.Url, ObjectKey: dto.ObjectKey, Bucket: dto.Bucket, Size: dto.Size,
+	}, nil
+}
+
 func (c *Controller) MultipartInit(ctx context.Context, req *v1.MultipartInitReq) (res *v1.MultipartInitRes, err error) {
 	userId, err := uid(ctx)
 	if err != nil {

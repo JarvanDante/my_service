@@ -20,6 +20,7 @@ import (
 	"github.com/JarvanDante/my_service/internal/modules/media/domain"
 	"github.com/JarvanDante/my_service/internal/modules/media/service"
 	"github.com/JarvanDante/my_service/internal/shared/aesbnc"
+	"github.com/JarvanDante/my_service/internal/shared/paas"
 	"github.com/JarvanDante/my_service/internal/shared/storage"
 )
 
@@ -119,6 +120,60 @@ func (s *sMedia) Upload(ctx context.Context, in service.UploadInput) (*service.U
 	return &service.UploadDTO{
 		Id: id, Url: url, ObjectKey: objectKey, Bucket: client.Bucket(),
 		Purpose: purpose, ContentType: contentType, Size: size,
+	}, nil
+}
+
+func storageBiz(purpose string) string {
+	if purpose == "video" {
+		return "post_video"
+	}
+	return "post"
+}
+
+func (s *sMedia) InitStorageUpload(ctx context.Context, in service.StorageInitInput) (*service.StorageInitDTO, error) {
+	purpose := strings.ToLower(strings.TrimSpace(in.Purpose))
+	if purpose == "" {
+		purpose = "image"
+	}
+	if purpose != "image" && purpose != "video" {
+		return nil, gerror.NewCode(gcode.CodeInvalidParameter, "帖子上传仅支持 image/video")
+	}
+	filename := strings.TrimSpace(in.Filename)
+	if filename == "" {
+		return nil, gerror.NewCode(gcode.CodeInvalidParameter, "文件名必填")
+	}
+	if in.Size <= 0 {
+		return nil, gerror.NewCode(gcode.CodeInvalidParameter, "文件大小无效")
+	}
+	contentType := detectContentType(filename, in.ContentType)
+	if err := s.validateMime(ctx, purpose, contentType); err != nil {
+		return nil, err
+	}
+	if err := s.validateSize(ctx, purpose, in.Size); err != nil {
+		return nil, err
+	}
+	out, err := paas.CreateStorageObject(ctx, paas.StorageCreateIn{
+		Filename: filename, Biz: storageBiz(purpose),
+		ContentType: contentType, SizeBytes: in.Size, Remark: "h5-post",
+	})
+	if err != nil {
+		return nil, err
+	}
+	return &service.StorageInitDTO{
+		Id: out.Id, UploadUrl: out.UploadUrl, Method: out.Method, Bucket: out.Bucket,
+		ObjectKey: out.Key, ExpireSec: out.ExpireSec, PublicUrl: out.PublicUrl,
+		ContentType: out.ContentType,
+	}, nil
+}
+
+func (s *sMedia) ConfirmStorageUpload(ctx context.Context, id string) (*service.StorageConfirmDTO, error) {
+	out, err := paas.ConfirmStorageObject(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	return &service.StorageConfirmDTO{
+		Id: out.Id, Url: out.PublicUrl, Size: out.SizeBytes,
+		Bucket: "my-storage", ObjectKey: out.Id,
 	}, nil
 }
 

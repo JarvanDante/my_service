@@ -92,8 +92,36 @@ type MultipartAbortInput struct {
 	OperatorId int64
 }
 
+type StorageInitInput struct {
+	Filename    string
+	Purpose     string
+	ContentType string
+	Size        int64
+}
+
+type StorageInitDTO struct {
+	Id          string
+	UploadUrl   string
+	Method      string
+	Bucket      string
+	ObjectKey   string
+	ExpireSec   int
+	PublicUrl   string
+	ContentType string
+}
+
+type StorageConfirmDTO struct {
+	Id        string
+	Url       string
+	ObjectKey string
+	Bucket    string
+	Size      int64
+}
+
 type IMedia interface {
 	Upload(ctx context.Context, in UploadInput) (*UploadDTO, error)
+	InitStorageUpload(ctx context.Context, in StorageInitInput) (*StorageInitDTO, error)
+	ConfirmStorageUpload(ctx context.Context, id string) (*StorageConfirmDTO, error)
 	ReadObject(ctx context.Context, rawURL, objectKey string) ([]byte, string, error)
 	MultipartInit(ctx context.Context, in MultipartInitInput) (*MultipartInitDTO, error)
 	MultipartPresign(ctx context.Context, in MultipartPresignInput) ([]MultipartPresignItemDTO, error)

@@ -19,6 +19,8 @@ func RegisterFront(group *ghttp.RouterGroup, repo domain.Repository) {
 		auth.Middleware(middleware.Auth, middleware.UserRateLimit)
 		auth.Bind(
 			ctrl.Upload,
+			ctrl.StorageInit,
+			ctrl.StorageConfirm,
 			ctrl.MultipartInit,
 			ctrl.MultipartPart,
 			ctrl.MultipartParts,

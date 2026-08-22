@@ -76,6 +76,7 @@ paas:
   app_secret: "3cdcfe258d1854ed90facfaa9000b9e4a7f2c46f8cbc345ebd939868357880e9"
   media_base: "http://my_media:8004"
   media_admin_token: "488ac147a8b24d2b0541b24f4fdfb5f8b10c20129f6b46fcce6d2091094e872a"
+  storage_base: "http://my_storage:8005"
 
 # 播放网关(给浏览器的签名地址, 与 my_media/my_play 一致)
 play_gateway:
