@@ -7,6 +7,7 @@ import (
 	"io"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/gogf/gf/v2/frame/g"
 	"github.com/minio/minio-go/v7"
@@ -152,6 +153,47 @@ func ParseURL(raw, defaultBucket string) (bucket, key string) {
 		return defaultBucket, key
 	}
 	return "", ""
+}
+
+// SignPlayURL 私有桶 my-storage 签发可播/可下的 GET 地址；其它地址原样返回。
+func SignPlayURL(ctx context.Context, raw string) string {
+	raw = strings.TrimSpace(raw)
+	if raw == "" || !strings.Contains(raw, "/my-storage/") {
+		return raw
+	}
+	bucket, key := ParseURL(raw, "my-storage")
+	if key == "" {
+		return raw
+	}
+	c, err := Get(ctx)
+	if err != nil {
+		return raw
+	}
+	u, err := c.PresignGetIn(ctx, bucket, key, 2*time.Hour)
+	if err != nil {
+		g.Log().Warningf(ctx, "签发 my-storage 播放地址失败: %v", err)
+		return raw
+	}
+	return u
+}
+
+// PresignGetIn 按桶签发预签名 GET。
+func (c *Client) PresignGetIn(ctx context.Context, bucket, objectKey string, expire time.Duration) (string, error) {
+	if bucket == "" {
+		bucket = c.bucket
+	}
+	key := strings.TrimLeft(objectKey, "/")
+	if key == "" || strings.Contains(key, "..") {
+		return "", fmt.Errorf("对象路径无效")
+	}
+	if expire <= 0 {
+		expire = 2 * time.Hour
+	}
+	u, err := c.mc.PresignedGetObject(ctx, bucket, key, expire, nil)
+	if err != nil {
+		return "", err
+	}
+	return u.String(), nil
 }
 
 // ObjectKeyFromURL 从本桶 publicURL 解析 object key; 非法外链返回空。

@@ -14,6 +14,7 @@ import (
 
 	"github.com/JarvanDante/my_service/internal/model/entity"
 	"github.com/JarvanDante/my_service/internal/modules/post/service"
+	"github.com/JarvanDante/my_service/internal/shared/storage"
 )
 
 const postSiteId = 1 // 单站点样板
@@ -55,6 +56,13 @@ func toDTO(r *entity.Post) *service.PostDTO {
 		LikeCount: r.LikeCount, CommentCount: r.CommentCount, Status: r.Status,
 		RejectReason: r.RejectReason, CreatedAt: created,
 	}
+}
+
+func signPostDTO(ctx context.Context, d *service.PostDTO) {
+	if d == nil {
+		return
+	}
+	d.VideoUrl = storage.SignPlayURL(ctx, d.VideoUrl)
 }
 
 func fillAuthors(ctx context.Context, list []*service.PostDTO) {
@@ -181,6 +189,7 @@ func (s *sPost) FrontList(ctx context.Context, f service.ListFilter) ([]*service
 	for _, r := range list {
 		d := toDTO(r)
 		d.Status, d.RejectReason = 0, "" // 前台流不暴露审核态
+		signPostDTO(ctx, d)
 		out = append(out, d)
 	}
 	fillAuthors(ctx, out)
@@ -203,6 +212,7 @@ func (s *sPost) Detail(ctx context.Context, id, viewerId int64) (*service.PostDT
 		Data(g.Map{"view_count": &gdb.Counter{Field: "view_count", Value: 1}}).Update()
 	d := toDTO(r)
 	d.ViewCount++
+	signPostDTO(ctx, d)
 	fillAuthors(ctx, []*service.PostDTO{d})
 	return d, nil
 }
@@ -226,7 +236,9 @@ func (s *sPost) My(ctx context.Context, userId int64, page, size int) ([]*servic
 	}
 	out := make([]*service.PostDTO, 0, len(list))
 	for _, r := range list {
-		out = append(out, toDTO(r))
+		d := toDTO(r)
+		signPostDTO(ctx, d)
+		out = append(out, d)
 	}
 	fillAuthors(ctx, out)
 	return out, total, nil
@@ -273,7 +285,9 @@ func (s *sPost) List(ctx context.Context, f service.ListFilter) ([]*service.Post
 	}
 	out := make([]*service.PostDTO, 0, len(list))
 	for _, r := range list {
-		out = append(out, toDTO(r))
+		d := toDTO(r)
+		signPostDTO(ctx, d)
+		out = append(out, d)
 	}
 	return out, total, nil
 }
