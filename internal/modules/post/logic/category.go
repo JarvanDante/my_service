@@ -55,7 +55,7 @@ func (s *sCategory) Create(ctx context.Context, in service.CategoryInput) (int64
 	if in.Name == "" {
 		return 0, gerror.New("分类名不能为空")
 	}
-	if in.Kind < 0 || in.Kind > 3 {
+	if in.Kind < 0 || in.Kind > 2 {
 		return 0, gerror.New("类型非法")
 	}
 	if in.Status != 0 && in.Status != 1 {
