@@ -1,6 +1,7 @@
 package logic
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"io"
@@ -18,6 +19,7 @@ import (
 	"github.com/JarvanDante/my_service/internal/model/entity"
 	"github.com/JarvanDante/my_service/internal/modules/media/domain"
 	"github.com/JarvanDante/my_service/internal/modules/media/service"
+	"github.com/JarvanDante/my_service/internal/shared/aesbnc"
 	"github.com/JarvanDante/my_service/internal/shared/paas"
 	"github.com/JarvanDante/my_service/internal/shared/storage"
 )
@@ -83,7 +85,23 @@ func (s *sMedia) Upload(ctx context.Context, in service.UploadInput) (*service.U
 	}
 	defer f.Close()
 
-	created, confirmed, err := putViaUnifiedStorage(ctx, filename, purpose, contentType, size, f)
+	var body io.Reader = f
+	if aesbnc.ShouldEncryptPurpose(purpose) {
+		raw, err := io.ReadAll(f)
+		if err != nil {
+			return nil, gerror.WrapCode(gcode.CodeInternalError, err, "读取上传文件失败")
+		}
+		enc, err := aesbnc.Encrypt(raw)
+		if err != nil {
+			return nil, gerror.WrapCode(gcode.CodeInternalError, err, "图片加密失败")
+		}
+		body = bytes.NewReader(enc)
+		filename = aesbnc.ToBncKey(filename)
+		contentType = "application/octet-stream"
+		size = int64(len(enc))
+	}
+
+	created, confirmed, err := putViaUnifiedStorage(ctx, filename, purpose, contentType, size, body)
 	if err != nil {
 		return nil, err
 	}
@@ -210,16 +228,24 @@ func (s *sMedia) ReadObject(ctx context.Context, rawURL, objectKey string) ([]by
 	if err != nil {
 		return nil, "", gerror.WrapCode(gcode.CodeInternalError, err, "对象存储不可用")
 	}
-	key := strings.TrimSpace(objectKey)
+	bucket, key := storage.ParseURL(rawURL, "")
 	if key == "" {
-		key = client.ObjectKeyFromURL(rawURL)
-	} else if strings.Contains(key, "..") {
-		key = ""
+		okey := strings.TrimSpace(objectKey)
+		if okey != "" && !strings.Contains(okey, "..") && strings.Contains(okey, "/") {
+			key = okey
+		}
+	}
+	if bucket == "" {
+		if strings.Contains(rawURL, "/my-storage/") || strings.Contains(objectKey, "my-storage/") {
+			bucket = "my-storage"
+		} else {
+			bucket = client.Bucket()
+		}
 	}
 	if key == "" {
 		return nil, "", gerror.NewCode(gcode.CodeInvalidParameter, "无法识别的图片地址")
 	}
-	data, err := client.Get(ctx, key)
+	data, err := client.GetIn(ctx, bucket, key)
 	if err != nil {
 		return nil, "", gerror.WrapCode(gcode.CodeNotFound, err, "对象不存在")
 	}

@@ -100,18 +100,58 @@ func (c *Client) PublicURL(objectKey string) string {
 	return fmt.Sprintf("%s/%s/%s", c.publicURL, c.bucket, key)
 }
 
-// Get 读取对象全文(预览/前台拉密文用)。
+// Get 读取默认桶对象全文(预览/前台拉密文用)。
 func (c *Client) Get(ctx context.Context, objectKey string) ([]byte, error) {
+	return c.GetIn(ctx, c.bucket, objectKey)
+}
+
+// GetIn 按桶读取对象。
+func (c *Client) GetIn(ctx context.Context, bucket, objectKey string) ([]byte, error) {
+	if bucket == "" {
+		bucket = c.bucket
+	}
 	key := strings.TrimLeft(objectKey, "/")
 	if key == "" || strings.Contains(key, "..") {
 		return nil, fmt.Errorf("对象路径无效")
 	}
-	obj, err := c.mc.GetObject(ctx, c.bucket, key, minio.GetObjectOptions{})
+	obj, err := c.mc.GetObject(ctx, bucket, key, minio.GetObjectOptions{})
 	if err != nil {
 		return nil, fmt.Errorf("读取对象失败: %w", err)
 	}
 	defer obj.Close()
 	return io.ReadAll(obj)
+}
+
+// ParseURL 从 my-media / my-storage 地址解析桶和 key。
+func ParseURL(raw, defaultBucket string) (bucket, key string) {
+	u := strings.TrimSpace(raw)
+	if u == "" {
+		return "", ""
+	}
+	if i := strings.IndexAny(u, "?#"); i >= 0 {
+		u = u[:i]
+	}
+	for _, b := range []string{"my-storage", "my-media"} {
+		marker := "/" + b + "/"
+		if i := strings.Index(u, marker); i >= 0 {
+			key = strings.TrimLeft(u[i+len(marker):], "/")
+			if key == "" || strings.Contains(key, "..") {
+				return "", ""
+			}
+			return b, key
+		}
+	}
+	if defaultBucket != "" {
+		key = strings.TrimLeft(u, "/")
+		if strings.HasPrefix(key, defaultBucket+"/") {
+			key = key[len(defaultBucket)+1:]
+		}
+		if key == "" || strings.Contains(key, "..") || strings.Contains(key, "://") {
+			return "", ""
+		}
+		return defaultBucket, key
+	}
+	return "", ""
 }
 
 // ObjectKeyFromURL 从本桶 publicURL 解析 object key; 非法外链返回空。

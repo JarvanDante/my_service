@@ -125,7 +125,7 @@ func ToBncKey(key string) string {
 
 func ShouldEncryptPurpose(purpose string) bool {
 	switch strings.ToLower(strings.TrimSpace(purpose)) {
-	case "image", "cover", "avatar":
+	case "image", "cover", "avatar", "ad", "post":
 		return true
 	default:
 		return false
