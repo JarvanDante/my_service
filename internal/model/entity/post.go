@@ -15,6 +15,7 @@ type Post struct {
 	VideoUrl     string      `json:"videoUrl"     orm:"video_url"`
 	MediaId      int64       `json:"mediaId"      orm:"media_id"`
 	ViewCount    int64       `json:"viewCount"    orm:"view_count"`
+	Rank         int         `json:"rank"         orm:"rank"`
 	LikeCount    int         `json:"likeCount"    orm:"like_count"`
 	CommentCount int         `json:"commentCount" orm:"comment_count"`
 	Status       int         `json:"status"       orm:"status"` // 0待审 1通过 2拒绝 3删除

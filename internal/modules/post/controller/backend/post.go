@@ -37,7 +37,7 @@ func (c *Controller) List(ctx context.Context, req *v1.ListReq) (res *v1.ListRes
 		res.List = append(res.List, v1.Item{
 			Id: d.Id, UserId: d.UserId, Title: d.Title, Content: d.Content, Pics: d.Pics,
 			Topics: d.Topics, Category: d.Category, VideoUrl: d.VideoUrl,
-			MediaId: d.MediaId, ViewCount: d.ViewCount, LikeCount: d.LikeCount,
+			MediaId: d.MediaId, ViewCount: d.ViewCount, Rank: d.Rank, LikeCount: d.LikeCount,
 			CommentCount: d.CommentCount, Status: d.Status, RejectReason: d.RejectReason,
 			CreatedAt: d.CreatedAt,
 		})
@@ -47,7 +47,7 @@ func (c *Controller) List(ctx context.Context, req *v1.ListReq) (res *v1.ListRes
 
 func (c *Controller) Update(ctx context.Context, req *v1.UpdateReq) (res *v1.UpdateRes, err error) {
 	if err = c.svc.Update(ctx, service.UpdateInput{
-		Id: req.Id, Category: req.Category, ViewCount: req.ViewCount,
+		Id: req.Id, Category: req.Category, ViewCount: req.ViewCount, Rank: req.Rank,
 	}); err != nil {
 		return nil, err
 	}

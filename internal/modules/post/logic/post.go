@@ -53,6 +53,7 @@ func toDTO(r *entity.Post) *service.PostDTO {
 	return &service.PostDTO{
 		Id: r.Id, UserId: r.UserId, Title: r.Title, Content: r.Content, Pics: pics,
 		Topics: topics, Category: r.Category, VideoUrl: r.VideoUrl, MediaId: r.MediaId, ViewCount: r.ViewCount,
+		Rank: r.Rank,
 		LikeCount: r.LikeCount, CommentCount: r.CommentCount, Status: r.Status,
 		RejectReason: r.RejectReason, CreatedAt: created,
 	}
@@ -201,7 +202,7 @@ func (s *sPost) FrontList(ctx context.Context, f service.ListFilter) ([]*service
 	if err != nil {
 		return nil, 0, err
 	}
-	q := m.Clone()
+	q := m.Clone().OrderDesc("rank")
 	if f.Sort == "hot" {
 		q = q.OrderDesc("like_count").OrderDesc("id")
 	} else {
@@ -325,6 +326,9 @@ func (s *sPost) Update(ctx context.Context, in service.UpdateInput) error {
 	if in.ViewCount < 0 {
 		return gerror.New("浏览量不能为负")
 	}
+	if in.Rank < 0 {
+		return gerror.New("权重不能为负")
+	}
 	cat := strings.TrimSpace(in.Category)
 	if cat != "" {
 		cnt, err := g.Model("post_category").Ctx(ctx).
@@ -339,7 +343,7 @@ func (s *sPost) Update(ctx context.Context, in service.UpdateInput) error {
 	res, err := g.Model("post").Ctx(ctx).
 		Where("site_id", postSiteId).Where("id", in.Id).
 		Data(g.Map{
-			"category": cat, "view_count": in.ViewCount, "updated_at": gtime.Now(),
+			"category": cat, "view_count": in.ViewCount, "rank": in.Rank, "updated_at": gtime.Now(),
 		}).Update()
 	if err != nil {
 		return err

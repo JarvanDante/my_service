@@ -14,6 +14,7 @@ type Item struct {
 	VideoUrl     string   `json:"video_url"`
 	MediaId      int64    `json:"media_id"`
 	ViewCount    int64    `json:"view_count"`
+	Rank         int      `json:"rank"`
 	LikeCount    int      `json:"like_count"`
 	CommentCount int      `json:"comment_count"`
 	Status       int      `json:"status"`
@@ -44,10 +45,11 @@ type AuditReq struct {
 type AuditRes struct{}
 
 type UpdateReq struct {
-	g.Meta    `path:"/post/{id}" method:"put" tags:"Backend/Post" summary:"编辑帖子(分类/浏览量)"`
+	g.Meta    `path:"/post/{id}" method:"put" tags:"Backend/Post" summary:"编辑帖子(分类/浏览量/权重)"`
 	Id        int64  `json:"id" in:"path" v:"required|min:1#ID必填"`
 	Category  string `json:"category"`
 	ViewCount int64  `json:"view_count" v:"min:0#浏览量不能为负"`
+	Rank      int    `json:"rank" v:"min:0#权重不能为负"`
 }
 type UpdateRes struct{}
 

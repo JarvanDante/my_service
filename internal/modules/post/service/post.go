@@ -16,6 +16,7 @@ type PostDTO struct {
 	VideoUrl     string
 	MediaId      int64
 	ViewCount    int64
+	Rank         int
 	LikeCount    int
 	CommentCount int
 	Status       int
@@ -49,6 +50,7 @@ type UpdateInput struct {
 	Id        int64
 	Category  string
 	ViewCount int64
+	Rank      int
 }
 
 type IPost interface {
