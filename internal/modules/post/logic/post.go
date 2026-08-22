@@ -18,6 +18,7 @@ import (
 )
 
 const postSiteId = 1 // 单站点样板
+const defaultPostCategory = "最新"
 
 type sPost struct{}
 
@@ -130,7 +131,8 @@ func (s *sPost) Create(ctx context.Context, in service.CreateInput) (int64, erro
 	id, err := g.Model("post").Ctx(ctx).Data(g.Map{
 		"site_id": postSiteId, "user_id": in.UserId, "title": title,
 		"content": content, "pics": string(picsJSON), "topics": string(topicsJSON),
-		"video_url": strings.TrimSpace(in.VideoUrl), "media_id": in.MediaId, "status": 0,
+		"video_url": strings.TrimSpace(in.VideoUrl), "media_id": in.MediaId,
+		"category": defaultPostCategory, "status": 0,
 	}).InsertAndGetId()
 	if err != nil {
 		return 0, err
@@ -192,11 +194,7 @@ func (s *sPost) FrontList(ctx context.Context, f service.ListFilter) ([]*service
 		m = m.Where("title ILIKE ?", "%"+f.Keyword+"%")
 	}
 	if cat := strings.TrimSpace(f.Category); cat != "" {
-		raw, err := json.Marshal([]string{cat})
-		if err != nil {
-			return nil, 0, err
-		}
-		m = m.Where("(category = ?) OR (topics::jsonb @> ?::jsonb)", cat, string(raw))
+		m = m.Where("category", cat)
 	}
 	total, err := m.Clone().Count()
 	if err != nil {
