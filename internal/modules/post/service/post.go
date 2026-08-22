@@ -33,12 +33,15 @@ type CreateInput struct {
 }
 
 type ListFilter struct {
-	Status  int // -1=全部(后台); 前台固定1
-	Sort    string
-	Keyword string
-	UserId  int64
-	Page    int
-	Size    int
+	Status     int // -1=全部(后台); 前台固定1
+	Sort       string
+	Keyword    string
+	UserId     int64
+	Category   string // 普通分类名, 匹配 post.topics
+	FollowOnly bool   // 只看 viewer 关注的人
+	ViewerId   int64
+	Page       int
+	Size       int
 }
 
 type IPost interface {

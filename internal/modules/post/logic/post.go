@@ -165,11 +165,37 @@ func (s *sPost) FrontList(ctx context.Context, f service.ListFilter) ([]*service
 		f.Size = 20
 	}
 	m := g.Model("post").Ctx(ctx).Where("site_id", postSiteId).Where("status", 1)
-	if f.UserId > 0 {
+	if f.FollowOnly {
+		if f.ViewerId <= 0 {
+			return []*service.PostDTO{}, 0, nil
+		}
+		ids, err := g.Model("user_follow").Ctx(ctx).
+			Where("user_id", f.ViewerId).Fields("home_id").Limit(500).Array()
+		if err != nil {
+			return nil, 0, err
+		}
+		followed := make([]int64, 0, len(ids))
+		for _, v := range ids {
+			if id := v.Int64(); id > 0 {
+				followed = append(followed, id)
+			}
+		}
+		if len(followed) == 0 {
+			return []*service.PostDTO{}, 0, nil
+		}
+		m = m.WhereIn("user_id", followed)
+	} else if f.UserId > 0 {
 		m = m.Where("user_id", f.UserId)
 	}
 	if f.Keyword != "" {
 		m = m.Where("title ILIKE ?", "%"+f.Keyword+"%")
+	}
+	if cat := strings.TrimSpace(f.Category); cat != "" {
+		raw, err := json.Marshal([]string{cat})
+		if err != nil {
+			return nil, 0, err
+		}
+		m = m.Where("topics::jsonb @> ?::jsonb", string(raw))
 	}
 	total, err := m.Clone().Count()
 	if err != nil {

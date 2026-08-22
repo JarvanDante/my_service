@@ -43,11 +43,13 @@ type CreateRes struct {
 // ListReq 帖子流(公开, 仅已通过; sort=new/hot)。
 type ListReq struct {
 	g.Meta  `path:"/post/list" method:"get" tags:"Front/Post" summary:"帖子列表"`
-	Sort    string `json:"sort"`    // new(默认)/hot
-	Keyword string `json:"keyword"` // 标题模糊
-	UserId  int64  `json:"user_id"` // 0=全部, >0 该用户已通过帖子
-	Page    int    `json:"page"`
-	Size    int    `json:"size"`
+	Sort     string `json:"sort"`     // new(默认)/hot
+	Keyword  string `json:"keyword"`  // 标题模糊
+	UserId   int64  `json:"user_id"`  // 0=全部, >0 该用户已通过帖子
+	Category string `json:"category"` // 普通分类名(匹配 topics)
+	Follow   int    `json:"follow"`   // 1=只看当前用户关注的人
+	Page     int    `json:"page"`
+	Size     int    `json:"size"`
 }
 type ListRes struct {
 	List  []Item `json:"list"`
