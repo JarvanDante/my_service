@@ -63,6 +63,35 @@ func (c *Controller) Restore(ctx context.Context, req *v1.RestoreReq) (res *v1.R
 	return &v1.RestoreRes{Token: dto.Token, User: toApiUser(ctx, dto.User)}, nil
 }
 
+// AccountLogin 公开: 用户名+密码登录。
+func (c *Controller) AccountLogin(ctx context.Context, req *v1.AccountLoginReq) (res *v1.AccountLoginRes, err error) {
+	r := ghttp.RequestFromCtx(ctx)
+	dto, err := c.user.AccountLogin(ctx, service.AccountLoginInput{
+		Username:      req.Username,
+		Password:      req.Password,
+		DeviceId:      req.DeviceId,
+		DeviceType:    req.DeviceType,
+		DeviceVersion: req.DeviceVersion,
+		Ip:            r.GetClientIp(),
+	})
+	if err != nil {
+		return nil, err
+	}
+	return &v1.AccountLoginRes{Token: dto.Token, User: toApiUser(ctx, dto.User)}, nil
+}
+
+// SetPassword 需登录: 设置或修改密码。
+func (c *Controller) SetPassword(ctx context.Context, req *v1.SetPasswordReq) (res *v1.SetPasswordRes, err error) {
+	id, err := uid(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if err = c.user.SetPassword(ctx, id, req.OldPassword, req.Password); err != nil {
+		return nil, err
+	}
+	return &v1.SetPasswordRes{}, nil
+}
+
 // Info 需登录。
 func (c *Controller) Info(ctx context.Context, req *v1.InfoReq) (res *v1.InfoRes, err error) {
 	id, err := uid(ctx)
@@ -609,7 +638,7 @@ func toApiUser(ctx context.Context, d *service.UserInfoDTO) v1.UserInfo {
 		Id: d.Id, Username: d.Username, Nickname: d.Nickname, Phone: d.Phone,
 		Img: d.Img, Signature: d.Signature, Sex: d.Sex, Level: d.Level,
 		Balance: d.Balance, Credit: d.Credit, GroupName: d.GroupName,
-		Fans: d.Fans, Follow: d.Follow,
+		Fans: d.Fans, Follow: d.Follow, HasPassword: d.HasPassword,
 		// 站点差异字段: 仅返回 Nacos response.user_info_extra 白名单内的 key
 		Ext: siteconf.PickExt(ctx, "user_info", map[string]interface{}{
 			"bg_img":         d.BgImg,

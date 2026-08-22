@@ -16,7 +16,8 @@ type UserInfo struct {
 	Credit    float64 `json:"credit"`
 	GroupName string  `json:"group_name"`
 	Fans      int     `json:"fans"`
-	Follow    int     `json:"follow"`
+	Follow      int  `json:"follow"`
+	HasPassword bool `json:"has_password"`
 	// Ext 站点差异字段(由 Nacos response.user_info_extra 白名单控制)
 	Ext map[string]interface{} `json:"ext,omitempty"`
 }
@@ -46,6 +47,28 @@ type RestoreRes struct {
 	Token string   `json:"token"`
 	User  UserInfo `json:"user"`
 }
+
+// AccountLoginReq 用户名+密码登录(公开)。用户名即「我的」页编号。
+type AccountLoginReq struct {
+	g.Meta        `path:"/user/account-login" method:"post" tags:"Front/User" summary:"账密登录"`
+	Username      string `json:"username"       v:"required#用户名必填"`
+	Password      string `json:"password"       v:"required#密码必填"`
+	DeviceId      string `json:"device_id"      v:"required#设备号必填"`
+	DeviceType    string `json:"device_type"`
+	DeviceVersion string `json:"device_version"`
+}
+type AccountLoginRes struct {
+	Token string   `json:"token"`
+	User  UserInfo `json:"user"`
+}
+
+// SetPasswordReq 设置或修改密码(需登录)。首次设密不用旧密码。
+type SetPasswordReq struct {
+	g.Meta      `path:"/user/password" method:"post" tags:"Front/User" summary:"设置密码"`
+	OldPassword string `json:"old_password"`
+	Password    string `json:"password" v:"required|length:6,32#新密码必填|密码需6-32位"`
+}
+type SetPasswordRes struct{}
 
 // 个人信息(需登录)
 type InfoReq struct {

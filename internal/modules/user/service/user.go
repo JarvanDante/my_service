@@ -19,6 +19,16 @@ type RestoreInput struct {
 	Ip            string
 }
 
+// AccountLoginInput 用户名+密码登录。
+type AccountLoginInput struct {
+	Username      string
+	Password      string
+	DeviceId      string
+	DeviceType    string
+	DeviceVersion string
+	Ip            string
+}
+
 // UserInfoDTO 当前用户详情(含私密字段)。
 type UserInfoDTO struct {
 	Id        int64
@@ -39,6 +49,7 @@ type UserInfoDTO struct {
 	ShareNum     int
 	ChannelName  string
 	GroupEndTime int64
+	HasPassword  bool
 }
 
 // PublicUserDTO 对外公开信息(看他人时用, 不含手机/余额)。
@@ -468,6 +479,8 @@ type IUser interface {
 	// 认证
 	Login(ctx context.Context, in LoginInput) (*LoginDTO, error)
 	Restore(ctx context.Context, in RestoreInput) (*LoginDTO, error)
+	AccountLogin(ctx context.Context, in AccountLoginInput) (*LoginDTO, error)
+	SetPassword(ctx context.Context, userId int64, oldPassword, password string) error
 	Logout(ctx context.Context, userId int64) error
 	Refresh(ctx context.Context, userId int64) (string, error)
 	// 资料

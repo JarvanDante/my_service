@@ -5,6 +5,7 @@ import (
 	"context"
 	"strings"
 
+	"github.com/gogf/gf/v2/crypto/gmd5"
 	"github.com/gogf/gf/v2/errors/gerror"
 	"github.com/gogf/gf/v2/frame/g"
 	"github.com/gogf/gf/v2/os/gtime"
@@ -136,6 +137,86 @@ func (s *sUser) Restore(ctx context.Context, in service.RestoreInput) (*service.
 	return &service.LoginDTO{Token: token, User: toUserInfo(u)}, nil
 }
 
+func hashUserPassword(password, slat string) string {
+	return gmd5.MustEncryptString(password + slat)
+}
+
+// AccountLogin 用户名+密码登录, 通过后换绑到当前设备。
+func (s *sUser) AccountLogin(ctx context.Context, in service.AccountLoginInput) (*service.LoginDTO, error) {
+	username := strings.ToUpper(strings.TrimSpace(in.Username))
+	password := strings.TrimSpace(in.Password)
+	if username == "" || password == "" || in.DeviceId == "" {
+		return nil, gerror.New("用户名、密码与设备号不能为空")
+	}
+	u, err := s.repo.FindByAccount(ctx, username)
+	if err != nil {
+		return nil, err
+	}
+	if u == nil {
+		return nil, gerror.New("用户名或密码错误")
+	}
+	if u.Password == "" {
+		return nil, gerror.New("该账号尚未设置密码, 请先在本机设置")
+	}
+	slat := u.Slat
+	if slat == "" {
+		return nil, gerror.New("用户名或密码错误")
+	}
+	if hashUserPassword(password, slat) != u.Password {
+		return nil, gerror.New("用户名或密码错误")
+	}
+	if u.IsDisabled == 1 {
+		msg := u.ErrorMsg
+		if msg == "" {
+			msg = "账号已被禁用"
+		}
+		return nil, gerror.New(msg)
+	}
+	if err = s.repo.RebindDevice(ctx, u.Id, in.DeviceId, in.DeviceType, in.DeviceVersion, in.Ip); err != nil {
+		return nil, err
+	}
+	if u, err = s.repo.FindById(ctx, u.Id); err != nil {
+		return nil, err
+	}
+	u = s.ensureEncodedUsername(ctx, u)
+	token, err := kit.IssueToken(ctx, u.Id)
+	if err != nil {
+		return nil, err
+	}
+	return &service.LoginDTO{Token: token, User: toUserInfo(u)}, nil
+}
+
+// SetPassword 首次设密或修改密码。已设过则必须校验旧密码。
+func (s *sUser) SetPassword(ctx context.Context, userId int64, oldPassword, password string) error {
+	password = strings.TrimSpace(password)
+	if len(password) < 6 || len(password) > 32 {
+		return gerror.New("密码需6-32位")
+	}
+	u, err := s.repo.FindById(ctx, userId)
+	if err != nil {
+		return err
+	}
+	if u == nil {
+		return gerror.New("用户不存在")
+	}
+	slat := u.Slat
+	if slat == "" {
+		slat = grand.S(8)
+	}
+	if u.Password != "" {
+		if strings.TrimSpace(oldPassword) == "" {
+			return gerror.New("请输入旧密码")
+		}
+		if hashUserPassword(oldPassword, u.Slat) != u.Password {
+			return gerror.New("旧密码不正确")
+		}
+	}
+	return s.repo.UpdateProfile(ctx, userId, g.Map{
+		"password": hashUserPassword(password, slat),
+		"slat":     slat,
+	})
+}
+
 // Info 当前用户详情。
 func (s *sUser) Info(ctx context.Context, userId int64) (*service.UserInfoDTO, error) {
 	u, err := s.repo.FindById(ctx, userId)
@@ -187,6 +268,7 @@ func toUserInfo(u *entity.Users) *service.UserInfoDTO {
 		ShareNum:     u.ShareNum,
 		ChannelName:  u.ChannelName,
 		GroupEndTime: u.GroupEndTime,
+		HasPassword:  u.Password != "",
 	}
 }
 
