@@ -18,6 +18,7 @@ type UserInfo struct {
 	Fans      int     `json:"fans"`
 	Follow      int  `json:"follow"`
 	HasPassword bool `json:"has_password"`
+	HasParent   bool `json:"has_parent"`
 	// Ext 站点差异字段(由 Nacos response.user_info_extra 白名单控制)
 	Ext map[string]interface{} `json:"ext,omitempty"`
 }

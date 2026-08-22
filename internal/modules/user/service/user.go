@@ -50,6 +50,7 @@ type UserInfoDTO struct {
 	ChannelName  string
 	GroupEndTime int64
 	HasPassword  bool
+	HasParent    bool
 }
 
 // PublicUserDTO 对外公开信息(看他人时用, 不含手机/余额)。

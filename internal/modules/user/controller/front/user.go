@@ -656,7 +656,7 @@ func toApiUser(ctx context.Context, d *service.UserInfoDTO) v1.UserInfo {
 		Id: d.Id, Username: d.Username, Nickname: d.Nickname, Phone: d.Phone,
 		Img: d.Img, Signature: d.Signature, Sex: d.Sex, Level: d.Level,
 		Balance: d.Balance, Credit: d.Credit, GroupName: d.GroupName,
-		Fans: d.Fans, Follow: d.Follow, HasPassword: d.HasPassword,
+		Fans: d.Fans, Follow: d.Follow, HasPassword: d.HasPassword, HasParent: d.HasParent,
 		// 站点差异字段: 仅返回 Nacos response.user_info_extra 白名单内的 key
 		Ext: siteconf.PickExt(ctx, "user_info", map[string]interface{}{
 			"bg_img":         d.BgImg,

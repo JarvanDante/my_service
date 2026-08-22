@@ -302,6 +302,7 @@ func toUserInfo(u *entity.Users) *service.UserInfoDTO {
 		ChannelName:  u.ChannelName,
 		GroupEndTime: u.GroupEndTime,
 		HasPassword:  u.Password != "",
+		HasParent:    u.ParentId != 0,
 	}
 }
 
