@@ -164,6 +164,35 @@ func (r *userRepo) FansList(ctx context.Context, userId int64, page, size int) (
 // BindInviter 绑定推荐人: 事务内设置 parent + 推荐人 share_num+1。
 func (r *userRepo) BindInviter(ctx context.Context, userId, inviterId int64, inviterName string) error {
 	return g.DB().Transaction(ctx, func(ctx context.Context, tx gdb.TX) error {
+		first, second := userId, inviterId
+		if inviterId < userId {
+			first, second = inviterId, userId
+		}
+		var me, inviter *entity.Users
+		if err := tx.Model("users").Ctx(ctx).Where("id", first).LockUpdate().Scan(&me); err != nil {
+			return err
+		}
+		if first != second {
+			var other *entity.Users
+			if err := tx.Model("users").Ctx(ctx).Where("id", second).LockUpdate().Scan(&other); err != nil {
+				return err
+			}
+			if first == userId {
+				inviter = other
+			} else {
+				inviter = me
+				me = other
+			}
+		}
+		if me == nil || inviter == nil {
+			return gerror.New("用户不存在")
+		}
+		if me.ParentId != 0 {
+			return gerror.New("已绑定推荐人, 不可修改")
+		}
+		if inviter.ParentId == userId {
+			return gerror.New("不能互相邀请")
+		}
 		if _, err := tx.Model("users").Ctx(ctx).Where("id", userId).Data(g.Map{
 			"parent_id":   inviterId,
 			"parent_name": inviterName,

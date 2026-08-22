@@ -557,11 +557,41 @@ func (s *sUser) BindParent(ctx context.Context, userId int64, account string) er
 	if inviter.Id == userId {
 		return gerror.New("不能绑定自己")
 	}
+	if err = s.rejectInviteCycle(ctx, userId, inviter); err != nil {
+		return err
+	}
 	parentName := kit.EncodeUserId(inviter.Id)
 	if parentName == "" {
 		parentName = inviter.Username
 	}
 	return s.repo.BindInviter(ctx, userId, inviter.Id, parentName)
+}
+
+// rejectInviteCycle 邀请只能单向：先绑定的生效，反向或沿邀请链回到自己则拒绝。
+func (s *sUser) rejectInviteCycle(ctx context.Context, userId int64, inviter *entity.Users) error {
+	if inviter.ParentId == userId {
+		return gerror.New("不能互相邀请")
+	}
+	seen := map[int64]struct{}{inviter.Id: {}}
+	cur := inviter.ParentId
+	for i := 0; cur > 0 && i < 64; i++ {
+		if cur == userId {
+			return gerror.New("不能互相邀请")
+		}
+		if _, ok := seen[cur]; ok {
+			break
+		}
+		seen[cur] = struct{}{}
+		u, err := s.repo.FindById(ctx, cur)
+		if err != nil {
+			return err
+		}
+		if u == nil || u.ParentId <= 0 {
+			break
+		}
+		cur = u.ParentId
+	}
+	return nil
 }
 
 // RedeemCode 使用兑换码。
