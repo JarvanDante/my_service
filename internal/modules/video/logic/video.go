@@ -265,7 +265,7 @@ func (s *sVideo) overlayMediaURLs(ctx context.Context, list []*service.VideoDTO)
 			continue
 		}
 		if a, ok := m[d.MediaCode]; ok {
-			if a.CoverUrl != "" {
+			if a.CoverUrl != "" && !isSiteCustomCover(d.CoverUrl) {
 				d.CoverUrl = a.CoverUrl
 			}
 			if a.PlayUrl != "" {
@@ -281,7 +281,7 @@ func (s *sVideo) resolvePlay(ctx context.Context, d *service.VideoDTO) {
 		return
 	}
 	if a, err := paas.AssetDetail(ctx, d.MediaCode); err == nil && a != nil {
-		if a.CoverUrl != "" {
+		if a.CoverUrl != "" && !isSiteCustomCover(d.CoverUrl) {
 			d.CoverUrl = a.CoverUrl
 		}
 		if a.PlayUrl != "" {
@@ -292,6 +292,21 @@ func (s *sVideo) resolvePlay(ctx context.Context, d *service.VideoDTO) {
 		d.SourceUrl = url
 	}
 	d.CoverUrl, d.SourceUrl = paas.ApplyGatewayURLs(ctx, d.CoverUrl, d.SourceUrl, d.MediaCode)
+}
+
+func isSiteCustomCover(cover string) bool {
+	cover = strings.TrimSpace(cover)
+	if cover == "" {
+		return false
+	}
+	if strings.Contains(cover, "/my-storage/") {
+		return true
+	}
+	low := strings.ToLower(cover)
+	if (strings.Contains(low, ".bnc") || strings.Contains(low, ".ceb")) && !strings.Contains(low, "/hls/") {
+		return true
+	}
+	return false
 }
 
 func normalizeKind(kind int) int {
