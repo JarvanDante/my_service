@@ -6,6 +6,7 @@ import (
 	"crypto/md5"
 	"encoding/hex"
 	"fmt"
+	"strings"
 	"sync"
 
 	"github.com/gogf/gf/v2/errors/gerror"
@@ -14,6 +15,7 @@ import (
 	"github.com/JarvanDante/my_service/internal/model/entity"
 	"github.com/JarvanDante/my_service/internal/modules/user/domain"
 	"github.com/JarvanDante/my_service/internal/modules/user/service"
+	"github.com/JarvanDante/my_service/internal/shared/kit"
 )
 
 func (s *sUser) AdminListUsers(ctx context.Context, in service.AdminUserListInput) (*service.AdminUserListDTO, error) {
@@ -22,6 +24,12 @@ func (s *sUser) AdminListUsers(ctx context.Context, in service.AdminUserListInpu
 	}
 	if in.Size <= 0 {
 		in.Size = 20
+	}
+	if in.UserId <= 0 {
+		if uid := resolveAdminSearchId(in.Username); uid > 0 {
+			in.UserId = uid
+			in.Username = ""
+		}
 	}
 	list, total, err := s.repo.AdminListUsers(ctx, domain.AdminUserFilter{
 		Keyword: in.Keyword, UserId: in.UserId, Username: in.Username, Phone: in.Phone,
@@ -172,16 +180,43 @@ func (s *sUser) AdminBalanceLogs(ctx context.Context, userId int64, page, size i
 	return out, total, nil
 }
 
+func resolveAdminSearchId(account string) int64 {
+	account = strings.TrimSpace(account)
+	if account == "" {
+		return 0
+	}
+	if uid := kit.DecodePublicId(account); uid > 0 {
+		return uid
+	}
+	if uid := kit.DecodeUserId(account); uid > 0 {
+		return uid
+	}
+	if uid := kit.DecodeUserId(strings.ToUpper(account)); uid > 0 {
+		return uid
+	}
+	return 0
+}
+
 func toAdminItem(ctx context.Context, u *entity.Users, appidCache map[int64]string) *service.AdminUserItemDTO {
+	username := kit.EncodePublicId(u.Id)
+	if username == "" {
+		username = u.Username
+	}
+	parentName := u.ParentName
+	if u.ParentId > 0 {
+		if code := kit.EncodePublicId(u.ParentId); code != "" {
+			parentName = code
+		}
+	}
 	return &service.AdminUserItemDTO{
-		Id: u.Id, Username: u.Username, Nickname: u.Nickname, Phone: u.Phone,
+		Id: u.Id, Username: username, Nickname: u.Nickname, Phone: u.Phone,
 		Sex: u.Sex, Tag: u.Tag, Img: u.Img,
 		AccountSlat: buildAccountSlat(ctx, u.Username, u.SiteId, appidCache),
 		Balance:     u.Balance, GiftCount: u.GiftCount, Credit: u.Credit, MoneyCount: u.MoneyCount,
 		IsUp: u.IsUp, IsValid: u.IsValid, HasBuy: u.HasBuy, Level: u.Level,
 		GroupId: u.GroupId, GroupName: u.GroupName, GroupRate: u.GroupRate,
 		GroupStartTime: u.GroupStartTime, GroupEndTime: u.GroupEndTime,
-		ParentId: u.ParentId, ParentName: u.ParentName, Channel: u.ChannelName,
+		ParentId: u.ParentId, ParentName: parentName, Channel: u.ChannelName,
 		DeviceType: u.DeviceType, DeviceExt: u.DeviceExt, DeviceVersion: u.DeviceVersion,
 		MovieFeeRate: u.MovieFeeRate, PostFeeRate: u.PostFeeRate, ShareNum: u.ShareNum,
 		IsDisabled: u.IsDisabled,
