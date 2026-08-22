@@ -51,6 +51,18 @@ func (s *sUser) DefaultAvatars(ctx context.Context) []string {
 	return avatarPool(ctx)
 }
 
+func isDefaultAvatar(ctx context.Context, img string) bool {
+	if img == "" {
+		return false
+	}
+	for _, item := range avatarPool(ctx) {
+		if item == img {
+			return true
+		}
+	}
+	return false
+}
+
 // randAvatar 注册用: 随机取一张默认头像。
 func randAvatar(ctx context.Context) string {
 	pool := avatarPool(ctx)

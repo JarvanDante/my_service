@@ -380,6 +380,9 @@ func (s *sUser) UpdateProfile(ctx context.Context, userId int64, in service.Upda
 		data["nickname"] = in.Nickname
 	}
 	if in.Img != "" {
+		if !isDefaultAvatar(ctx, in.Img) {
+			return gerror.New("请从系统头像中选择")
+		}
 		data["img"] = in.Img
 	}
 	if in.BgImg != "" {
