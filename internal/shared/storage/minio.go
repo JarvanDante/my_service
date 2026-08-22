@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"net/url"
 	"strings"
 	"sync"
 	"time"
@@ -16,6 +17,7 @@ import (
 
 type Client struct {
 	mc        *minio.Client
+	presign   *minio.Client // 按浏览器 Host 签名，禁止签完再改 Host
 	bucket    string
 	publicURL string
 }
@@ -42,15 +44,41 @@ func newClient(ctx context.Context) (*Client, error) {
 	useSSL := g.Cfg().MustGet(ctx, "minio.useSSL", false).Bool()
 	publicURL := strings.TrimRight(g.Cfg().MustGet(ctx, "minio.publicURL", "http://127.0.0.1:19000").String(), "/")
 
+	// Region 固定可跳过 GetBucketLocation；预签名 client 指向 127.0.0.1 时不能再去拨号探活
+	region := g.Cfg().MustGet(ctx, "minio.region", "us-east-1").String()
+	if region == "" {
+		region = "us-east-1"
+	}
+
 	mc, err := minio.New(endpoint, &minio.Options{
 		Creds:  credentials.NewStaticV4(accessKey, secretKey, ""),
 		Secure: useSSL,
+		Region: region,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("创建 MinIO 客户端失败: %w", err)
 	}
 
-	c := &Client{mc: mc, bucket: bucket, publicURL: publicURL}
+	presign := mc
+	presignEndpoint, presignSSL := endpoint, useSSL
+	if publicURL != "" {
+		if u, err := url.Parse(publicURL); err == nil && u.Host != "" {
+			presignEndpoint = u.Host
+			presignSSL = strings.EqualFold(u.Scheme, "https")
+		}
+	}
+	if presignEndpoint != endpoint || presignSSL != useSSL {
+		presign, err = minio.New(presignEndpoint, &minio.Options{
+			Creds:  credentials.NewStaticV4(accessKey, secretKey, ""),
+			Secure: presignSSL,
+			Region: region,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("创建 MinIO 预签名客户端失败: %w", err)
+		}
+	}
+
+	c := &Client{mc: mc, presign: presign, bucket: bucket, publicURL: publicURL}
 	if err = c.ensureBucket(ctx); err != nil {
 		return nil, err
 	}
@@ -189,7 +217,11 @@ func (c *Client) PresignGetIn(ctx context.Context, bucket, objectKey string, exp
 	if expire <= 0 {
 		expire = 2 * time.Hour
 	}
-	u, err := c.mc.PresignedGetObject(ctx, bucket, key, expire, nil)
+	signer := c.presign
+	if signer == nil {
+		signer = c.mc
+	}
+	u, err := signer.PresignedGetObject(ctx, bucket, key, expire, nil)
 	if err != nil {
 		return "", err
 	}
