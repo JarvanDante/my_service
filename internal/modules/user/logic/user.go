@@ -141,14 +141,47 @@ func hashUserPassword(password, slat string) string {
 	return gmd5.MustEncryptString(password + slat)
 }
 
-// AccountLogin 用户名+密码登录, 通过后换绑到当前设备。
+func (s *sUser) findLoginAccount(ctx context.Context, account string) (*entity.Users, error) {
+	account = strings.TrimSpace(account)
+	if account == "" {
+		return nil, nil
+	}
+	u, err := s.repo.FindByAccount(ctx, account)
+	if err != nil {
+		return nil, err
+	}
+	if u != nil {
+		return u, nil
+	}
+	if upper := strings.ToUpper(account); upper != account {
+		u, err = s.repo.FindByAccount(ctx, upper)
+		if err != nil {
+			return nil, err
+		}
+		if u != nil {
+			return u, nil
+		}
+	}
+	if uid := kit.DecodePublicId(account); uid > 0 {
+		return s.repo.FindById(ctx, uid)
+	}
+	if uid := kit.DecodeUserId(account); uid > 0 {
+		return s.repo.FindById(ctx, uid)
+	}
+	if uid := kit.DecodeUserId(strings.ToUpper(account)); uid > 0 {
+		return s.repo.FindById(ctx, uid)
+	}
+	return nil, nil
+}
+
+// AccountLogin 用户编号+密码登录(不是设备号)。通过后换绑到当前设备。
 func (s *sUser) AccountLogin(ctx context.Context, in service.AccountLoginInput) (*service.LoginDTO, error) {
-	username := strings.ToUpper(strings.TrimSpace(in.Username))
+	account := strings.TrimSpace(in.Username)
 	password := strings.TrimSpace(in.Password)
-	if username == "" || password == "" || in.DeviceId == "" {
+	if account == "" || password == "" || in.DeviceId == "" {
 		return nil, gerror.New("用户名、密码与设备号不能为空")
 	}
-	u, err := s.repo.FindByAccount(ctx, username)
+	u, err := s.findLoginAccount(ctx, account)
 	if err != nil {
 		return nil, err
 	}
