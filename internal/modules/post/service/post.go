@@ -12,6 +12,7 @@ type PostDTO struct {
 	Content      string
 	Pics         []string
 	Topics       []string
+	Category     string
 	VideoUrl     string
 	MediaId      int64
 	ViewCount    int64
@@ -44,6 +45,12 @@ type ListFilter struct {
 	Size       int
 }
 
+type UpdateInput struct {
+	Id        int64
+	Category  string
+	ViewCount int64
+}
+
 type IPost interface {
 	Create(ctx context.Context, in CreateInput) (int64, error)
 	// FrontList 已通过帖子流(sort=new/hot)。
@@ -55,6 +62,8 @@ type IPost interface {
 	DeleteOwn(ctx context.Context, userId, id int64) error
 	// List 后台列表。
 	List(ctx context.Context, f ListFilter) ([]*PostDTO, int, error)
+	// Update 后台改分类和浏览量。
+	Update(ctx context.Context, in UpdateInput) error
 	// Audit 审核(仅 0待审 可审, 条件更新幂等)。
 	Audit(ctx context.Context, id int64, pass bool, reason string) error
 	// Delete 后台硬删(连带评论)。

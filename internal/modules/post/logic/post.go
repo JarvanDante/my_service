@@ -52,7 +52,7 @@ func toDTO(r *entity.Post) *service.PostDTO {
 	}
 	return &service.PostDTO{
 		Id: r.Id, UserId: r.UserId, Title: r.Title, Content: r.Content, Pics: pics,
-		Topics: topics, VideoUrl: r.VideoUrl, MediaId: r.MediaId, ViewCount: r.ViewCount,
+		Topics: topics, Category: r.Category, VideoUrl: r.VideoUrl, MediaId: r.MediaId, ViewCount: r.ViewCount,
 		LikeCount: r.LikeCount, CommentCount: r.CommentCount, Status: r.Status,
 		RejectReason: r.RejectReason, CreatedAt: created,
 	}
@@ -195,7 +195,7 @@ func (s *sPost) FrontList(ctx context.Context, f service.ListFilter) ([]*service
 		if err != nil {
 			return nil, 0, err
 		}
-		m = m.Where("topics::jsonb @> ?::jsonb", string(raw))
+		m = m.Where("(category = ?) OR (topics::jsonb @> ?::jsonb)", cat, string(raw))
 	}
 	total, err := m.Clone().Count()
 	if err != nil {
@@ -316,6 +316,38 @@ func (s *sPost) List(ctx context.Context, f service.ListFilter) ([]*service.Post
 		out = append(out, d)
 	}
 	return out, total, nil
+}
+
+func (s *sPost) Update(ctx context.Context, in service.UpdateInput) error {
+	if in.Id <= 0 {
+		return gerror.New("ID非法")
+	}
+	if in.ViewCount < 0 {
+		return gerror.New("浏览量不能为负")
+	}
+	cat := strings.TrimSpace(in.Category)
+	if cat != "" {
+		cnt, err := g.Model("post_category").Ctx(ctx).
+			Where("site_id", postSiteId).Where("name", cat).Where("status", 1).Count()
+		if err != nil {
+			return err
+		}
+		if cnt == 0 {
+			return gerror.New("分类不存在或已禁用")
+		}
+	}
+	res, err := g.Model("post").Ctx(ctx).
+		Where("site_id", postSiteId).Where("id", in.Id).
+		Data(g.Map{
+			"category": cat, "view_count": in.ViewCount, "updated_at": gtime.Now(),
+		}).Update()
+	if err != nil {
+		return err
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		return gerror.New("帖子不存在")
+	}
+	return nil
 }
 
 func (s *sPost) Audit(ctx context.Context, id int64, pass bool, reason string) error {

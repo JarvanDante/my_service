@@ -10,6 +10,7 @@ type Item struct {
 	Content      string   `json:"content"`
 	Pics         []string `json:"pics"`
 	Topics       []string `json:"topics"`
+	Category     string   `json:"category"`
 	VideoUrl     string   `json:"video_url"`
 	MediaId      int64    `json:"media_id"`
 	ViewCount    int64    `json:"view_count"`
@@ -41,6 +42,14 @@ type AuditReq struct {
 	Reason string `json:"reason"` // 拒绝原因
 }
 type AuditRes struct{}
+
+type UpdateReq struct {
+	g.Meta    `path:"/post/{id}" method:"put" tags:"Backend/Post" summary:"编辑帖子(分类/浏览量)"`
+	Id        int64  `json:"id" in:"path" v:"required|min:1#ID必填"`
+	Category  string `json:"category"`
+	ViewCount int64  `json:"view_count" v:"min:0#浏览量不能为负"`
+}
+type UpdateRes struct{}
 
 type DeleteReq struct {
 	g.Meta `path:"/post/{id}" method:"delete" tags:"Backend/Post" summary:"删除帖子(硬删, 连带评论)"`

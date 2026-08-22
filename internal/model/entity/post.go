@@ -11,6 +11,7 @@ type Post struct {
 	Content      string      `json:"content"      orm:"content"`
 	Pics         string      `json:"pics"         orm:"pics"` // 原始 JSON 数组文本
 	Topics       string      `json:"topics"       orm:"topics"` // 话题名 JSON 数组
+	Category     string      `json:"category"     orm:"category"`
 	VideoUrl     string      `json:"videoUrl"     orm:"video_url"`
 	MediaId      int64       `json:"mediaId"      orm:"media_id"`
 	ViewCount    int64       `json:"viewCount"    orm:"view_count"`

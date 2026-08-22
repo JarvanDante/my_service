@@ -27,7 +27,7 @@ func RegisterFront(group *ghttp.RouterGroup) {
 func RegisterBackend(group *ghttp.RouterGroup) {
 	ctrl := backend.New(logic.New(), logic.NewCategory())
 	group.Bind(
-		ctrl.List, ctrl.Audit, ctrl.Delete,
+		ctrl.List, ctrl.Update, ctrl.Audit, ctrl.Delete,
 		ctrl.CategoryList, ctrl.CategoryCreate, ctrl.CategoryUpdate, ctrl.CategoryDelete,
 	)
 }
