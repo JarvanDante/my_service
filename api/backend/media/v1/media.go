@@ -10,7 +10,7 @@ import (
 type UploadReq struct {
 	g.Meta  `path:"/media/upload" method:"post" tags:"Backend/Media" mime:"multipart/form-data" summary:"上传媒体文件"`
 	File    *ghttp.UploadFile `json:"file" type:"file" v:"required#文件必填"`
-	Purpose string            `json:"purpose" d:"image" dc:"用途: image/cover/video/avatar"`
+	Purpose string            `json:"purpose" d:"image" dc:"用途: image/cover/video/avatar/ad，写入统一存储 my-storage"`
 }
 
 type UploadRes struct {

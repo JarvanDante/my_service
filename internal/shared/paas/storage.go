@@ -2,6 +2,8 @@ package paas
 
 import (
 	"context"
+	"io"
+	"net/http"
 	"strings"
 
 	"github.com/gogf/gf/v2/errors/gerror"
@@ -101,4 +103,33 @@ func ConfirmStorageObject(ctx context.Context, id string) (*StorageConfirmOut, e
 		return nil, err
 	}
 	return out, nil
+}
+
+// PutUploadURL 按统一存储签发的预签名地址写入文件。不要带 Content-Type。
+func PutUploadURL(ctx context.Context, uploadURL string, body io.Reader, size int64) error {
+	uploadURL = strings.TrimSpace(uploadURL)
+	if uploadURL == "" {
+		return gerror.New("缺少统一存储上传地址")
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodPut, uploadURL, body)
+	if err != nil {
+		return gerror.Wrap(err, "构造统一存储上传请求失败")
+	}
+	if size > 0 {
+		req.ContentLength = size
+	}
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return gerror.Wrap(err, "写入统一存储失败")
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		raw, _ := io.ReadAll(io.LimitReader(resp.Body, 180))
+		msg := strings.TrimSpace(string(raw))
+		if msg == "" {
+			msg = resp.Status
+		}
+		return gerror.Newf("写入统一存储失败(%d): %s", resp.StatusCode, msg)
+	}
+	return nil
 }

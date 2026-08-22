@@ -11,7 +11,7 @@ import (
 	"github.com/JarvanDante/my_service/internal/shared/middleware"
 )
 
-// RegisterFront 前台用户上传(需登录)。图走整文件加密; 视频走分片续传。
+// RegisterFront 前台用户上传(需登录)。帖子/图/视频/广告/头像走统一存储 my-storage。
 func RegisterFront(group *ghttp.RouterGroup, repo domain.Repository) {
 	ctrl := front.New(logic.New(repo))
 	group.Bind(ctrl.Object)

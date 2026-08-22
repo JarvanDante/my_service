@@ -53,9 +53,9 @@ func (c *Controller) Upload(ctx context.Context, req *v1.UploadReq) (res *v1.Upl
 		purpose = "image"
 	}
 	switch purpose {
-	case "image", "avatar", "video":
+	case "image", "avatar", "video", "ad", "post", "post_video":
 	default:
-		return nil, gerror.NewCode(gcode.CodeInvalidParameter, "前台仅支持上传 image/avatar/video")
+		return nil, gerror.NewCode(gcode.CodeInvalidParameter, "前台仅支持上传 image/avatar/video/ad")
 	}
 	dto, err := c.media.Upload(ctx, service.UploadInput{
 		File: req.File, Purpose: purpose, OperatorId: userId,
@@ -101,29 +101,10 @@ func (c *Controller) StorageConfirm(ctx context.Context, req *v1.StorageConfirmR
 }
 
 func (c *Controller) MultipartInit(ctx context.Context, req *v1.MultipartInitReq) (res *v1.MultipartInitRes, err error) {
-	userId, err := uid(ctx)
-	if err != nil {
+	if _, err = uid(ctx); err != nil {
 		return nil, err
 	}
-	purpose := strings.ToLower(strings.TrimSpace(req.Purpose))
-	if purpose == "" {
-		purpose = "video"
-	}
-	if purpose != "video" {
-		return nil, gerror.NewCode(gcode.CodeInvalidParameter, "前台分片上传仅支持 video")
-	}
-	dto, err := c.media.MultipartInit(ctx, service.MultipartInitInput{
-		Filename: req.Filename, Purpose: purpose, ContentType: req.ContentType,
-		Size: req.Size, PartSize: req.PartSize, OperatorId: userId, Resume: true,
-	})
-	if err != nil {
-		return nil, err
-	}
-	return &v1.MultipartInitRes{
-		UploadId: dto.UploadId, ObjectKey: dto.ObjectKey, Bucket: dto.Bucket,
-		Purpose: dto.Purpose, ContentType: dto.ContentType, Size: dto.Size,
-		PartSize: dto.PartSize, PartCount: dto.PartCount,
-	}, nil
+	return nil, gerror.NewCode(gcode.CodeInvalidParameter, "前台视频请走统一存储，不再分片上传到 my-media")
 }
 
 func (c *Controller) MultipartPart(ctx context.Context, req *v1.MultipartPartUploadReq) (res *v1.MultipartPartUploadRes, err error) {

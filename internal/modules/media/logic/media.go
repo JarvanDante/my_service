@@ -1,7 +1,6 @@
 package logic
 
 import (
-	"bytes"
 	"context"
 	"fmt"
 	"io"
@@ -19,7 +18,6 @@ import (
 	"github.com/JarvanDante/my_service/internal/model/entity"
 	"github.com/JarvanDante/my_service/internal/modules/media/domain"
 	"github.com/JarvanDante/my_service/internal/modules/media/service"
-	"github.com/JarvanDante/my_service/internal/shared/aesbnc"
 	"github.com/JarvanDante/my_service/internal/shared/paas"
 	"github.com/JarvanDante/my_service/internal/shared/storage"
 )
@@ -28,17 +26,24 @@ type sMedia struct{ repo domain.Repository }
 
 func New(repo domain.Repository) service.IMedia { return &sMedia{repo: repo} }
 
+var imageMimes = []string{"image/jpeg", "image/jpg", "image/png", "image/gif", "image/webp"}
+var avatarMimes = []string{"image/jpeg", "image/jpg", "image/png", "image/webp"}
+var videoMimes = []string{
+	"video/mp4", "video/quicktime", "video/x-matroska", "video/webm",
+	"video/3gpp", "video/3gpp2", "video/x-m4v",
+}
+
 var purposeDefaults = map[string]struct {
 	mime    []string
 	maxSize int64 // KB
 }{
-	"image":  {[]string{"image/jpeg", "image/jpg", "image/png", "image/gif", "image/webp"}, 5120},
-	"cover":  {[]string{"image/jpeg", "image/jpg", "image/png", "image/gif", "image/webp"}, 5120},
-	"avatar": {[]string{"image/jpeg", "image/jpg", "image/png", "image/webp"}, 2048},
-	"video": {[]string{
-		"video/mp4", "video/quicktime", "video/x-matroska", "video/webm",
-		"video/3gpp", "video/3gpp2", "video/x-m4v",
-	}, 2097152},
+	"image":      {imageMimes, 5120},
+	"cover":      {imageMimes, 5120},
+	"avatar":     {avatarMimes, 2048},
+	"ad":         {imageMimes, 5120},
+	"post":       {imageMimes, 5120},
+	"video":      {videoMimes, 2097152},
+	"post_video": {videoMimes, 2097152},
 }
 
 func (s *sMedia) Upload(ctx context.Context, in service.UploadInput) (*service.UploadDTO, error) {
@@ -72,62 +77,85 @@ func (s *sMedia) Upload(ctx context.Context, in service.UploadInput) (*service.U
 		return nil, err
 	}
 
-	objectKey := buildObjectKey(purpose, filename)
-	client, err := storage.Get(ctx)
-	if err != nil {
-		return nil, gerror.WrapCode(gcode.CodeInternalError, err, "对象存储不可用")
-	}
-
 	f, err := in.File.Open()
 	if err != nil {
 		return nil, gerror.WrapCode(gcode.CodeInternalError, err, "打开上传文件失败")
 	}
 	defer f.Close()
 
-	var reader io.Reader = f
-	if aesbnc.ShouldEncryptPurpose(purpose) {
-		raw, err := io.ReadAll(f)
-		if err != nil {
-			return nil, gerror.WrapCode(gcode.CodeInternalError, err, "读取上传文件失败")
-		}
-		enc, err := aesbnc.Encrypt(raw)
-		if err != nil {
-			return nil, gerror.WrapCode(gcode.CodeInternalError, err, "图片加密失败")
-		}
-		reader = bytes.NewReader(enc)
-		objectKey = aesbnc.ToBncKey(objectKey)
-		contentType = "application/octet-stream"
-		size = int64(len(enc))
-	}
-
-	url, err := client.Put(ctx, objectKey, reader, size, contentType)
+	created, confirmed, err := putViaUnifiedStorage(ctx, filename, purpose, contentType, size, f)
 	if err != nil {
-		return nil, gerror.WrapCode(gcode.CodeInternalError, err, "上传失败")
+		return nil, err
+	}
+	url := confirmed.PublicUrl
+	if url == "" {
+		url = created.PublicUrl
+	}
+	objectKey := created.Key
+	if objectKey == "" {
+		objectKey = created.Id
+	}
+	bucket := created.Bucket
+	if bucket == "" {
+		bucket = "my-storage"
 	}
 
 	id, err := s.repo.Create(ctx, &entity.MediaObject{
-		Bucket:      client.Bucket(),
+		Bucket:      bucket,
 		ObjectKey:   objectKey,
 		Purpose:     purpose,
 		ContentType: contentType,
-		Size:        size,
+		Size:        confirmed.SizeBytes,
 		CreatedBy:   in.OperatorId,
 	})
 	if err != nil {
 		return nil, gerror.WrapCode(gcode.CodeDbOperationError, err, "保存媒体记录失败")
 	}
+	if confirmed.SizeBytes > 0 {
+		size = confirmed.SizeBytes
+	}
 
 	return &service.UploadDTO{
-		Id: id, Url: url, ObjectKey: objectKey, Bucket: client.Bucket(),
+		Id: id, Url: url, ObjectKey: objectKey, Bucket: bucket,
 		Purpose: purpose, ContentType: contentType, Size: size,
 	}, nil
 }
 
 func storageBiz(purpose string) string {
-	if purpose == "video" {
+	switch strings.ToLower(strings.TrimSpace(purpose)) {
+	case "video":
+		return "video"
+	case "post_video":
 		return "post_video"
+	case "avatar":
+		return "avatar"
+	case "cover":
+		return "cover"
+	case "ad":
+		return "ad"
+	case "post":
+		return "post"
+	default:
+		return "image"
 	}
-	return "post"
+}
+
+func putViaUnifiedStorage(ctx context.Context, filename, purpose, contentType string, size int64, body io.Reader) (*paas.StorageCreateOut, *paas.StorageConfirmOut, error) {
+	created, err := paas.CreateStorageObject(ctx, paas.StorageCreateIn{
+		Filename: filename, Biz: storageBiz(purpose),
+		ContentType: contentType, SizeBytes: size, Remark: "site-" + purpose,
+	})
+	if err != nil {
+		return nil, nil, err
+	}
+	if err = paas.PutUploadURL(ctx, created.UploadUrl, body, size); err != nil {
+		return nil, nil, gerror.WrapCode(gcode.CodeInternalError, err, "上传失败")
+	}
+	confirmed, err := paas.ConfirmStorageObject(ctx, created.Id)
+	if err != nil {
+		return nil, nil, err
+	}
+	return created, confirmed, nil
 }
 
 func (s *sMedia) InitStorageUpload(ctx context.Context, in service.StorageInitInput) (*service.StorageInitDTO, error) {
@@ -135,8 +163,8 @@ func (s *sMedia) InitStorageUpload(ctx context.Context, in service.StorageInitIn
 	if purpose == "" {
 		purpose = "image"
 	}
-	if purpose != "image" && purpose != "video" {
-		return nil, gerror.NewCode(gcode.CodeInvalidParameter, "帖子上传仅支持 image/video")
+	if _, ok := purposeDefaults[purpose]; !ok {
+		return nil, gerror.NewCodef(gcode.CodeInvalidParameter, "不支持的用途: %s", purpose)
 	}
 	filename := strings.TrimSpace(in.Filename)
 	if filename == "" {
@@ -154,7 +182,7 @@ func (s *sMedia) InitStorageUpload(ctx context.Context, in service.StorageInitIn
 	}
 	out, err := paas.CreateStorageObject(ctx, paas.StorageCreateIn{
 		Filename: filename, Biz: storageBiz(purpose),
-		ContentType: contentType, SizeBytes: in.Size, Remark: "h5-post",
+		ContentType: contentType, SizeBytes: in.Size, Remark: "h5-" + purpose,
 	})
 	if err != nil {
 		return nil, err

@@ -8,7 +8,7 @@ import (
 type UploadReq struct {
 	g.Meta  `path:"/media/upload" method:"post" tags:"Front/Media" mime:"multipart/form-data" summary:"上传图片或视频"`
 	File    *ghttp.UploadFile `json:"file" type:"file" v:"required#文件必填"`
-	Purpose string            `json:"purpose" d:"image" dc:"用途: image/avatar/video"`
+	Purpose string            `json:"purpose" d:"image" dc:"用途: image/avatar/video/ad"`
 }
 
 type UploadRes struct {
