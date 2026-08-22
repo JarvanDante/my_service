@@ -14,6 +14,7 @@ import (
 	configmod "github.com/JarvanDante/my_service/internal/modules/config"
 	couponmod "github.com/JarvanDante/my_service/internal/modules/coupon"
 	feedbackmod "github.com/JarvanDante/my_service/internal/modules/feedback"
+	groupmod "github.com/JarvanDante/my_service/internal/modules/group"
 	finmod "github.com/JarvanDante/my_service/internal/modules/finance"
 	lotterymod "github.com/JarvanDante/my_service/internal/modules/lottery"
 	mediamod "github.com/JarvanDante/my_service/internal/modules/media"
@@ -51,6 +52,7 @@ func mountFront(s *ghttp.Server) {
 		redeemmod.RegisterFront(group)
 		configmod.RegisterFront(group)
 		appmod.RegisterFront(group)
+		groupmod.RegisterFront(group)
 		collectmod.RegisterFront(group)
 		msgmod.RegisterFront(group)
 		opsmod.RegisterFront(group)
@@ -111,6 +113,7 @@ func mountBackend(s *ghttp.Server) {
 			redeemmod.RegisterBackend(perm)
 			configmod.RegisterBackend(perm)
 			appmod.RegisterBackend(perm)
+			groupmod.RegisterBackend(perm)
 			msgmod.RegisterBackend(perm)
 			opsmod.RegisterBackend(perm)
 			postmod.RegisterBackend(perm)
