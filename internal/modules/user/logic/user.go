@@ -624,6 +624,33 @@ func (s *sUser) ShareLogs(ctx context.Context, userId int64, page, size int) ([]
 	return out, total, nil
 }
 
+func (s *sUser) Invitees(ctx context.Context, userId int64, page, size int) ([]*service.InviteeDTO, int, error) {
+	page, size = normalizePage(page, size)
+	list, total, err := s.repo.InviteeList(ctx, userId, page, size)
+	if err != nil {
+		return nil, 0, err
+	}
+	out := make([]*service.InviteeDTO, 0, len(list))
+	for _, u := range list {
+		code := kit.EncodeUserId(u.Id)
+		if u.Username != "" && !strings.HasPrefix(u.Username, "device_") {
+			code = u.Username
+		}
+		name := strings.TrimSpace(u.Nickname)
+		if name == "" {
+			name = "用户" + code
+		}
+		at := u.CreatedAt
+		if u.RegisterAt != nil {
+			at = u.RegisterAt
+		}
+		out = append(out, &service.InviteeDTO{
+			Nickname: name, InviteCode: code, CreatedAt: fmtTime(at),
+		})
+	}
+	return out, total, nil
+}
+
 func fmtTime(t *gtime.Time) string {
 	if t == nil {
 		return ""

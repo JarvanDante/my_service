@@ -121,6 +121,7 @@ type Repository interface {
 	CodeLogs(ctx context.Context, userId int64, page, size int) ([]*entity.UserCodeLog, int, error)
 	AddShareLog(ctx context.Context, userId int64, typ string, targetId int64, channel string) error
 	ShareLogList(ctx context.Context, userId int64, page, size int) ([]*entity.UserShareLog, int, error)
+	InviteeList(ctx context.Context, parentId int64, page, size int) ([]*entity.Users, int, error)
 	// 成长: 签到 / 任务
 	GetSignDays(ctx context.Context, userId int64, yearMonth int) ([]int, bool, error)
 	SaveSign(ctx context.Context, userId int64, yearMonth int, days []int, exists bool, credit float64) error

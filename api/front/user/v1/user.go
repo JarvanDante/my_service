@@ -287,6 +287,22 @@ type ShareLogsRes struct {
 	Size  int        `json:"size"`
 }
 
+type Invitee struct {
+	Nickname   string `json:"nickname"`
+	InviteCode string `json:"invite_code"`
+	CreatedAt  string `json:"created_at"`
+}
+
+type InviteesReq struct {
+	g.Meta `path:"/user/share/invitees" method:"get" tags:"Front/User" summary:"我邀请的用户"`
+	Page   int `json:"page"`
+	Size   int `json:"size"`
+}
+type InviteesRes struct {
+	List  []Invitee `json:"list"`
+	Total int       `json:"total"`
+}
+
 // ---- P5 成长(签到/任务) ----
 
 // 每日签到

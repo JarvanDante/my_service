@@ -24,7 +24,7 @@ func RegisterFront(group *ghttp.RouterGroup, repo domain.Repository) {
 			ctrl.Home, ctrl.Update, ctrl.Images, ctrl.Find, ctrl.Avatars,
 			ctrl.DoFollow, ctrl.Follows, ctrl.Fans,
 			ctrl.BindParent, ctrl.BindCode, ctrl.Redeem, ctrl.CodeLogs,
-			ctrl.Share, ctrl.ShareLogs, ctrl.ShareReport,
+			ctrl.Share, ctrl.ShareLogs, ctrl.ShareReport, ctrl.Invitees,
 			ctrl.DoSign, ctrl.Tasks, ctrl.DoTask, ctrl.TaskLogs, ctrl.Up,
 			ctrl.Recharge, ctrl.RechargeDo, ctrl.RechargeMockPay, ctrl.Vip, ctrl.VipDo, ctrl.VipLogs, ctrl.Exchange, ctrl.ExchangeDo,
 			ctrl.Chats, ctrl.ChatMessages, ctrl.ChatSend, ctrl.ChatDel, ctrl.CustomerUrl,

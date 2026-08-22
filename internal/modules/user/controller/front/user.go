@@ -348,6 +348,24 @@ func (c *Controller) ShareLogs(ctx context.Context, req *v1.ShareLogsReq) (res *
 	return &v1.ShareLogsRes{List: items, Total: total, Page: req.Page, Size: req.Size}, nil
 }
 
+func (c *Controller) Invitees(ctx context.Context, req *v1.InviteesReq) (res *v1.InviteesRes, err error) {
+	id, err := uid(ctx)
+	if err != nil {
+		return nil, err
+	}
+	list, total, err := c.user.Invitees(ctx, id, req.Page, req.Size)
+	if err != nil {
+		return nil, err
+	}
+	items := make([]v1.Invitee, 0, len(list))
+	for _, u := range list {
+		items = append(items, v1.Invitee{
+			Nickname: u.Nickname, InviteCode: u.InviteCode, CreatedAt: u.CreatedAt,
+		})
+	}
+	return &v1.InviteesRes{List: items, Total: total}, nil
+}
+
 // ShareReport 上报分享(需登录)。
 func (c *Controller) ShareReport(ctx context.Context, req *v1.ShareReportReq) (res *v1.ShareReportRes, err error) {
 	id, err := uid(ctx)

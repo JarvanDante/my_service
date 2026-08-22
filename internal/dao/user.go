@@ -276,6 +276,18 @@ func (r *userRepo) ShareLogList(ctx context.Context, userId int64, page, size in
 	return list, total, err
 }
 
+func (r *userRepo) InviteeList(ctx context.Context, parentId int64, page, size int) ([]*entity.Users, int, error) {
+	m := g.Model("users").Ctx(ctx).Where("parent_id", parentId)
+	total, err := m.Clone().Count()
+	if err != nil {
+		return nil, 0, err
+	}
+	var list []*entity.Users
+	err = m.Clone().Page(page, size).OrderDesc("id").
+		Fields("id,username,nickname,created_at,register_at").Scan(&list)
+	return list, total, err
+}
+
 // GetSignDays 取某月已签到日, 及该月记录是否存在。
 func (r *userRepo) GetSignDays(ctx context.Context, userId int64, yearMonth int) ([]int, bool, error) {
 	one, err := g.Model("user_sign").Ctx(ctx).

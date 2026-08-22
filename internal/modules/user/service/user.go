@@ -117,6 +117,12 @@ type ShareLogDTO struct {
 	CreatedAt string
 }
 
+type InviteeDTO struct {
+	Nickname   string
+	InviteCode string
+	CreatedAt  string
+}
+
 // ---- P5 成长(签到/任务) ----
 
 type SignDTO struct {
@@ -501,6 +507,7 @@ type IUser interface {
 	CodeLogs(ctx context.Context, userId int64, page, size int) ([]*CodeLogDTO, int, error)
 	ShareInfo(ctx context.Context, userId int64) (*ShareDTO, error)
 	ShareLogs(ctx context.Context, userId int64, page, size int) ([]*ShareLogDTO, int, error)
+	Invitees(ctx context.Context, userId int64, page, size int) ([]*InviteeDTO, int, error)
 	ReportShare(ctx context.Context, userId int64, typ string, targetId int64, channel string) error
 	// 成长(签到/任务)
 	DoDaySign(ctx context.Context, userId int64) (*SignDTO, error)
