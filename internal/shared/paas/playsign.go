@@ -123,11 +123,18 @@ func PlaylistURL(ctx context.Context, code, raw string) string {
 }
 
 func isMinioHls(u string) bool {
-	return strings.Contains(u, ":19000/") ||
-		strings.Contains(u, "host.docker.internal") ||
-		strings.Contains(u, "/my-media/media/hls/") ||
+	if strings.Contains(u, "/my-storage/") {
+		return false
+	}
+	return strings.Contains(u, "/my-media/media/hls/") ||
 		strings.Contains(u, "/my-media/cartoon/") ||
-		strings.Contains(u, "/my-media/comics/")
+		strings.Contains(u, "/my-media/comics/") ||
+		strings.Contains(u, ":19000/my-media/") ||
+		(strings.Contains(u, "host.docker.internal") && strings.Contains(u, "/my-media/"))
+}
+
+func isSiteStorageCover(cover string) bool {
+	return strings.Contains(cover, "/my-storage/")
 }
 
 // ApplyGatewayURLs 有媒资短码时封面/播放一律改写为网关签名地址。
@@ -135,7 +142,7 @@ func ApplyGatewayURLs(ctx context.Context, cover, play, code string) (string, st
 	if code == "" {
 		return cover, play
 	}
-	if u := CoverURL(ctx, code); u != "" && (cover == "" || isMinioHls(cover) ||
+	if u := CoverURL(ctx, code); u != "" && !isSiteStorageCover(cover) && (cover == "" || isMinioHls(cover) ||
 		strings.Contains(cover, "/hls/"+code+"/cover.jpg") ||
 		strings.Contains(cover, "/hls/"+code+"/cover.bnc") ||
 		strings.Contains(cover, "/comics/"+code+"/cover.")) {
