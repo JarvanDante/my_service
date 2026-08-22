@@ -17,6 +17,7 @@ import (
 
 	"github.com/JarvanDante/my_service/internal/model/entity"
 	"github.com/JarvanDante/my_service/internal/modules/redeemcode/service"
+	"github.com/JarvanDante/my_service/internal/shared/balance"
 )
 
 const (
@@ -89,11 +90,10 @@ func (s *sRedeemCode) Use(ctx context.Context, userId int64, code string) (*serv
 			Data(g.Map{"status": 0}).Update(); err != nil {
 			return err
 		}
-		// 发金币
-		if _, err := tx.Model("users").Ctx(ctx).Where("id", userId).
-			Data(g.Map{"balance": &gdb.Counter{Field: "balance", Value: float64(rc.Value)}}).
-			Update(); err != nil {
-			return err
+		if rc.Value > 0 {
+			if err := balance.Add(ctx, tx, userId, float64(rc.Value), balance.SceneRedeemCode, fmt.Sprintf("redeem_code:%d", rc.Id), goldDesc(rc.Value)); err != nil {
+				return err
+			}
 		}
 		// 记录(唯一约束兜底并发下同用户重复提交)
 		if _, err := tx.Model("redeem_code_record").Ctx(ctx).Data(g.Map{

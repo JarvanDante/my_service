@@ -29,6 +29,7 @@ const (
 	SceneLotteryPrize   = "lottery_prize"   // 抽奖奖励
 	SceneAiCost         = "ai_cost"         // AI生成任务扣费(提交/重试)
 	SceneAiRefund       = "ai_refund"       // AI生成任务退款(提交失败/生成失败/取消/人工退)
+	SceneRedeemCode     = "redeem_code"     // 兑换码到账
 )
 
 // ErrInsufficient 余额不足(供调用方判定并转换成业务提示)。

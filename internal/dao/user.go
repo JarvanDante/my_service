@@ -3,6 +3,7 @@ package dao
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 
 	"github.com/gogf/gf/v2/database/gdb"
 	"github.com/gogf/gf/v2/errors/gerror"
@@ -12,6 +13,7 @@ import (
 
 	"github.com/JarvanDante/my_service/internal/model/entity"
 	"github.com/JarvanDante/my_service/internal/modules/user/domain"
+	"github.com/JarvanDante/my_service/internal/shared/balance"
 )
 
 type userRepo struct{}
@@ -193,10 +195,15 @@ func (r *userRepo) HasRedeemed(ctx context.Context, codeId, userId int64) (bool,
 func (r *userRepo) RedeemCode(ctx context.Context, userId int64, username string, c *entity.UserCode) error {
 	return g.DB().Transaction(ctx, func(ctx context.Context, tx gdb.TX) error {
 		switch c.Type {
-		case "point": // 加金币(balance)
-			if _, err := tx.Model("users").Ctx(ctx).Where("id", userId).
-				Data(g.Map{"balance": &gdb.Counter{Field: "balance", Value: float64(c.AddNum)}}).Update(); err != nil {
-				return err
+		case "point": // 加金币 + 写余额流水
+			if c.AddNum > 0 {
+				remark := "兑换码到账"
+				if c.Name != "" {
+					remark = "兑换码到账:" + c.Name
+				}
+				if err := balance.Add(ctx, tx, userId, float64(c.AddNum), balance.SceneRedeemCode, fmt.Sprintf("user_code:%d", c.Id), remark); err != nil {
+					return err
+				}
 			}
 		case "group": // 加/续用户组, add_num 为天数
 			now := gtime.Timestamp()
