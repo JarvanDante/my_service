@@ -528,9 +528,6 @@ func (s *sUser) BindParent(ctx context.Context, userId int64, account string) er
 	if me == nil {
 		return gerror.New("用户不存在")
 	}
-	if me.ParentId != 0 {
-		return gerror.New("已绑定推荐人, 不可修改")
-	}
 	inviter, err := s.repo.FindByAccount(ctx, account)
 	if err != nil {
 		return err
@@ -559,6 +556,9 @@ func (s *sUser) BindParent(ctx context.Context, userId int64, account string) er
 	}
 	if err = s.rejectInviteCycle(ctx, userId, inviter); err != nil {
 		return err
+	}
+	if me.ParentId != 0 {
+		return gerror.New("已绑定推荐人, 不可修改")
 	}
 	parentName := kit.EncodeUserId(inviter.Id)
 	if parentName == "" {

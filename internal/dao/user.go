@@ -187,11 +187,11 @@ func (r *userRepo) BindInviter(ctx context.Context, userId, inviterId int64, inv
 		if me == nil || inviter == nil {
 			return gerror.New("用户不存在")
 		}
-		if me.ParentId != 0 {
-			return gerror.New("已绑定推荐人, 不可修改")
-		}
 		if inviter.ParentId == userId {
 			return gerror.New("不能互相邀请")
+		}
+		if me.ParentId != 0 {
+			return gerror.New("已绑定推荐人, 不可修改")
 		}
 		if _, err := tx.Model("users").Ctx(ctx).Where("id", userId).Data(g.Map{
 			"parent_id":   inviterId,
