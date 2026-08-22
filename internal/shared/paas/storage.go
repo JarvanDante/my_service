@@ -4,6 +4,7 @@ import (
 	"context"
 	"io"
 	"net/http"
+	"net/url"
 	"strings"
 
 	"github.com/gogf/gf/v2/errors/gerror"
@@ -106,15 +107,28 @@ func ConfirmStorageObject(ctx context.Context, id string) (*StorageConfirmOut, e
 }
 
 // PutUploadURL 按统一存储签发的预签名地址写入文件。不要带 Content-Type。
+// 预签名 Host 是给浏览器的 127.0.0.1:19000；容器内改拨 minio.endpoint，Host 头保持原值以免验签失败。
 func PutUploadURL(ctx context.Context, uploadURL string, body io.Reader, size int64) error {
 	uploadURL = strings.TrimSpace(uploadURL)
 	if uploadURL == "" {
 		return gerror.New("缺少统一存储上传地址")
 	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodPut, uploadURL, body)
+	u, err := url.Parse(uploadURL)
+	if err != nil {
+		return gerror.Wrap(err, "统一存储上传地址无效")
+	}
+	signedHost := u.Host
+	if internal := strings.TrimSpace(g.Cfg().MustGet(ctx, "minio.endpoint").String()); internal != "" {
+		host := u.Hostname()
+		if host == "127.0.0.1" || host == "localhost" || host == "::1" {
+			u.Host = internal
+		}
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodPut, u.String(), body)
 	if err != nil {
 		return gerror.Wrap(err, "构造统一存储上传请求失败")
 	}
+	req.Host = signedHost
 	if size > 0 {
 		req.ContentLength = size
 	}
