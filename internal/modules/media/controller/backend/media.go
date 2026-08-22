@@ -49,7 +49,38 @@ func operatorId(ctx context.Context) (int64, error) {
 	return id, nil
 }
 
-// Upload 整文件上传(小文件/封面)。
+func (c *Controller) StorageInit(ctx context.Context, req *v1.StorageInitReq) (res *v1.StorageInitRes, err error) {
+	if _, err = operatorId(ctx); err != nil {
+		return nil, err
+	}
+	dto, err := c.media.InitStorageUpload(ctx, service.StorageInitInput{
+		Filename: req.Filename, Purpose: req.Purpose,
+		ContentType: req.ContentType, Size: req.Size,
+	})
+	if err != nil {
+		return nil, err
+	}
+	return &v1.StorageInitRes{
+		Id: dto.Id, UploadUrl: dto.UploadUrl, Method: dto.Method, Bucket: dto.Bucket,
+		ObjectKey: dto.ObjectKey, ExpireSec: dto.ExpireSec, PublicUrl: dto.PublicUrl,
+		ContentType: dto.ContentType,
+	}, nil
+}
+
+func (c *Controller) StorageConfirm(ctx context.Context, req *v1.StorageConfirmReq) (res *v1.StorageConfirmRes, err error) {
+	if _, err = operatorId(ctx); err != nil {
+		return nil, err
+	}
+	dto, err := c.media.ConfirmStorageUpload(ctx, req.Id)
+	if err != nil {
+		return nil, err
+	}
+	return &v1.StorageConfirmRes{
+		Id: dto.Id, Url: dto.Url, ObjectKey: dto.ObjectKey, Bucket: dto.Bucket, Size: dto.Size,
+	}, nil
+}
+
+// Upload 整文件上传(小文件/封面)，内部走统一存储 my-storage。
 func (c *Controller) Upload(ctx context.Context, req *v1.UploadReq) (res *v1.UploadRes, err error) {
 	op, err := operatorId(ctx)
 	if err != nil {

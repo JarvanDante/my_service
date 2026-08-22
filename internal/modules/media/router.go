@@ -41,6 +41,8 @@ func RegisterBackend(group *ghttp.RouterGroup, repo domain.Repository) {
 	ctrl := backend.New(logic.New(repo))
 	group.Bind(
 		ctrl.Upload,
+		ctrl.StorageInit,
+		ctrl.StorageConfirm,
 		ctrl.MultipartInit,
 		ctrl.MultipartPresign,
 		ctrl.MultipartParts,
