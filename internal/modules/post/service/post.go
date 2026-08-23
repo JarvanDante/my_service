@@ -8,6 +8,7 @@ type PostDTO struct {
 	UserId       int64
 	Nickname     string
 	Img          string
+	Sex          int
 	Title        string
 	Content      string
 	Pics         []string

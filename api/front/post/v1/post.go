@@ -8,6 +8,7 @@ type Item struct {
 	UserId       int64    `json:"user_id"`
 	Nickname     string   `json:"nickname"`
 	Img          string   `json:"img"`
+	Sex          int      `json:"sex"`
 	Title        string   `json:"title"`
 	Content      string   `json:"content"`
 	Pics         []string `json:"pics"`

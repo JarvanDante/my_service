@@ -83,21 +83,25 @@ func fillAuthors(ctx context.Context, list []*service.PostDTO) {
 	if len(ids) == 0 {
 		return
 	}
-	rows, err := g.Model("users").Ctx(ctx).WhereIn("id", ids).Fields("id,nickname,img").All()
+	rows, err := g.Model("users").Ctx(ctx).WhereIn("id", ids).Fields("id,nickname,img,sex").All()
 	if err != nil {
 		return
 	}
-	type author struct{ nickname, img string }
+	type author struct {
+		nickname string
+		img      string
+		sex      int
+	}
 	m := map[int64]author{}
 	for _, row := range rows {
-		m[row["id"].Int64()] = author{row["nickname"].String(), row["img"].String()}
+		m[row["id"].Int64()] = author{row["nickname"].String(), row["img"].String(), row["sex"].Int()}
 	}
 	for _, d := range list {
 		if d == nil {
 			continue
 		}
 		if a, ok := m[d.UserId]; ok {
-			d.Nickname, d.Img = a.nickname, a.img
+			d.Nickname, d.Img, d.Sex = a.nickname, a.img, a.sex
 		}
 	}
 }
