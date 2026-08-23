@@ -39,7 +39,7 @@ func normalizeHotCategory(raw string) (string, error) {
 		return "short", nil
 	case "video", "视频":
 		return "video", nil
-	case "planet", "星球":
+	case "planet", "星球", "社区", "community":
 		return "planet", nil
 	default:
 		return "", gerror.New("分类非法")
