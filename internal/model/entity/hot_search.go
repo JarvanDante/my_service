@@ -7,6 +7,7 @@ type HotSearch struct {
 	Id          int64       `json:"id"          orm:"id"`
 	SiteId      int64       `json:"siteId"      orm:"site_id"`
 	Keyword     string      `json:"keyword"     orm:"keyword"`
+	Category    string      `json:"category"    orm:"category"`
 	Heat        int         `json:"heat"        orm:"heat"`
 	SearchCount int64       `json:"searchCount" orm:"search_count"`
 	Status      int         `json:"status"      orm:"status"`

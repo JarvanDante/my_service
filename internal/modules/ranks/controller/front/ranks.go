@@ -27,7 +27,7 @@ func (c *Controller) Rank(ctx context.Context, req *v1.RankReq) (res *v1.RankRes
 }
 
 func (c *Controller) Hot(ctx context.Context, req *v1.HotReq) (res *v1.HotRes, err error) {
-	words, err := c.svc.HotKeywords(ctx)
+	words, err := c.svc.HotKeywords(ctx, req.Category)
 	if err != nil {
 		return nil, err
 	}

@@ -13,6 +13,7 @@ type RankItem struct {
 type HotDTO struct {
 	Id          int64
 	Keyword     string
+	Category    string
 	Heat        int
 	SearchCount int64
 	Status      int
@@ -20,10 +21,11 @@ type HotDTO struct {
 }
 
 type HotFilter struct {
-	Status  int // -1=全部
-	Keyword string
-	Page    int
-	Size    int
+	Status   int // -1=全部
+	Category string
+	Keyword  string
+	Page     int
+	Size     int
 }
 
 type IRank interface {
@@ -31,11 +33,12 @@ type IRank interface {
 	Rank(ctx context.Context, mediaType int, period string) ([]RankItem, error)
 	// RefreshRank 清缓存。
 	RefreshRank(ctx context.Context) error
-	// HotKeywords 前台热搜词(heat desc, search_count desc, 上限 20)。
-	HotKeywords(ctx context.Context) ([]string, error)
+	// HotKeywords 前台热搜词(heat desc, search_count desc, 上限 10)。
+	// category 非空时先取该分类, 不足 10 条用通用词补齐。
+	HotKeywords(ctx context.Context, category string) ([]string, error)
 	// 后台热搜词管理
 	HotList(ctx context.Context, f HotFilter) ([]*HotDTO, int, error)
-	HotCreate(ctx context.Context, keyword string, heat, status int) (int64, error)
-	HotUpdate(ctx context.Context, id int64, keyword string, heat, status int) error
+	HotCreate(ctx context.Context, keyword, category string, heat, status int) (int64, error)
+	HotUpdate(ctx context.Context, id int64, keyword, category string, heat, status int) error
 	HotDelete(ctx context.Context, id int64) error
 }

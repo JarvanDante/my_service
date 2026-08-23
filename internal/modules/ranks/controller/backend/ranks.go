@@ -21,7 +21,7 @@ func (c *Controller) List(ctx context.Context, req *v1.ListReq) (res *v1.ListRes
 		}
 	}
 	list, total, err := c.svc.HotList(ctx, service.HotFilter{
-		Status: statusFilter, Keyword: req.Keyword, Page: req.Page, Size: req.Size,
+		Status: statusFilter, Category: req.Category, Keyword: req.Keyword, Page: req.Page, Size: req.Size,
 	})
 	if err != nil {
 		return nil, err
@@ -29,7 +29,7 @@ func (c *Controller) List(ctx context.Context, req *v1.ListReq) (res *v1.ListRes
 	res = &v1.ListRes{Total: total, List: make([]v1.Item, 0, len(list))}
 	for _, r := range list {
 		res.List = append(res.List, v1.Item{
-			Id: r.Id, Keyword: r.Keyword, Heat: r.Heat,
+			Id: r.Id, Keyword: r.Keyword, Category: r.Category, Heat: r.Heat,
 			SearchCount: r.SearchCount, Status: r.Status, UpdatedAt: r.UpdatedAt,
 		})
 	}
@@ -37,7 +37,7 @@ func (c *Controller) List(ctx context.Context, req *v1.ListReq) (res *v1.ListRes
 }
 
 func (c *Controller) Create(ctx context.Context, req *v1.CreateReq) (res *v1.CreateRes, err error) {
-	id, err := c.svc.HotCreate(ctx, req.Keyword, req.Heat, req.Status)
+	id, err := c.svc.HotCreate(ctx, req.Keyword, req.Category, req.Heat, req.Status)
 	if err != nil {
 		return nil, err
 	}
@@ -45,7 +45,7 @@ func (c *Controller) Create(ctx context.Context, req *v1.CreateReq) (res *v1.Cre
 }
 
 func (c *Controller) Update(ctx context.Context, req *v1.UpdateReq) (res *v1.UpdateRes, err error) {
-	if err = c.svc.HotUpdate(ctx, req.Id, req.Keyword, req.Heat, req.Status); err != nil {
+	if err = c.svc.HotUpdate(ctx, req.Id, req.Keyword, req.Category, req.Heat, req.Status); err != nil {
 		return nil, err
 	}
 	return &v1.UpdateRes{}, nil

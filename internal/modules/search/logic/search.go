@@ -187,7 +187,7 @@ func (s *sSearch) touchHot(ctx context.Context, keyword string) {
 		return
 	}
 	if _, err := g.Model("hot_search").Ctx(ctx).Data(g.Map{
-		"site_id": schSiteId, "keyword": keyword, "heat": 0, "search_count": 0, "status": 1,
+		"site_id": schSiteId, "keyword": keyword, "category": "", "heat": 0, "search_count": 0, "status": 1,
 	}).InsertIgnore(); err != nil {
 		g.Log().Warningf(ctx, "热搜埋点插入失败 keyword=%s: %v", keyword, err)
 		return
