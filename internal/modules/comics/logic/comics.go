@@ -135,6 +135,14 @@ func (s *sComics) query(ctx context.Context, f service.ListFilter) ([]*service.C
 	if f.OnlyRecommend {
 		base = base.Where("is_recommend", 1)
 	}
+	switch f.PayType {
+	case 1:
+		base = base.Where("is_vip", 1)
+	case 2:
+		base = base.Where("is_vip", 0).Where("price > ?", 0)
+	case 3:
+		base = base.Where("is_vip", 0).Where("price <= ?", 0)
+	}
 	if f.Sort == 1 {
 		base = base.Where("view_count > 0")
 	}

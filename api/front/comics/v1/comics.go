@@ -24,15 +24,17 @@ type Item struct {
 }
 
 // ListReq 漫画列表(公开)。sort: 0综合(rank) 1最多观看 2最新 3最多点赞。
+// pay_type: 0全部 1VIP 2付费解锁(非VIP且price>0) 3免费。
 type ListReq struct {
-	g.Meta   `path:"/comics/list" method:"get" tags:"Front/Comics" summary:"漫画列表"`
-	Category string `json:"category"`
-	Tag      string `json:"tag"`
-	Keyword  string `json:"keyword"`
-	Sort     int    `json:"sort"`
-	Recommend int   `json:"recommend"` // 1=仅推荐栏
-	Page     int    `json:"page"`
-	Size     int    `json:"size"`
+	g.Meta    `path:"/comics/list" method:"get" tags:"Front/Comics" summary:"漫画列表"`
+	Category  string `json:"category"`
+	Tag       string `json:"tag"`
+	Keyword   string `json:"keyword"`
+	Sort      int    `json:"sort"`
+	PayType   int    `json:"pay_type"`
+	Recommend int    `json:"recommend"` // 1=仅推荐栏
+	Page      int    `json:"page"`
+	Size      int    `json:"size"`
 }
 type ListRes struct {
 	List  []Item `json:"list"`

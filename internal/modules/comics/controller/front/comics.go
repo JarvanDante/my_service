@@ -48,7 +48,7 @@ func toItem(d *service.ComicsDTO) v1.Item {
 func (c *Controller) List(ctx context.Context, req *v1.ListReq) (res *v1.ListRes, err error) {
 	list, total, err := c.svc.FrontList(ctx, optionalUid(ctx), service.ListFilter{
 		Category: req.Category, Tag: req.Tag, Keyword: req.Keyword,
-		Sort: req.Sort, OnlyRecommend: req.Recommend == 1, Page: req.Page, Size: req.Size,
+		Sort: req.Sort, PayType: req.PayType, OnlyRecommend: req.Recommend == 1, Page: req.Page, Size: req.Size,
 	})
 	if err != nil {
 		return nil, err

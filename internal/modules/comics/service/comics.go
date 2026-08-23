@@ -98,14 +98,15 @@ type ChapterInput struct {
 }
 
 type ListFilter struct {
-	Category string
-	Tag      string
-	Keyword  string
-	Status   int  // -1=全部, 前台固定传 1
-	Sort     int  // 0综合(推荐权重) 1最多观看 2最新 3最多点赞
+	Category      string
+	Tag           string
+	Keyword       string
+	Status        int  // -1=全部, 前台固定传 1
+	Sort          int  // 0综合(推荐权重) 1最多观看 2最新 3最多点赞
+	PayType       int  // 0全部 1VIP 2付费解锁 3免费
 	OnlyRecommend bool // 仅 is_recommend=1, 给 H5 推荐栏
-	Page     int
-	Size     int
+	Page          int
+	Size          int
 }
 
 type IComics interface {
