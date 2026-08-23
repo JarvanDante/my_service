@@ -34,7 +34,7 @@ type IRank interface {
 	// RefreshRank 清缓存。
 	RefreshRank(ctx context.Context) error
 	// HotKeywords 前台热搜词(heat desc, search_count desc, 上限 10)。
-	// category 非空时先取该分类, 不足 10 条用通用词补齐。
+	// category 非空时只出该分类, 不用通用词补齐。
 	HotKeywords(ctx context.Context, category string) ([]string, error)
 	// 后台热搜词管理
 	HotList(ctx context.Context, f HotFilter) ([]*HotDTO, int, error)

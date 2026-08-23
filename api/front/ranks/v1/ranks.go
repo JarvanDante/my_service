@@ -24,7 +24,7 @@ type HotItem struct {
 	Keyword string `json:"keyword"`
 }
 
-// HotReq 热搜词(公开)。category 与前台搜索范围对齐, 空=全站混排。
+// HotReq 热搜词(公开)。category 与前台搜索范围对齐, 空=全站混排; 非空只出该分类。
 type HotReq struct {
 	g.Meta   `path:"/hotsearch/list" method:"get" tags:"Front/Rank" summary:"热搜词"`
 	Category string `json:"category"` // comic/cartoon/novel/short/video

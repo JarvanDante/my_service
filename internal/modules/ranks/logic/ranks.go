@@ -124,8 +124,8 @@ func (s *sRank) RefreshRank(ctx context.Context) error {
 	return nil
 }
 
-// HotKeywords 前台热搜词, 默认 10 条。
-// category 非空: 先取该分类, 不够再用通用词补齐; 空: 全站混排(兼容旧端)。
+// HotKeywords 前台热搜词, 默认最多 10 条。
+// category 非空: 只出该分类, 不用通用词补齐; 空: 全站混排(兼容旧端)。
 func (s *sRank) HotKeywords(ctx context.Context, category string) ([]string, error) {
 	cat, err := normalizeHotCategory(category)
 	if err != nil {
@@ -134,31 +134,7 @@ func (s *sRank) HotKeywords(ctx context.Context, category string) ([]string, err
 	if cat == "" && strings.TrimSpace(category) == "" {
 		return scanHotKeywords(ctx, "", false, rkHotLimit)
 	}
-	out, err := scanHotKeywords(ctx, cat, true, rkHotLimit)
-	if err != nil {
-		return nil, err
-	}
-	if len(out) >= rkHotLimit {
-		return out[:rkHotLimit], nil
-	}
-	seen := make(map[string]struct{}, len(out))
-	for _, w := range out {
-		seen[w] = struct{}{}
-	}
-	extra, err := scanHotKeywords(ctx, "", true, rkHotLimit)
-	if err != nil {
-		return out, nil
-	}
-	for _, w := range extra {
-		if _, ok := seen[w]; ok {
-			continue
-		}
-		out = append(out, w)
-		if len(out) >= rkHotLimit {
-			break
-		}
-	}
-	return out, nil
+	return scanHotKeywords(ctx, cat, true, rkHotLimit)
 }
 
 func (s *sRank) HotList(ctx context.Context, f service.HotFilter) ([]*service.HotDTO, int, error) {
