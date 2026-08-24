@@ -36,7 +36,7 @@ func (c *Controller) Click(ctx context.Context, req *v1.ClickReq) (res *v1.Click
 	}
 	res = &v1.ClickRes{Message: d.Message, TodayChecked: d.TodayChecked, ContinuouslyDays: d.ContinuouslyDays}
 	for _, x := range d.Rewards {
-		res.Rewards = append(res.Rewards, v1.RewardItem{Gold: x.Gold, VipDays: x.VipDays})
+		res.Rewards = append(res.Rewards, v1.RewardItem{Gold: x.Gold, Points: x.Points, VipDays: x.VipDays})
 	}
 	return res, nil
 }
@@ -52,10 +52,16 @@ func (c *Controller) Info(ctx context.Context, req *v1.InfoReq) (res *v1.InfoRes
 	}
 	res = &v1.InfoRes{TodayChecked: d.TodayChecked, ContinuouslyDays: d.ContinuouslyDays}
 	for _, x := range d.Rewards {
-		res.Rewards = append(res.Rewards, v1.RewardCfg{DayNum: x.DayNum, UserType: x.UserType, Gold: x.Gold, VipDays: x.VipDays})
+		res.Rewards = append(res.Rewards, v1.RewardCfg{
+			DayNum: x.DayNum, Label: x.Label, UserType: x.UserType,
+			Gold: x.Gold, Points: x.Points, VipDays: x.VipDays, IsMilestone: x.IsMilestone,
+		})
 	}
 	for _, x := range d.Records {
-		res.Records = append(res.Records, v1.RecordItem{Date: x.Date, ContinuouslyDays: x.ContinuouslyDays, RewardGold: x.RewardGold})
+		res.Records = append(res.Records, v1.RecordItem{
+			Date: x.Date, ContinuouslyDays: x.ContinuouslyDays,
+			RewardGold: x.RewardGold, RewardPoints: x.RewardPoints, RewardVipDays: x.RewardVipDays,
+		})
 	}
 	return res, nil
 }

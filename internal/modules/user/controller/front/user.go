@@ -405,7 +405,7 @@ func (c *Controller) Tasks(ctx context.Context, req *v1.TasksReq) (res *v1.Tasks
 	for _, t := range list {
 		items = append(items, v1.Task{
 			Id: t.Id, Name: t.Name, Type: t.Type, Description: t.Description,
-			MaxNum: t.MaxNum, DoneToday: t.DoneToday,
+			MaxNum: t.MaxNum, DoneToday: t.DoneToday, Reward: t.Reward,
 		})
 	}
 	return &v1.TasksRes{List: items}, nil

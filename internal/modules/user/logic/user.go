@@ -770,7 +770,7 @@ func (s *sUser) Tasks(ctx context.Context, userId int64) ([]*service.TaskDTO, er
 		done, _ := s.repo.TaskDoneToday(ctx, userId, t.Id, logDate)
 		out = append(out, &service.TaskDTO{
 			Id: t.Id, Name: t.Name, Type: t.Type, Description: t.Description,
-			MaxNum: t.MaxNum, DoneToday: done,
+			MaxNum: t.MaxNum, DoneToday: done, Reward: t.Reward,
 		})
 	}
 	return out, nil

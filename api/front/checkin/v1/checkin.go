@@ -5,18 +5,24 @@ import "github.com/gogf/gf/v2/frame/g"
 
 type RewardItem struct {
 	Gold    int64 `json:"gold"`
+	Points  int64 `json:"points"`
 	VipDays int   `json:"vip_days"`
 }
 type RewardCfg struct {
-	DayNum   int   `json:"day_num"`
-	UserType int   `json:"user_type"`
-	Gold     int64 `json:"gold"`
-	VipDays  int   `json:"vip_days"`
+	DayNum      int    `json:"day_num"`
+	Label       string `json:"label"`
+	UserType    int    `json:"user_type"`
+	Gold        int64  `json:"gold"`
+	Points      int64  `json:"points"`
+	VipDays     int    `json:"vip_days"`
+	IsMilestone int    `json:"is_milestone"`
 }
 type RecordItem struct {
 	Date             string `json:"date"`
 	ContinuouslyDays int    `json:"continuously_days"`
 	RewardGold       int64  `json:"reward_gold"`
+	RewardPoints     int64  `json:"reward_points"`
+	RewardVipDays    int    `json:"reward_vip_days"`
 }
 
 // Click 用户签到。

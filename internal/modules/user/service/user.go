@@ -140,6 +140,7 @@ type TaskDTO struct {
 	Description string
 	MaxNum      int
 	DoneToday   int
+	Reward      float64
 }
 
 type TaskDoneDTO struct {

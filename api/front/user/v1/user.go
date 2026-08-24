@@ -323,8 +323,9 @@ type Task struct {
 	Name        string `json:"name"`
 	Type        string `json:"type"`
 	Description string `json:"description"`
-	MaxNum      int    `json:"max_num"`
-	DoneToday   int    `json:"done_today"`
+	MaxNum      int     `json:"max_num"`
+	DoneToday   int     `json:"done_today"`
+	Reward      float64 `json:"reward"`
 }
 type TasksReq struct {
 	g.Meta `path:"/user/tasks" method:"get" tags:"Front/User" summary:"任务列表"`

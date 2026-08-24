@@ -10,5 +10,7 @@ type UserCheckin struct {
 	CheckinDate      *gtime.Time `json:"checkinDate"      orm:"checkin_date"`
 	ContinuouslyDays int         `json:"continuouslyDays" orm:"continuously_days"`
 	RewardGold       int64       `json:"rewardGold"       orm:"reward_gold"`
+	RewardPoints     int64       `json:"rewardPoints"     orm:"reward_points"`
+	RewardVipDays    int         `json:"rewardVipDays"    orm:"reward_vip_days"`
 	CreatedAt        *gtime.Time `json:"createdAt"        orm:"created_at"`
 }

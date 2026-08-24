@@ -129,6 +129,7 @@ func mountBackend(s *ghttp.Server) {
 			pubmod.RegisterBackend(perm)
 			lotterymod.RegisterBackend(perm)
 			aimod.RegisterBackend(perm)
+			checkinmod.RegisterBackend(perm)
 		})
 	})
 }
