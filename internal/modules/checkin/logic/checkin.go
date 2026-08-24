@@ -4,6 +4,7 @@ package logic
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/gogf/gf/v2/database/gdb"
 	"github.com/gogf/gf/v2/frame/g"
@@ -195,9 +196,7 @@ func (s *sCheckin) SaveConfig(ctx context.Context, in service.ConfigDTO) error {
 	if in.MakeupLimit < 0 {
 		in.MakeupLimit = 0
 	}
-	if len(in.MakeupDesc) > 21 {
-		in.MakeupDesc = in.MakeupDesc[:21]
-	}
+	in.MakeupDesc = clipRunes(in.MakeupDesc, 21)
 	cnt, err := g.Model("checkin_config").Ctx(ctx).Where("site_id", checkinSiteId).Count()
 	if err != nil {
 		return err
@@ -304,4 +303,17 @@ func dateStr(t *gtime.Time) string {
 		return ""
 	}
 	return t.Format("Y-m-d")
+}
+
+// clipRunes 按字截断, 避免 len(string) 按字节切开 UTF-8 多字节字符(如全角逗号 EF BC 8C)。
+func clipRunes(s string, n int) string {
+	if n <= 0 {
+		return ""
+	}
+	s = strings.ToValidUTF8(s, "")
+	r := []rune(s)
+	if len(r) > n {
+		return string(r[:n])
+	}
+	return s
 }
