@@ -36,14 +36,62 @@ func atoi64Or(s string, def int64) int64 {
 	return v
 }
 
+func bizTypeText(bizType int, params map[string]any) string {
+	switch bizType {
+	case 1:
+		if media, _ := params["media_type"].(string); media == "video" {
+			return "视频换脸"
+		}
+		return "图片换脸"
+	case 2:
+		return "脱衣"
+	case 3:
+		return "文生图"
+	case 4:
+		return "图生视频"
+	case 5:
+		return "文生小说"
+	case 6:
+		return "AI对话"
+	default:
+		return strconv.Itoa(bizType)
+	}
+}
+
+func statusText(status int) string {
+	switch status {
+	case 1:
+		return "待处理"
+	case 2:
+		return "处理中"
+	case 3:
+		return "成功"
+	case 4:
+		return "异常"
+	case 5:
+		return "退款"
+	case 6:
+		return "已取消"
+	default:
+		return strconv.Itoa(status)
+	}
+}
+
 func toTaskItem(d *service.TaskDTO) v1.TaskItem {
+	sets := d.Sets
+	if sets <= 0 {
+		sets = 1
+	}
 	return v1.TaskItem{
 		Id: d.Id, UserId: d.UserId, TaskNo: d.TaskNo, ClientToken: d.ClientToken,
-		BizType: d.BizType, TemplateId: d.TemplateId, Params: d.Params, InputUrl: d.InputUrl,
-		CostGold: d.CostGold, Status: d.Status, Provider: d.Provider,
-		ProviderTaskId: d.ProviderTaskId, Result: d.Result, ErrMsg: d.ErrMsg,
-		RetryCount: d.RetryCount, SubmittedAt: d.SubmittedAt, FinishedAt: d.FinishedAt,
-		CreatedAt: d.CreatedAt,
+		BizType: d.BizType, BizTypeText: bizTypeText(d.BizType, d.Params),
+		TemplateId: d.TemplateId, Params: d.Params, InputUrl: d.InputUrl,
+		CostGold: d.CostGold, Status: d.Status, StatusText: statusText(d.Status),
+		Provider: d.Provider, ProviderTaskId: d.ProviderTaskId, Result: d.Result,
+		ErrMsg: d.ErrMsg, RetryCount: d.RetryCount, SubmittedAt: d.SubmittedAt,
+		FinishedAt: d.FinishedAt, CreatedAt: d.CreatedAt,
+		Nickname: d.Nickname, Phone: d.Phone, Avatar: d.Avatar, GroupName: d.GroupName,
+		ChannelName: d.ChannelName, DeviceType: d.DeviceType, Sets: sets,
 	}
 }
 
@@ -62,7 +110,7 @@ func (c *Controller) TemplateList(ctx context.Context, req *v1.TemplateListReq) 
 		res.List = append(res.List, v1.TemplateItem{
 			Id: d.Id, Name: d.Name, BizType: d.BizType, Cover: d.Cover, Preview: d.Preview,
 			Params: d.Params, CostGold: d.CostGold, Sort: d.Sort, Status: d.Status,
-			CreatedAt: d.CreatedAt,
+			UsageCount: d.UsageCount, CreatedAt: d.CreatedAt,
 		})
 	}
 	return res, nil
@@ -100,14 +148,25 @@ func (c *Controller) TemplateDelete(ctx context.Context, req *v1.TemplateDeleteR
 // ---------------- 任务 ----------------
 
 func (c *Controller) TaskList(ctx context.Context, req *v1.TaskListReq) (res *v1.TaskListRes, err error) {
-	list, total, err := c.svc.TaskList(ctx, service.TaskFilter{
+	list, total, stats, err := c.svc.TaskList(ctx, service.TaskFilter{
 		UserId: atoi64Or(req.UserId, 0), BizType: atoiOr(req.BizType, 0),
-		Status: atoiOr(req.Status, 0), TaskNo: req.TaskNo, Page: req.Page, Size: req.Size,
+		Status: atoiOr(req.Status, 0), TaskNo: req.TaskNo, Nickname: req.Nickname,
+		ChannelName: req.ChannelName, DeviceType: req.DeviceType,
+		StartTime: req.StartTime, EndTime: req.EndTime,
+		RegisterStart: req.RegisterStart, RegisterEnd: req.RegisterEnd,
+		Page: req.Page, Size: req.Size,
 	})
 	if err != nil {
 		return nil, err
 	}
 	res = &v1.TaskListRes{Total: total, List: make([]v1.TaskItem, 0, len(list))}
+	if stats != nil {
+		res.Stats = v1.TaskStats{
+			Total: stats.Total, Success: stats.Success, Refund: stats.Refund, Abnormal: stats.Abnormal,
+			TotalGold: stats.TotalGold, SuccessGold: stats.SuccessGold,
+			RefundGold: stats.RefundGold, AbnormalGold: stats.AbnormalGold,
+		}
+	}
 	for _, d := range list {
 		res.List = append(res.List, toTaskItem(d))
 	}
@@ -128,6 +187,13 @@ func (c *Controller) TaskRefund(ctx context.Context, req *v1.TaskRefundReq) (res
 		return nil, err
 	}
 	return &v1.TaskRefundRes{Refund: refund}, nil
+}
+
+func (c *Controller) TaskDelete(ctx context.Context, req *v1.TaskDeleteReq) (res *v1.TaskDeleteRes, err error) {
+	if err = c.svc.TaskDelete(ctx, req.Id); err != nil {
+		return nil, err
+	}
+	return &v1.TaskDeleteRes{}, nil
 }
 
 // ---------------- 回调 ----------------

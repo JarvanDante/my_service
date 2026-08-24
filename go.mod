@@ -10,6 +10,7 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/minio/minio-go/v7 v7.0.97
 	github.com/nacos-group/nacos-sdk-go/v2 v2.3.3
+	github.com/segmentio/kafka-go v0.4.47
 )
 
 require (
@@ -72,6 +73,7 @@ require (
 	github.com/olekukonko/tablewriter v1.1.0 // indirect
 	github.com/orcaman/concurrent-map v0.0.0-20210501183033-44dafcb38ecc // indirect
 	github.com/philhofer/fwd v1.2.0 // indirect
+	github.com/pierrec/lz4/v4 v4.1.15 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/prometheus/client_golang v1.12.2 // indirect
 	github.com/prometheus/client_model v0.2.0 // indirect

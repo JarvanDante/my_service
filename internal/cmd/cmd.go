@@ -49,6 +49,7 @@ var Main = gcmd.Command{
 		mountBackend(s)
 
 		registerCronJobs(ctx)
+		startFaceSwapWorker(ctx)
 		s.Run()
 		return nil
 	},

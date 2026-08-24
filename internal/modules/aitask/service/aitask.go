@@ -11,10 +11,11 @@ type TemplateDTO struct {
 	Cover     string
 	Preview   string
 	Params    map[string]any
-	CostGold  float64
-	Sort      int
-	Status    int
-	CreatedAt string
+	CostGold   float64
+	Sort       int
+	Status     int
+	UsageCount int
+	CreatedAt  string
 }
 
 // TaskDTO AI 任务。Provider/ProviderTaskId 只给后台用, 前台控制器不下发。
@@ -37,6 +38,25 @@ type TaskDTO struct {
 	SubmittedAt    string
 	FinishedAt     string
 	CreatedAt      string
+	Nickname       string
+	Phone          string
+	Avatar         string
+	GroupName      string
+	ChannelName    string
+	DeviceType     string
+	Sets           int
+}
+
+// TaskStats 后台订单汇总(按当前筛选, 不分页)。
+type TaskStats struct {
+	Total        int
+	Success      int
+	Refund       int
+	Abnormal     int
+	TotalGold    float64
+	SuccessGold  float64
+	RefundGold   float64
+	AbnormalGold float64
 }
 
 // SubmitInput 提交入参。价格不在这里 —— 服务端按 template_id 自己算。
@@ -66,12 +86,19 @@ type TemplateFilter struct {
 
 // TaskFilter 任务筛选。UserId/BizType/Status 为 0/-1 表示不筛。
 type TaskFilter struct {
-	UserId  int64
-	BizType int
-	Status  int
-	TaskNo  string
-	Page    int
-	Size    int
+	UserId        int64
+	BizType       int
+	Status        int
+	TaskNo        string
+	Nickname      string
+	ChannelName   string
+	DeviceType    string
+	StartTime     string
+	EndTime       string
+	RegisterStart string
+	RegisterEnd   string
+	Page          int
+	Size          int
 }
 
 // TemplateInput 后台模板保存入参。
@@ -117,6 +144,8 @@ type IAiTask interface {
 	// Callback 供应商回调: 验签 + 幂等落终态; 失败状态在同一事务里自动退款。
 	// 重复回调返回 nil(成功), 不重复处理也不重复退款。
 	Callback(ctx context.Context, in CallbackInput) error
+	HandleWorkerResult(ctx context.Context, jobID, status, outputURL, outputKey, errMsg string) error
+	ExpireStale(ctx context.Context) (int, error)
 
 	// ---- 后台 ----
 
@@ -125,9 +154,11 @@ type IAiTask interface {
 	TemplateUpdate(ctx context.Context, in TemplateInput) error
 	TemplateDelete(ctx context.Context, id int64) error
 
-	TaskList(ctx context.Context, f TaskFilter) ([]*TaskDTO, int, error)
+	TaskList(ctx context.Context, f TaskFilter) ([]*TaskDTO, int, *TaskStats, error)
 	// TaskRetry 重新提交任务(失败/已退款要重新扣费; 排队中的任务钱没退, 只重投不扣费), retry_count+1。
 	TaskRetry(ctx context.Context, id int64) (*TaskDTO, error)
 	// TaskRefund 人工退款: 仅非终态(排队中/处理中)或失败态可退, 条件更新防重复退款。
 	TaskRefund(ctx context.Context, id int64, remark string) (float64, error)
+	// TaskDelete 删除订单记录。处理中拒绝; 排队中先退款再删, 避免吞金币。
+	TaskDelete(ctx context.Context, id int64) error
 }

@@ -40,8 +40,14 @@ redis:
     db:      0
 
 kafka:
+  enabled: true
   brokers: ["kafka:29092"]
   groupId: "my_service"
+  faceswap_job_topic: "ai.faceswap.jobs"
+  faceswap_result_topic: "ai.faceswap.results"
+
+faceswap:
+  bucket: "my-storage"
 
 minio:
   # 预签名/直链给浏览器：走宿主机映射

@@ -75,4 +75,16 @@ func TestToBncKey(t *testing.T) {
 	if ToBncKey("a/cover.bnc") != "a/cover.bnc" {
 		t.Fatal(ToBncKey("a/cover.bnc"))
 	}
+	if ToBncKey("") != "image.bnc" {
+		t.Fatal(ToBncKey(""))
+	}
+}
+
+func TestIsEncryptedName(t *testing.T) {
+	if !IsEncryptedName("a/cover.bnc") || !IsEncryptedName("my/image/xxx/bnc") || !IsEncryptedName("bnc") {
+		t.Fatal("expected ciphertext names")
+	}
+	if IsEncryptedName("a/cover.jpg") {
+		t.Fatal("jpg is plaintext")
+	}
 }

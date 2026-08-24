@@ -8,6 +8,7 @@ import (
 	"github.com/gogf/gf/v2/os/gcron"
 
 	"github.com/JarvanDante/my_service/internal/dao"
+	ailogic "github.com/JarvanDante/my_service/internal/modules/aitask/logic"
 	"github.com/JarvanDante/my_service/internal/modules/user/logic"
 )
 
@@ -32,4 +33,13 @@ func registerCronJobs(ctx context.Context) {
 		g.Log().Info(ctx, "daily job running...")
 		// TODO: 调用 userLogic / 其他模块 service 完成批处理
 	}, "daily-user-job")
+
+	ai := ailogic.New()
+	_, _ = gcron.Add(ctx, "0 * * * * *", func(ctx context.Context) {
+		if n, err := ai.ExpireStale(ctx); err != nil {
+			g.Log().Warningf(ctx, "ai expire stale: %v", err)
+		} else if n > 0 {
+			g.Log().Infof(ctx, "ai expire stale: %d", n)
+		}
+	}, "ai-task-timeout")
 }

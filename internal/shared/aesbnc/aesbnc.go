@@ -90,7 +90,9 @@ func IsEncryptedName(name string) bool {
 	if i := strings.IndexAny(low, "?#"); i >= 0 {
 		low = low[:i]
 	}
-	return strings.HasSuffix(low, ".bnc") || strings.HasSuffix(low, ".ceb")
+	return strings.HasSuffix(low, ".bnc") || strings.HasSuffix(low, ".ceb") ||
+		strings.HasSuffix(low, "/bnc") || strings.HasSuffix(low, "/ceb") ||
+		low == "bnc" || low == "ceb"
 }
 
 func LooksLikeImage(b []byte) bool {
@@ -113,14 +115,18 @@ func LooksLikeImage(b []byte) bool {
 }
 
 func ToBncKey(key string) string {
-	if key == "" || IsEncryptedName(key) {
+	if key == "" {
+		return "image" + Ext
+	}
+	if IsEncryptedName(key) && (strings.HasSuffix(strings.ToLower(key), Ext) || strings.HasSuffix(strings.ToLower(key), ".ceb")) {
 		return key
 	}
 	ext := filepath.Ext(key)
-	if ext == "" {
-		return key + Ext
+	base := strings.TrimSuffix(key, ext)
+	if strings.TrimSpace(base) == "" {
+		return "image" + Ext
 	}
-	return strings.TrimSuffix(key, ext) + Ext
+	return base + Ext
 }
 
 func ShouldEncryptPurpose(purpose string) bool {

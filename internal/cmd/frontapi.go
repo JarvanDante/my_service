@@ -24,6 +24,7 @@ var FrontAPI = gcmd.Command{
 		s.BindStatusHandler(404, middleware.NotFound)
 		s.BindHandler("/health", middleware.Health)
 		mountFront(s)
+		startFaceSwapWorker(ctx)
 		s.Run()
 		return nil
 	},

@@ -28,6 +28,8 @@ import (
 	"context"
 	"encoding/json"
 	"strconv"
+	"strings"
+	"time"
 
 	"github.com/gogf/gf/v2/crypto/gmd5"
 	"github.com/gogf/gf/v2/database/gdb"
@@ -51,8 +53,9 @@ const (
 	cfgOpen           = "ai_open"            // 总开关
 	cfgDefaultCost    = "ai_default_cost"    // 无模板时的默认单价
 	cfgDailyLimit     = "ai_daily_limit"     // 每人每日任务数上限, <=0 不限
-	cfgCallbackSecret = "ai_callback_secret" // 回调验签密钥
-	cfgProvider       = "ai_provider"        // 当前供应商名, 默认 mock
+	cfgCallbackSecret = "ai_callback_secret"  // 回调验签密钥
+	cfgProvider       = "ai_provider"         // 当前供应商名, 默认 mock
+	cfgTaskTimeout    = "ai_task_timeout_sec" // 排队/处理超时秒数, 超时失败退款
 )
 
 type sAiTask struct{}
@@ -428,6 +431,53 @@ func (s *sAiTask) Tasks(ctx context.Context, userId int64, f service.TaskFilter)
 	return queryTasks(ctx, f)
 }
 
+func taskNeedUserJoin(f service.TaskFilter) bool {
+	return f.Nickname != "" || f.ChannelName != "" || f.DeviceType != "" ||
+		f.RegisterStart != "" || f.RegisterEnd != ""
+}
+
+func applyTaskFilter(m *gdb.Model, f service.TaskFilter) *gdb.Model {
+	m = m.Where("ai_task.site_id", aiSiteId)
+	if f.UserId > 0 {
+		m = m.Where("ai_task.user_id", f.UserId)
+	}
+	if f.BizType > 0 {
+		m = m.Where("ai_task.biz_type", f.BizType)
+	}
+	if f.Status > 0 {
+		m = m.Where("ai_task.status", f.Status)
+	}
+	if f.TaskNo != "" {
+		m = m.Where("ai_task.task_no", f.TaskNo)
+	}
+	if f.StartTime != "" {
+		m = m.Where("ai_task.created_at >= ?", f.StartTime)
+	}
+	if f.EndTime != "" {
+		m = m.Where("ai_task.created_at <= ?", f.EndTime)
+	}
+	if taskNeedUserJoin(f) {
+		m = m.LeftJoin("users", "users.id = ai_task.user_id")
+		if f.Nickname != "" {
+			like := "%" + f.Nickname + "%"
+			m = m.Where("(users.nickname ILIKE ? OR users.username ILIKE ? OR users.phone ILIKE ?)", like, like, like)
+		}
+		if f.ChannelName != "" {
+			m = m.Where("users.channel_name ILIKE ?", "%"+f.ChannelName+"%")
+		}
+		if f.DeviceType != "" {
+			m = m.Where("users.device_type", f.DeviceType)
+		}
+		if f.RegisterStart != "" {
+			m = m.Where("users.register_at >= ?", f.RegisterStart)
+		}
+		if f.RegisterEnd != "" {
+			m = m.Where("users.register_at <= ?", f.RegisterEnd)
+		}
+	}
+	return m
+}
+
 func queryTasks(ctx context.Context, f service.TaskFilter) ([]*service.TaskDTO, int, error) {
 	if f.Page <= 0 {
 		f.Page = 1
@@ -435,25 +485,13 @@ func queryTasks(ctx context.Context, f service.TaskFilter) ([]*service.TaskDTO, 
 	if f.Size <= 0 || f.Size > 100 {
 		f.Size = 20
 	}
-	base := g.Model("ai_task").Ctx(ctx).Where("site_id", aiSiteId)
-	if f.UserId > 0 {
-		base = base.Where("user_id", f.UserId)
-	}
-	if f.BizType > 0 {
-		base = base.Where("biz_type", f.BizType)
-	}
-	if f.Status > 0 {
-		base = base.Where("status", f.Status)
-	}
-	if f.TaskNo != "" {
-		base = base.Where("task_no", f.TaskNo)
-	}
+	base := applyTaskFilter(g.Model("ai_task").Ctx(ctx), f)
 	total, err := base.Clone().Count()
 	if err != nil {
 		return nil, 0, err
 	}
 	var list []*entity.AiTask
-	if err := base.Clone().OrderDesc("id").Page(f.Page, f.Size).Scan(&list); err != nil {
+	if err := base.Clone().Fields("ai_task.*").OrderDesc("ai_task.id").Page(f.Page, f.Size).Scan(&list); err != nil {
 		return nil, 0, err
 	}
 	out := make([]*service.TaskDTO, 0, len(list))
@@ -461,6 +499,97 @@ func queryTasks(ctx context.Context, f service.TaskFilter) ([]*service.TaskDTO, 
 		out = append(out, taskDTO(r))
 	}
 	return out, total, nil
+}
+
+func queryTaskStats(ctx context.Context, f service.TaskFilter) *service.TaskStats {
+	stats := &service.TaskStats{}
+	rows, err := applyTaskFilter(g.Model("ai_task").Ctx(ctx), f).
+		Fields("ai_task.status AS status, count(1) AS cnt, coalesce(sum(ai_task.cost_gold),0) AS gold").
+		Group("ai_task.status").All()
+	if err != nil {
+		return stats
+	}
+	for _, row := range rows {
+		n := row["cnt"].Int()
+		gold := row["gold"].Float64()
+		stats.Total += n
+		stats.TotalGold += gold
+		switch row["status"].Int() {
+		case entity.AiStatusSucceed:
+			stats.Success = n
+			stats.SuccessGold = gold
+		case entity.AiStatusRefunded, entity.AiStatusCancelled:
+			stats.Refund += n
+			stats.RefundGold += gold
+		case entity.AiStatusFailed:
+			stats.Abnormal = n
+			stats.AbnormalGold = gold
+		}
+	}
+	return stats
+}
+
+func fillTaskUsers(ctx context.Context, list []*service.TaskDTO) {
+	if len(list) == 0 {
+		return
+	}
+	ids := make([]int64, 0, len(list))
+	seen := map[int64]struct{}{}
+	for _, r := range list {
+		if r.UserId <= 0 {
+			continue
+		}
+		if _, ok := seen[r.UserId]; ok {
+			continue
+		}
+		seen[r.UserId] = struct{}{}
+		ids = append(ids, r.UserId)
+	}
+	if len(ids) == 0 {
+		return
+	}
+	var users []*entity.Users
+	if err := g.Model("users").Ctx(ctx).WhereIn("id", ids).Scan(&users); err != nil {
+		return
+	}
+	byID := map[int64]*entity.Users{}
+	for _, u := range users {
+		byID[u.Id] = u
+	}
+	for _, r := range list {
+		r.Sets = setsOf(r.Params)
+		u := byID[r.UserId]
+		if u == nil {
+			continue
+		}
+		r.Nickname = u.Nickname
+		r.Phone = u.Phone
+		r.Avatar = u.Img
+		r.GroupName = u.GroupName
+		r.ChannelName = u.ChannelName
+		r.DeviceType = u.DeviceType
+	}
+}
+
+func setsOf(params map[string]any) int {
+	if params == nil {
+		return 1
+	}
+	switch v := params["sets"].(type) {
+	case float64:
+		if int(v) > 0 {
+			return int(v)
+		}
+	case int:
+		if v > 0 {
+			return v
+		}
+	case json.Number:
+		if n, err := v.Int64(); err == nil && n > 0 {
+			return int(n)
+		}
+	}
+	return 1
 }
 
 // ---------------------------------------------------------------- 前台: 取消
@@ -552,6 +681,85 @@ func (s *sAiTask) Callback(ctx context.Context, in service.CallbackInput) error 
 	return applyTerminal(ctx, t.Id, in.Status, in.Result, in.ErrMsg)
 }
 
+func (s *sAiTask) HandleWorkerResult(ctx context.Context, jobID, status, outputURL, outputKey, errMsg string) error {
+	jobID = strings.TrimSpace(jobID)
+	if jobID == "" {
+		return gerror.New("job_id 为空")
+	}
+	var t *entity.AiTask
+	if err := g.Model("ai_task").Ctx(ctx).
+		Where("site_id", aiSiteId).Where("task_no", jobID).Scan(&t); err != nil {
+		return err
+	}
+	if t == nil {
+		return gerror.Newf("任务不存在: %s", jobID)
+	}
+	if status == "ready" {
+		url := strings.TrimSpace(outputURL)
+		if url == "" && outputKey != "" {
+			url = publicObjectURL(ctx, faceswapBucket(ctx), outputKey)
+		}
+		return applyTerminal(ctx, t.Id, entity.AiStatusSucceed, map[string]any{
+			"url":        url,
+			"output_key": outputKey,
+		}, "")
+	}
+	if errMsg == "" {
+		errMsg = "换脸失败"
+	}
+	return applyTerminal(ctx, t.Id, entity.AiStatusFailed, nil, errMsg)
+}
+
+func faceswapBucket(ctx context.Context) string {
+	b := strings.TrimSpace(g.Cfg().MustGet(ctx, "faceswap.bucket", "my-storage").String())
+	if b == "" {
+		return "my-storage"
+	}
+	return b
+}
+
+func publicObjectURL(ctx context.Context, bucket, key string) string {
+	base := strings.TrimRight(g.Cfg().MustGet(ctx, "minio.publicURL").String(), "/")
+	bucket = strings.Trim(bucket, "/")
+	key = strings.TrimLeft(key, "/")
+	if base == "" || bucket == "" || key == "" {
+		return ""
+	}
+	return base + "/" + bucket + "/" + key
+}
+
+func (s *sAiTask) ExpireStale(ctx context.Context) (int, error) {
+	sec := appcfg.Int(ctx, cfgTaskTimeout, 600)
+	if sec <= 0 {
+		return 0, nil
+	}
+	cutoff := gtime.Now().Add(-time.Duration(sec) * time.Second)
+	var list []*entity.AiTask
+	if err := g.Model("ai_task").Ctx(ctx).
+		Where("site_id", aiSiteId).
+		WhereIn("status", []int{entity.AiStatusQueued, entity.AiStatusRunning}).
+		Where("submitted_at IS NOT NULL").
+		Where("submitted_at < ?", cutoff).
+		OrderAsc("id").Limit(100).Scan(&list); err != nil {
+		return 0, err
+	}
+	n := 0
+	for _, t := range list {
+		if t == nil {
+			continue
+		}
+		if err := applyTerminal(ctx, t.Id, entity.AiStatusFailed, nil, "任务超时未完成"); err != nil {
+			g.Log().Warningf(ctx, "AI任务超时退款失败 task_no=%s: %v", t.TaskNo, err)
+			continue
+		}
+		n++
+	}
+	if n > 0 {
+		g.Log().Infof(ctx, "AI任务超时清理 %d 条", n)
+	}
+	return n, nil
+}
+
 // applyTerminal 把任务落到终态, 失败则退款。回调与轮询共用这一个入口, 两条路径同时到达
 // 也只会有一方真正生效(条件更新 + 行锁)。
 //
@@ -627,7 +835,33 @@ func (s *sAiTask) TemplateList(ctx context.Context, f service.TemplateFilter) ([
 	for _, r := range list {
 		out = append(out, tplDTO(r))
 	}
+	fillTemplateUsage(ctx, out)
 	return out, total, nil
+}
+
+func fillTemplateUsage(ctx context.Context, list []*service.TemplateDTO) {
+	if len(list) == 0 {
+		return
+	}
+	ids := make([]int64, 0, len(list))
+	for _, r := range list {
+		ids = append(ids, r.Id)
+	}
+	rows, err := g.Model("ai_task").Ctx(ctx).
+		Fields("template_id", "count(1) AS cnt").
+		Where("site_id", aiSiteId).
+		WhereIn("template_id", ids).
+		Group("template_id").All()
+	if err != nil {
+		return
+	}
+	cnt := map[int64]int{}
+	for _, row := range rows {
+		cnt[row["template_id"].Int64()] = row["cnt"].Int()
+	}
+	for _, r := range list {
+		r.UsageCount = cnt[r.Id]
+	}
 }
 
 func (s *sAiTask) TemplateCreate(ctx context.Context, in service.TemplateInput) (int64, error) {
@@ -683,8 +917,13 @@ func (s *sAiTask) TemplateDelete(ctx context.Context, id int64) error {
 
 // ---------------------------------------------------------------- 后台: 任务
 
-func (s *sAiTask) TaskList(ctx context.Context, f service.TaskFilter) ([]*service.TaskDTO, int, error) {
-	return queryTasks(ctx, f)
+func (s *sAiTask) TaskList(ctx context.Context, f service.TaskFilter) ([]*service.TaskDTO, int, *service.TaskStats, error) {
+	list, total, err := queryTasks(ctx, f)
+	if err != nil {
+		return nil, 0, nil, err
+	}
+	fillTaskUsers(ctx, list)
+	return list, total, queryTaskStats(ctx, f), nil
 }
 
 // TaskRetry 重新提交任务, retry_count+1, 再投一次供应商。
@@ -798,4 +1037,37 @@ func (s *sAiTask) TaskRefund(ctx context.Context, id int64, remark string) (floa
 		return 0, err
 	}
 	return refund, nil
+}
+
+// TaskDelete 删订单。处理中的任务 worker 还可能回写, 不能删。
+// 排队中还扣着用户的钱, 先按取消退款再删, 避免后台一点删除就把金币吞掉。
+func (s *sAiTask) TaskDelete(ctx context.Context, id int64) error {
+	t, err := findTask(ctx, id)
+	if err != nil {
+		return err
+	}
+	if t.Status == entity.AiStatusRunning {
+		return gerror.New("处理中的任务不能删除, 请等完成或先人工退款")
+	}
+	return g.DB().Transaction(ctx, func(ctx context.Context, tx gdb.TX) error {
+		if t.Status == entity.AiStatusQueued || t.Status == entity.AiStatusFailed {
+			res, err := tx.Model("ai_task").Ctx(ctx).Where("id", id).
+				WhereIn("status", []int{entity.AiStatusQueued, entity.AiStatusFailed}).
+				Data(g.Map{
+					"status": entity.AiStatusRefunded, "err_msg": "后台删除订单退款",
+					"finished_at": gtime.Now(), "updated_at": gtime.Now(),
+				}).Update()
+			if err != nil {
+				return err
+			}
+			if n, _ := res.RowsAffected(); n > 0 && t.CostGold > 0 {
+				if err := balance.Add(ctx, tx, t.UserId, t.CostGold,
+					balance.SceneAiRefund, t.TaskNo, "后台删除AI订单退款"); err != nil {
+					return err
+				}
+			}
+		}
+		_, err := tx.Model("ai_task").Ctx(ctx).Where("id", id).Delete()
+		return err
+	})
 }

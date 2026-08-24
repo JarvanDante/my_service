@@ -29,7 +29,7 @@ func RegisterBackend(group *ghttp.RouterGroup) {
 	ctrl := backend.New(logic.New())
 	group.Bind(
 		ctrl.TemplateList, ctrl.TemplateCreate, ctrl.TemplateUpdate, ctrl.TemplateDelete,
-		ctrl.TaskList, ctrl.TaskRetry, ctrl.TaskRefund,
+		ctrl.TaskList, ctrl.TaskRetry, ctrl.TaskRefund, ctrl.TaskDelete,
 	)
 }
 
