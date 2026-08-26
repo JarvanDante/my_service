@@ -66,12 +66,14 @@ func CoverURL(ctx context.Context, code string) string {
 	return playURL(code, siteCode(ctx), "cover.bnc")
 }
 
-// PageURL 漫画页图走 my_play。objectKey 形如 comics/{code}/ch001/page_001.jpg。
+// PageURL 漫画页图走 my_play。objectKey 形如 comics/{code}/ch001/page_001.bnc。
+// 统一签发 .bnc：旧库若仍是 jpg，网关会按同名候选加密后下发。
 func PageURL(ctx context.Context, code, objectKey string) string {
 	rel := comicRelPath(code, objectKey)
 	if rel == "" {
 		return ""
 	}
+	rel = forceBncExt(rel)
 	return playURL(code, siteCode(ctx), rel)
 }
 
@@ -100,6 +102,17 @@ func comicRelPath(code, key string) string {
 		return ""
 	}
 	return rel
+}
+
+func forceBncExt(rel string) string {
+	low := strings.ToLower(rel)
+	if strings.HasSuffix(low, ".bnc") || strings.HasSuffix(low, ".ceb") {
+		return rel
+	}
+	if i := strings.LastIndex(rel, "."); i >= 0 {
+		return rel[:i] + ".bnc"
+	}
+	return rel + ".bnc"
 }
 
 // PlaylistURL 媒资播放地址走 my_play 签名清单。
