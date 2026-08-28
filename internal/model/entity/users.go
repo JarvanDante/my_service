@@ -57,8 +57,11 @@ type Users struct {
 	Location       string      `json:"location"       orm:"location"         description:""` //
 	RegisterArea   string      `json:"registerArea"   orm:"register_area"    description:""` //
 	IsChina        int         `json:"isChina"        orm:"is_china"         description:""` //
-	IsDisabled     int         `json:"isDisabled"     orm:"is_disabled"      description:""` //
-	ErrorMsg       string      `json:"errorMsg"       orm:"error_msg"        description:""` //
+	IsDisabled         int         `json:"isDisabled"         orm:"is_disabled"          description:""` //
+	ErrorMsg           string      `json:"errorMsg"           orm:"error_msg"            description:""` //
+	CommentMuted       int         `json:"commentMuted"       orm:"comment_muted"        description:""` //
+	ViolateCount       int         `json:"violateCount"       orm:"violate_count"        description:""` //
+	TodayCommentCount  int         `json:"todayCommentCount"  orm:"today_comment_count"  description:""` //
 	IsSystem       int         `json:"isSystem"       orm:"is_system"        description:""` //
 	RegisterAt     *gtime.Time `json:"registerAt"     orm:"register_at"      description:""` //
 	RegisterDate   int         `json:"registerDate"   orm:"register_date"    description:""` //

@@ -53,12 +53,31 @@ func (c *Controller) Detail(ctx context.Context, req *v1.DetailReq) (res *v1.Det
 		return nil, err
 	}
 	return &v1.DetailRes{
-		AdminUserItem: toItem(&d.AdminUserItemDTO),
-		Signature:     d.Signature,
-		Fans:          d.Fans,
-		Follow:        d.Follow,
-		ErrorMsg:      d.ErrorMsg,
+		AdminUserItem:     toItem(&d.AdminUserItemDTO),
+		Signature:         d.Signature,
+		BgImg:             d.BgImg,
+		Rights:            d.Rights,
+		Privilege:         d.Privilege,
+		Fans:              d.Fans,
+		Follow:            d.Follow,
+		ErrorMsg:          d.ErrorMsg,
+		CommentMuted:      d.CommentMuted,
+		ViolateCount:      d.ViolateCount,
+		TodayCommentCount: d.TodayCommentCount,
 	}, nil
+}
+
+// Update 编辑用户资料(指定 UP 主等)。禁言字段预留，本接口不改。
+func (c *Controller) Update(ctx context.Context, req *v1.UpdateReq) (res *v1.UpdateRes, err error) {
+	if err = c.user.AdminUpdateUser(ctx, service.AdminUpdateUserInput{
+		Id: req.Id, Nickname: req.Nickname, Signature: req.Signature, Sex: req.Sex,
+		Img: req.Img, BgImg: req.BgImg, GroupId: req.GroupId, GroupEndTime: req.GroupEndTime,
+		MovieFeeRate: req.MovieFeeRate, PostFeeRate: req.PostFeeRate, Tag: req.Tag,
+		IsUp: req.IsUp, Privilege: req.Privilege, IsDisabled: req.IsDisabled, ErrorMsg: req.ErrorMsg,
+	}); err != nil {
+		return nil, err
+	}
+	return &v1.UpdateRes{}, nil
 }
 
 // Disable 禁用/解禁。

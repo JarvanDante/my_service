@@ -80,11 +80,38 @@ type DetailReq struct {
 }
 type DetailRes struct {
 	AdminUserItem
-	Signature string `json:"signature"`
-	Fans      int    `json:"fans"`
-	Follow    int    `json:"follow"`
-	ErrorMsg  string `json:"error_msg"`
+	Signature          string `json:"signature"`
+	BgImg              string `json:"bg_img"`
+	Rights             string `json:"rights"`
+	Privilege          int    `json:"privilege"` // 0无 1金币免费
+	Fans               int    `json:"fans"`
+	Follow             int    `json:"follow"`
+	ErrorMsg           string `json:"error_msg"`
+	CommentMuted       int    `json:"comment_muted"`        // 预留 0未禁言 1禁言
+	ViolateCount       int    `json:"violate_count"`        // 预留
+	TodayCommentCount  int    `json:"today_comment_count"`  // 预留
 }
+
+// UpdateReq 子后台编辑用户资料(含指定 UP 主)。禁言字段只读预留，本接口不改。
+type UpdateReq struct {
+	g.Meta         `path:"/users/{id}" method:"put" tags:"Backend/User" summary:"编辑用户资料(后台)"`
+	Id             int64  `json:"id" v:"required|min:1#用户ID必填|用户ID必须大于0"`
+	Nickname       string `json:"nickname" v:"required|max-length:64#昵称必填|昵称过长"`
+	Signature      string `json:"signature" v:"max-length:255#签名过长"`
+	Sex            int    `json:"sex" v:"in:0,1,2#性别仅支持未知/男/女"`
+	Img            string `json:"img" v:"required#头像必填"`
+	BgImg          string `json:"bg_img"`
+	GroupId        int64  `json:"group_id" v:"min:0#VIP不合法"`
+	GroupEndTime   int64  `json:"group_end_time" v:"min:0#VIP结束时间不合法"`
+	MovieFeeRate   int    `json:"movie_fee_rate" v:"min:0|max:100#视频分成须在0-100"`
+	PostFeeRate    int    `json:"post_fee_rate" v:"min:0|max:100#帖子分成须在0-100"`
+	Tag            string `json:"tag"`
+	IsUp           int    `json:"is_up" v:"in:0,1#是否UP仅支持0/1"`
+	Privilege      int    `json:"privilege" v:"in:0,1#特权仅支持无/金币免费"`
+	IsDisabled     int    `json:"is_disabled" v:"in:0,1#是否禁用仅支持0/1"`
+	ErrorMsg       string `json:"error_msg"`
+}
+type UpdateRes struct{}
 
 // 禁用 / 解禁
 type DisableReq struct {

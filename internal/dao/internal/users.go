@@ -68,9 +68,12 @@ type UsersColumns struct {
 	Location       string //
 	RegisterArea   string //
 	IsChina        string //
-	IsDisabled     string //
-	ErrorMsg       string //
-	IsSystem       string //
+	IsDisabled         string //
+	ErrorMsg           string //
+	CommentMuted       string //
+	ViolateCount       string //
+	TodayCommentCount  string //
+	IsSystem           string //
 	RegisterAt     string //
 	RegisterDate   string //
 	RegisterIp     string //
@@ -132,9 +135,12 @@ var usersColumns = UsersColumns{
 	Location:       "location",
 	RegisterArea:   "register_area",
 	IsChina:        "is_china",
-	IsDisabled:     "is_disabled",
-	ErrorMsg:       "error_msg",
-	IsSystem:       "is_system",
+	IsDisabled:        "is_disabled",
+	ErrorMsg:          "error_msg",
+	CommentMuted:      "comment_muted",
+	ViolateCount:      "violate_count",
+	TodayCommentCount: "today_comment_count",
+	IsSystem:          "is_system",
 	RegisterAt:     "register_at",
 	RegisterDate:   "register_date",
 	RegisterIp:     "register_ip",

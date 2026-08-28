@@ -5,12 +5,14 @@ import (
 	"context"
 	"crypto/md5"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"strings"
 	"sync"
 
 	"github.com/gogf/gf/v2/errors/gerror"
 	"github.com/gogf/gf/v2/frame/g"
+	"github.com/gogf/gf/v2/os/gtime"
 
 	"github.com/JarvanDante/my_service/internal/model/entity"
 	"github.com/JarvanDante/my_service/internal/modules/user/domain"
@@ -58,13 +60,159 @@ func (s *sUser) AdminUserDetail(ctx context.Context, id int64) (*service.AdminUs
 		return nil, gerror.New("用户不存在")
 	}
 	d := &service.AdminUserDetailDTO{
-		AdminUserItemDTO: *toAdminItem(ctx, u, map[int64]string{}),
-		Signature:        u.Signature,
-		Fans:             u.Fans,
-		Follow:           u.Follow,
-		ErrorMsg:         u.ErrorMsg,
+		AdminUserItemDTO:  *toAdminItem(ctx, u, map[int64]string{}),
+		Signature:         u.Signature,
+		BgImg:             u.BgImg,
+		Rights:            u.Rights,
+		Privilege:         privilegeFromRights(u.Rights),
+		Fans:              u.Fans,
+		Follow:            u.Follow,
+		ErrorMsg:          u.ErrorMsg,
+		CommentMuted:      u.CommentMuted,
+		ViolateCount:      u.ViolateCount,
+		TodayCommentCount: u.TodayCommentCount,
 	}
 	return d, nil
+}
+
+func privilegeFromRights(raw string) int {
+	s := strings.TrimSpace(raw)
+	if s == "" || s == "{}" || s == "[]" {
+		return 0
+	}
+	if strings.Contains(s, `"coin_free":1`) || strings.Contains(s, `"coin_free":true`) {
+		return 1
+	}
+	return 0
+}
+
+func rightsFromPrivilege(p int) string {
+	if p == 1 {
+		return `{"coin_free":1}`
+	}
+	return `{}`
+}
+
+func encodeUserTag(raw string) string {
+	raw = strings.TrimSpace(raw)
+	if raw == "" || raw == "[]" {
+		return "[]"
+	}
+	if strings.HasPrefix(raw, "[") {
+		return raw
+	}
+	parts := strings.FieldsFunc(raw, func(r rune) bool {
+		return r == ',' || r == '，' || r == '|'
+	})
+	out := make([]string, 0, len(parts))
+	for _, p := range parts {
+		p = strings.TrimSpace(p)
+		if p != "" {
+			out = append(out, p)
+		}
+	}
+	b, err := json.Marshal(out)
+	if err != nil {
+		return "[]"
+	}
+	return string(b)
+}
+
+func clampRate(v int) int {
+	if v < 0 {
+		return 0
+	}
+	if v > 100 {
+		return 100
+	}
+	return v
+}
+
+func (s *sUser) AdminUpdateUser(ctx context.Context, in service.AdminUpdateUserInput) error {
+	if in.Id <= 0 {
+		return gerror.New("用户ID无效")
+	}
+	u, err := s.repo.FindById(ctx, in.Id)
+	if err != nil {
+		return err
+	}
+	if u == nil {
+		return gerror.New("用户不存在")
+	}
+	nickname := strings.TrimSpace(in.Nickname)
+	if nickname == "" {
+		return gerror.New("昵称必填")
+	}
+	img := strings.TrimSpace(in.Img)
+	if img == "" {
+		return gerror.New("头像必填")
+	}
+	if in.Sex < 0 || in.Sex > 2 {
+		return gerror.New("性别不合法")
+	}
+	if in.IsUp != 0 && in.IsUp != 1 {
+		return gerror.New("是否UP不合法")
+	}
+	if in.Privilege != 0 && in.Privilege != 1 {
+		return gerror.New("特权不合法")
+	}
+	if in.IsDisabled != 0 && in.IsDisabled != 1 {
+		return gerror.New("禁用状态不合法")
+	}
+
+	groupId := in.GroupId
+	groupName := ""
+	groupRate := 0
+	groupEnd := in.GroupEndTime
+	groupStart := u.GroupStartTime
+	if groupId > 0 {
+		ug, err := s.repo.GroupFind(ctx, groupId)
+		if err != nil {
+			return err
+		}
+		if ug == nil {
+			return gerror.New("用户组不存在, 请先在用户组配置中创建")
+		}
+		if ug.Status != 1 {
+			return gerror.New("用户组已停用")
+		}
+		groupName = ug.Name
+		groupRate = ug.Rate
+		if groupId != u.GroupId || u.GroupStartTime == 0 {
+			groupStart = gtime.Now().Unix()
+		}
+	} else {
+		groupEnd = 0
+		groupStart = 0
+	}
+
+	reason := strings.TrimSpace(in.ErrorMsg)
+	if in.IsDisabled == 1 && reason == "" {
+		reason = "后台禁用"
+	}
+	if in.IsDisabled == 0 {
+		reason = ""
+	}
+
+	return s.repo.UpdateProfile(ctx, in.Id, g.Map{
+		"nickname":         nickname,
+		"signature":        strings.TrimSpace(in.Signature),
+		"sex":              in.Sex,
+		"img":              img,
+		"bg_img":           strings.TrimSpace(in.BgImg),
+		"movie_fee_rate":   clampRate(in.MovieFeeRate),
+		"post_fee_rate":    clampRate(in.PostFeeRate),
+		"tag":              encodeUserTag(in.Tag),
+		"is_up":            in.IsUp,
+		"rights":           rightsFromPrivilege(in.Privilege),
+		"is_disabled":      in.IsDisabled,
+		"error_msg":        reason,
+		"group_id":         groupId,
+		"group_name":       groupName,
+		"group_rate":       groupRate,
+		"group_start_time": groupStart,
+		"group_end_time":   groupEnd,
+	})
 }
 
 func (s *sUser) AdminSetDisabled(ctx context.Context, id int64, disable bool, reason string) error {

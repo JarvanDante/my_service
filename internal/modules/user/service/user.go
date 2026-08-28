@@ -303,10 +303,35 @@ type AdminUserListDTO struct {
 // AdminUserDetailDTO 后台用户详情(含状态/组/资产/轨迹)。
 type AdminUserDetailDTO struct {
 	AdminUserItemDTO
-	Signature string
-	Fans      int
-	Follow    int
-	ErrorMsg  string
+	Signature         string
+	BgImg             string
+	Rights            string
+	Privilege         int
+	Fans              int
+	Follow            int
+	ErrorMsg          string
+	CommentMuted      int
+	ViolateCount      int
+	TodayCommentCount int
+}
+
+// AdminUpdateUserInput 子后台编辑用户。
+type AdminUpdateUserInput struct {
+	Id           int64
+	Nickname     string
+	Signature    string
+	Sex          int
+	Img          string
+	BgImg        string
+	GroupId      int64
+	GroupEndTime int64
+	MovieFeeRate int
+	PostFeeRate  int
+	Tag          string
+	IsUp         int
+	Privilege    int
+	IsDisabled   int
+	ErrorMsg     string
 }
 
 // AdminSetGroupInput 调整用户组入参。
@@ -540,6 +565,7 @@ type IUser interface {
 	AdminSetDisabled(ctx context.Context, id int64, disable bool, reason string) error
 	AdminBatchSetDisabled(ctx context.Context, ids []int64, disable bool, reason string) (int, error)
 	AdminSetGroup(ctx context.Context, in AdminSetGroupInput) error
+	AdminUpdateUser(ctx context.Context, in AdminUpdateUserInput) error
 	AdminAdjustBalance(ctx context.Context, in AdminAdjustBalanceInput) error
 	AdminBalanceLogs(ctx context.Context, userId int64, page, size int) ([]*BalanceLogDTO, int, error)
 	// 后台(B4 用户组定义)
