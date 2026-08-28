@@ -2,6 +2,8 @@ package dao
 
 import (
 	"context"
+	"encoding/json"
+	"strings"
 
 	"github.com/gogf/gf/v2/frame/g"
 	"github.com/gogf/gf/v2/os/gtime"
@@ -30,6 +32,25 @@ func (r *videoRepo) List(ctx context.Context, f videodomain.ListFilter, page, si
 	}
 	if f.Category != "" {
 		m = m.Where("string_to_array(replace(category, '，', ','), ',') @> ARRAY[?]::text[]", f.Category)
+	}
+	tagNames := make([]string, 0, len(f.Tags))
+	for _, t := range f.Tags {
+		if s := strings.TrimSpace(t); s != "" {
+			tagNames = append(tagNames, s)
+		}
+	}
+	if len(tagNames) == 1 {
+		raw, _ := json.Marshal([]string{tagNames[0]})
+		m = m.Where("tags @> ?::jsonb", string(raw))
+	} else if len(tagNames) > 1 {
+		ors := make([]string, 0, len(tagNames))
+		args := make([]any, 0, len(tagNames))
+		for _, t := range tagNames {
+			raw, _ := json.Marshal([]string{t})
+			ors = append(ors, "tags @> ?::jsonb")
+			args = append(args, string(raw))
+		}
+		m = m.Where("("+strings.Join(ors, " OR ")+")", args...)
 	}
 	m = m.Where("kind", f.Kind)
 	if f.Status != 9 {

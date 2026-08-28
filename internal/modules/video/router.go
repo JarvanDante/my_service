@@ -16,20 +16,31 @@ import (
 // 挂 AuthOptional: 现在列表/详情不区分登录态, 但视频后续要接付费墙(paywall.MediaVideo),
 // 届时需要 ctx 里的 userId 才能标记已购, 先把中间件位置留好。
 func RegisterFront(group *ghttp.RouterGroup, repo domain.Repository) {
-	ctrl := front.New(logic.New(repo), logic.NewCategory(), logic.NewCategoryTable("cartoon_category"))
+	ctrl := front.New(
+		logic.New(repo), logic.NewCategory(), logic.NewCategoryTable("cartoon_category"),
+		logic.NewVideoModule(repo), logic.NewCartoonModule(repo),
+	)
 	group.Group("/", func(pub *ghttp.RouterGroup) {
 		pub.Middleware(middleware.AuthOptional)
-		pub.Bind(ctrl.List, ctrl.Detail, ctrl.CategoryList, ctrl.CartoonList, ctrl.CartoonCategoryList)
+		pub.Bind(
+			ctrl.List, ctrl.Detail, ctrl.CategoryList, ctrl.CartoonList, ctrl.CartoonCategoryList,
+			ctrl.VideoModuleList, ctrl.CartoonModuleList,
+		)
 	})
 }
 
-// RegisterBackend 后台视频 CRUD + 分类 CRUD(挂权限组)。
+// RegisterBackend 后台视频 CRUD + 分类 CRUD + 首页模块(挂权限组)。
 func RegisterBackend(group *ghttp.RouterGroup, repo domain.Repository) {
-	ctrl := backend.New(logic.New(repo), logic.NewCategory(), logic.NewCategoryTable("cartoon_category"))
+	ctrl := backend.New(
+		logic.New(repo), logic.NewCategory(), logic.NewCategoryTable("cartoon_category"),
+		logic.NewVideoModule(repo), logic.NewCartoonModule(repo),
+	)
 	group.Bind(
 		ctrl.List, ctrl.Create, ctrl.Update, ctrl.Delete, ctrl.Status,
 		ctrl.MediaAssets, ctrl.MediaPick, ctrl.SyncMedia,
 		ctrl.CategoryList, ctrl.CategoryCreate, ctrl.CategoryUpdate, ctrl.CategoryDelete,
 		ctrl.CartoonCategoryList, ctrl.CartoonCategoryCreate, ctrl.CartoonCategoryUpdate, ctrl.CartoonCategoryDelete,
+		ctrl.VideoModuleList, ctrl.VideoModuleCreate, ctrl.VideoModuleUpdate, ctrl.VideoModuleDelete,
+		ctrl.CartoonModuleList, ctrl.CartoonModuleCreate, ctrl.CartoonModuleUpdate, ctrl.CartoonModuleDelete,
 	)
 }

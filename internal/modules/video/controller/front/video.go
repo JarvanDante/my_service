@@ -13,10 +13,12 @@ type Controller struct {
 	svc        service.IVideo
 	videoCat   service.ICategory
 	cartoonCat service.ICategory
+	videoMod   service.IModule
+	cartoonMod service.IModule
 }
 
-func New(svc service.IVideo, videoCat, cartoonCat service.ICategory) *Controller {
-	return &Controller{svc: svc, videoCat: videoCat, cartoonCat: cartoonCat}
+func New(svc service.IVideo, videoCat, cartoonCat service.ICategory, videoMod, cartoonMod service.IModule) *Controller {
+	return &Controller{svc: svc, videoCat: videoCat, cartoonCat: cartoonCat, videoMod: videoMod, cartoonMod: cartoonMod}
 }
 
 // toItem 只挑前台需要的字段, cover_key/source_key/created_by/status 不外发。
@@ -49,7 +51,7 @@ func (c *Controller) CategoryList(ctx context.Context, _ *v1.CategoryListReq) (r
 
 func (c *Controller) List(ctx context.Context, req *v1.ListReq) (res *v1.ListRes, err error) {
 	dto, err := c.svc.FrontList(ctx, service.FrontListInput{
-		Keyword: req.Keyword, Category: req.Category, Kind: entity.VideoKindVideo,
+		Keyword: req.Keyword, Category: req.Category, Tag: req.Tag, Kind: entity.VideoKindVideo,
 		Sort: req.Sort, Page: req.Page, Size: req.Size,
 	})
 	if err != nil {
@@ -87,7 +89,7 @@ func (c *Controller) CartoonCategoryList(ctx context.Context, _ *v1.CartoonCateg
 
 func (c *Controller) CartoonList(ctx context.Context, req *v1.CartoonListReq) (res *v1.CartoonListRes, err error) {
 	dto, err := c.svc.FrontList(ctx, service.FrontListInput{
-		Keyword: req.Keyword, Category: req.Category, Kind: entity.VideoKindCartoon,
+		Keyword: req.Keyword, Category: req.Category, Tag: req.Tag, Kind: entity.VideoKindCartoon,
 		Sort: req.Sort, Page: req.Page, Size: req.Size,
 	})
 	if err != nil {
@@ -98,4 +100,35 @@ func (c *Controller) CartoonList(ctx context.Context, req *v1.CartoonListReq) (r
 		items = append(items, toItem(v))
 	}
 	return &v1.CartoonListRes{List: items, Total: dto.Total, Page: dto.Page, Size: dto.Size}, nil
+}
+
+func toFrontModules(list []*service.ModuleFrontDTO) []v1.FrontModuleItem {
+	out := make([]v1.FrontModuleItem, 0, len(list))
+	for _, d := range list {
+		row := v1.FrontModuleItem{
+			Id: d.Id, Name: d.Name, Style: d.Style, Icon: d.Icon, Size: d.Size, Tags: d.Tags,
+			Items: make([]v1.Item, 0, len(d.Items)),
+		}
+		for _, item := range d.Items {
+			row.Items = append(row.Items, toItem(item))
+		}
+		out = append(out, row)
+	}
+	return out
+}
+
+func (c *Controller) VideoModuleList(ctx context.Context, req *v1.VideoModuleListReq) (res *v1.VideoModuleListRes, err error) {
+	list, err := c.videoMod.FrontRepo(ctx, req.Position)
+	if err != nil {
+		return nil, err
+	}
+	return &v1.VideoModuleListRes{List: toFrontModules(list)}, nil
+}
+
+func (c *Controller) CartoonModuleList(ctx context.Context, req *v1.CartoonModuleListReq) (res *v1.CartoonModuleListRes, err error) {
+	list, err := c.cartoonMod.FrontRepo(ctx, req.Position)
+	if err != nil {
+		return nil, err
+	}
+	return &v1.CartoonModuleListRes{List: toFrontModules(list)}, nil
 }

@@ -102,9 +102,14 @@ func (s *sVideo) FrontList(ctx context.Context, in service.FrontListInput) (*ser
 	if size > 100 { // 前台是公开接口, 限一下单页上限, 免得被拿来整表拉取
 		size = 100
 	}
+	tags := append([]string{}, in.Tags...)
+	if t := strings.TrimSpace(in.Tag); t != "" {
+		tags = append(tags, t)
+	}
 	list, total, err := s.repo.List(ctx, domain.ListFilter{
 		Keyword:  strings.TrimSpace(in.Keyword),
 		Category: strings.TrimSpace(in.Category),
+		Tags:     tags,
 		Kind:     normalizeKind(in.Kind),
 		Status:   entity.VideoStatusPublished,
 		Sort:     in.Sort,

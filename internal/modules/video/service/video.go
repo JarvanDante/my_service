@@ -45,6 +45,8 @@ type ListDTO struct {
 type FrontListInput struct {
 	Keyword  string
 	Category string
+	Tag      string
+	Tags     []string
 	Kind     int // 0视频 2动漫
 	Sort     int // 0综合(sort权重) 1最新 2时长
 	Page     int

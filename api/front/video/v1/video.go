@@ -31,6 +31,7 @@ type ListReq struct {
 	g.Meta   `path:"/video/list" method:"get" tags:"Front/Video" summary:"视频列表"`
 	Keyword  string `json:"keyword"`
 	Category string `json:"category"`
+	Tag      string `json:"tag"`
 	Sort     int    `json:"sort" v:"in:0,1,2#排序方式非法"`
 	Page     int    `json:"page"`
 	Size     int    `json:"size"`
