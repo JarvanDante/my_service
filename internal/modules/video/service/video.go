@@ -19,6 +19,8 @@ type VideoDTO struct {
 	Duration      int
 	Sort          int
 	Status        int
+	UpUserId      int64
+	UpNickname    string
 	CreatedBy     int64
 	CreatedAt     string
 	UpdatedAt     string
@@ -71,6 +73,7 @@ type SaveInput struct {
 	Duration      int
 	Sort          int
 	Status        int
+	UpUserId      int64
 	OperatorId    int64
 }
 

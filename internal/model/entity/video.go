@@ -32,6 +32,7 @@ type Video struct {
 	Duration      int         `json:"duration"      orm:"duration"`
 	Sort          int         `json:"sort"          orm:"sort"`
 	Status        int         `json:"status"        orm:"status"`
+	UpUserId      int64       `json:"upUserId"      orm:"up_user_id"`
 	CreatedBy     int64       `json:"createdBy"     orm:"created_by"`
 	CreatedAt     *gtime.Time `json:"createdAt"     orm:"created_at"`
 	UpdatedAt     *gtime.Time `json:"updatedAt"     orm:"updated_at"`

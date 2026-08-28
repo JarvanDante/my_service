@@ -20,6 +20,8 @@ type VideoItem struct {
 	Duration      int      `json:"duration"`
 	Sort          int      `json:"sort"`
 	Status        int      `json:"status"`
+	UpUserId      int64    `json:"up_user_id"`
+	UpNickname    string   `json:"up_nickname"`
 	CreatedBy     int64    `json:"created_by"`
 	CreatedAt     string   `json:"created_at"`
 	UpdatedAt     string   `json:"updated_at"`
@@ -59,6 +61,7 @@ type CreateReq struct {
 	Duration      int      `json:"duration" v:"min:0#时长不合法"`
 	Sort          int      `json:"sort"`
 	Status        int      `json:"status" v:"in:0,1,2#status 仅支持 0/1/2"`
+	UpUserId      int64    `json:"up_user_id"`
 }
 type CreateRes struct {
 	Id int64 `json:"id"`
@@ -82,6 +85,7 @@ type UpdateReq struct {
 	Duration      int      `json:"duration" v:"min:0#时长不合法"`
 	Sort          int      `json:"sort"`
 	Status        int      `json:"status" v:"in:0,1,2#status 仅支持 0/1/2"`
+	UpUserId      int64    `json:"up_user_id"`
 }
 type UpdateRes struct{}
 

@@ -57,7 +57,8 @@ func (c *Controller) Create(ctx context.Context, req *v1.CreateReq) (res *v1.Cre
 		CoverUrl: req.CoverUrl, CoverKey: req.CoverKey, CoverMediaId: req.CoverMediaId,
 		SourceUrl: req.SourceUrl, SourceKey: req.SourceKey, SourceMediaId: req.SourceMediaId,
 		MediaCode: req.MediaCode, Kind: req.Kind, Category: req.Category, Categories: req.Categories, Tags: req.Tags,
-		Duration: req.Duration, Sort: req.Sort, Status: req.Status, OperatorId: op,
+		Duration: req.Duration, Sort: req.Sort, Status: req.Status,
+		UpUserId: req.UpUserId, OperatorId: op,
 	})
 	if err != nil {
 		return nil, err
@@ -75,7 +76,8 @@ func (c *Controller) Update(ctx context.Context, req *v1.UpdateReq) (res *v1.Upd
 		CoverUrl: req.CoverUrl, CoverKey: req.CoverKey, CoverMediaId: req.CoverMediaId,
 		SourceUrl: req.SourceUrl, SourceKey: req.SourceKey, SourceMediaId: req.SourceMediaId,
 		MediaCode: req.MediaCode, Category: req.Category, Categories: req.Categories, Tags: req.Tags,
-		Duration: req.Duration, Sort: req.Sort, Status: req.Status, OperatorId: op,
+		Duration: req.Duration, Sort: req.Sort, Status: req.Status,
+		UpUserId: req.UpUserId, OperatorId: op,
 	})
 	return &v1.UpdateRes{}, err
 }
@@ -143,7 +145,8 @@ func toItem(v *service.VideoDTO) v1.VideoItem {
 		CoverUrl: v.CoverUrl, CoverKey: v.CoverKey, CoverMediaId: v.CoverMediaId,
 		SourceUrl: v.SourceUrl, SourceKey: v.SourceKey, SourceMediaId: v.SourceMediaId,
 		MediaCode: v.MediaCode, Category: v.Category, Categories: v.Categories, Tags: v.Tags,
-		Duration: v.Duration, Sort: v.Sort, Status: v.Status, CreatedBy: v.CreatedBy,
+		Duration: v.Duration, Sort: v.Sort, Status: v.Status,
+		UpUserId: v.UpUserId, UpNickname: v.UpNickname, CreatedBy: v.CreatedBy,
 		CreatedAt: v.CreatedAt, UpdatedAt: v.UpdatedAt,
 	}
 }

@@ -93,7 +93,8 @@ func (r *videoRepo) Create(ctx context.Context, v *entity.Video) (int64, error) 
 		"cover_url": v.CoverUrl, "cover_key": v.CoverKey, "cover_media_id": v.CoverMediaId,
 		"source_url": v.SourceUrl, "source_key": v.SourceKey, "source_media_id": v.SourceMediaId,
 		"media_code": v.MediaCode, "kind": v.Kind, "category": v.Category, "tags": v.Tags,
-		"duration": v.Duration, "sort": v.Sort, "status": v.Status, "created_by": v.CreatedBy,
+		"duration": v.Duration, "sort": v.Sort, "status": v.Status,
+		"up_user_id": v.UpUserId, "created_by": v.CreatedBy,
 	}).Insert()
 	if err != nil {
 		return 0, err
@@ -108,7 +109,7 @@ func (r *videoRepo) Update(ctx context.Context, v *entity.Video) error {
 		"source_url": v.SourceUrl, "source_key": v.SourceKey, "source_media_id": v.SourceMediaId,
 		"media_code": v.MediaCode, "kind": v.Kind, "category": v.Category, "tags": v.Tags,
 		"duration": v.Duration, "sort": v.Sort, "status": v.Status,
-		"updated_at": gtime.Now(),
+		"up_user_id": v.UpUserId, "updated_at": gtime.Now(),
 	}).Update()
 	return err
 }

@@ -7,6 +7,7 @@ import (
 
 	"github.com/gogf/gf/v2/errors/gcode"
 	"github.com/gogf/gf/v2/errors/gerror"
+	"github.com/gogf/gf/v2/frame/g"
 
 	"github.com/JarvanDante/my_service/internal/model/entity"
 	"github.com/JarvanDante/my_service/internal/modules/video/domain"
@@ -86,6 +87,7 @@ func (s *sVideo) List(ctx context.Context, in service.ListInput) (*service.ListD
 		out = append(out, toDTO(ctx, v))
 	}
 	s.overlayMediaURLs(ctx, out)
+	fillUpNames(ctx, out)
 	return &service.ListDTO{List: out, Total: total, Page: page, Size: size}, nil
 }
 
@@ -145,7 +147,7 @@ func (s *sVideo) FrontDetail(ctx context.Context, id int64) (*service.VideoDTO, 
 
 func (s *sVideo) Create(ctx context.Context, in service.SaveInput) (int64, error) {
 	in.Category = resolveCategory(&in)
-	if err := validateSave(in); err != nil {
+	if err := validateSave(ctx, in); err != nil {
 		return 0, err
 	}
 	return s.repo.Create(ctx, &entity.Video{
@@ -153,17 +155,14 @@ func (s *sVideo) Create(ctx context.Context, in service.SaveInput) (int64, error
 		CoverUrl: in.CoverUrl, CoverKey: in.CoverKey, CoverMediaId: in.CoverMediaId,
 		SourceUrl: in.SourceUrl, SourceKey: in.SourceKey, SourceMediaId: in.SourceMediaId,
 		MediaCode: strings.TrimSpace(in.MediaCode), Kind: normalizeKind(in.Kind), Category: in.Category, Tags: encodeJSON(in.Tags),
-		Duration: in.Duration, Sort: in.Sort, Status: in.Status, CreatedBy: in.OperatorId,
+		Duration: in.Duration, Sort: in.Sort, Status: in.Status,
+		UpUserId: in.UpUserId, CreatedBy: in.OperatorId,
 	})
 }
 
 func (s *sVideo) Update(ctx context.Context, in service.SaveInput) error {
 	if in.Id <= 0 {
 		return gerror.NewCode(gcode.CodeInvalidParameter, "ID必填")
-	}
-	in.Category = resolveCategory(&in)
-	if err := validateSave(in); err != nil {
-		return err
 	}
 	old, err := s.repo.Find(ctx, in.Id)
 	if err != nil {
@@ -172,12 +171,17 @@ func (s *sVideo) Update(ctx context.Context, in service.SaveInput) error {
 	if old == nil || old.Id == 0 {
 		return gerror.NewCode(gcode.CodeNotFound, "视频不存在")
 	}
+	in.Kind = old.Kind
+	in.Category = resolveCategory(&in)
+	if err := validateSave(ctx, in); err != nil {
+		return err
+	}
 	return s.repo.Update(ctx, &entity.Video{
 		Id: in.Id, Title: strings.TrimSpace(in.Title), Description: strings.TrimSpace(in.Description),
 		CoverUrl: in.CoverUrl, CoverKey: in.CoverKey, CoverMediaId: in.CoverMediaId,
 		SourceUrl: in.SourceUrl, SourceKey: in.SourceKey, SourceMediaId: in.SourceMediaId,
 		MediaCode: strings.TrimSpace(in.MediaCode), Kind: old.Kind, Category: in.Category, Tags: encodeJSON(in.Tags),
-		Duration: in.Duration, Sort: in.Sort, Status: in.Status,
+		Duration: in.Duration, Sort: in.Sort, Status: in.Status, UpUserId: in.UpUserId,
 	})
 }
 
@@ -206,10 +210,13 @@ func (s *sVideo) SetStatus(ctx context.Context, id int64, status int) error {
 	if status == entity.VideoStatusPublished && strings.TrimSpace(old.Category) == "" {
 		return gerror.NewCode(gcode.CodeInvalidParameter, "请先编辑并选择本站分类后再上架")
 	}
+	if err := requireDouyinUp(ctx, old.Kind, status, old.UpUserId); err != nil {
+		return err
+	}
 	return s.repo.SetStatus(ctx, id, status)
 }
 
-func validateSave(in service.SaveInput) error {
+func validateSave(ctx context.Context, in service.SaveInput) error {
 	if strings.TrimSpace(in.Title) == "" {
 		return gerror.NewCode(gcode.CodeInvalidParameter, "标题必填")
 	}
@@ -222,7 +229,64 @@ func validateSave(in service.SaveInput) error {
 	if in.Status == entity.VideoStatusPublished && in.Category == "" {
 		return gerror.NewCode(gcode.CodeInvalidParameter, "上架前请选择本站分类")
 	}
+	return requireDouyinUp(ctx, in.Kind, in.Status, in.UpUserId)
+}
+
+func requireDouyinUp(ctx context.Context, kind, status int, upUserId int64) error {
+	if normalizeKind(kind) != entity.VideoKindDouyin || status != entity.VideoStatusPublished {
+		return nil
+	}
+	if upUserId <= 0 {
+		return gerror.NewCode(gcode.CodeInvalidParameter, "抖音上架必须绑定UP主")
+	}
+	var u *entity.Users
+	if err := g.Model("users").Ctx(ctx).Where("id", upUserId).Scan(&u); err != nil {
+		return gerror.WrapCode(gcode.CodeDbOperationError, err, "查询UP主失败")
+	}
+	if u == nil || u.Id == 0 {
+		return gerror.NewCode(gcode.CodeInvalidParameter, "UP主不存在")
+	}
+	if u.IsDisabled == 1 {
+		return gerror.NewCode(gcode.CodeInvalidParameter, "UP主已被禁用，无法上架")
+	}
+	if u.IsUp != 1 {
+		return gerror.NewCode(gcode.CodeInvalidParameter, "该用户不是UP主")
+	}
 	return nil
+}
+
+func fillUpNames(ctx context.Context, list []*service.VideoDTO) {
+	ids := make([]int64, 0)
+	seen := map[int64]struct{}{}
+	for _, d := range list {
+		if d == nil || d.UpUserId <= 0 {
+			continue
+		}
+		if _, ok := seen[d.UpUserId]; ok {
+			continue
+		}
+		seen[d.UpUserId] = struct{}{}
+		ids = append(ids, d.UpUserId)
+	}
+	if len(ids) == 0 {
+		return
+	}
+	var rows []struct {
+		Id       int64  `orm:"id"`
+		Nickname string `orm:"nickname"`
+	}
+	if err := g.Model("users").Ctx(ctx).WhereIn("id", ids).Fields("id,nickname").Scan(&rows); err != nil {
+		return
+	}
+	names := make(map[int64]string, len(rows))
+	for _, r := range rows {
+		names[r.Id] = r.Nickname
+	}
+	for _, d := range list {
+		if d != nil {
+			d.UpNickname = names[d.UpUserId]
+		}
+	}
 }
 
 func toDTO(ctx context.Context, v *entity.Video) *service.VideoDTO {
@@ -234,7 +298,8 @@ func toDTO(ctx context.Context, v *entity.Video) *service.VideoDTO {
 		CoverUrl: v.CoverUrl, CoverKey: v.CoverKey, CoverMediaId: v.CoverMediaId,
 		SourceUrl: v.SourceUrl, SourceKey: v.SourceKey, SourceMediaId: v.SourceMediaId,
 		MediaCode: v.MediaCode, Category: v.Category, Categories: parseCategories(v.Category), Tags: decodeTags(v.Tags),
-		Duration: v.Duration, Sort: v.Sort, Status: v.Status, CreatedBy: v.CreatedBy,
+		Duration: v.Duration, Sort: v.Sort, Status: v.Status,
+		UpUserId: v.UpUserId, CreatedBy: v.CreatedBy,
 	}
 	if v.CreatedAt != nil {
 		d.CreatedAt = v.CreatedAt.String()
