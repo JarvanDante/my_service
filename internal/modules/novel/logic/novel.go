@@ -146,6 +146,39 @@ func (s *sNovel) FrontList(ctx context.Context, userId int64, f service.ListFilt
 	return list, total, nil
 }
 
+func (s *sNovel) FrontCategories(ctx context.Context) ([]string, error) {
+	var rows []struct {
+		Category string `orm:"category"`
+	}
+	err := g.Model("novel").Ctx(ctx).
+		Where("site_id", nvSiteId).
+		Where("status", entity.ContentStatusOnline).
+		Where("category <> ?", "").
+		Fields("category").
+		Group("category").
+		OrderDesc("MAX(id)").
+		Scan(&rows)
+	if err != nil {
+		return nil, err
+	}
+	seen := map[string]struct{}{}
+	out := make([]string, 0, len(rows))
+	for _, r := range rows {
+		for _, part := range strings.Split(strings.ReplaceAll(r.Category, "，", ","), ",") {
+			name := strings.TrimSpace(part)
+			if name == "" {
+				continue
+			}
+			if _, ok := seen[name]; ok {
+				continue
+			}
+			seen[name] = struct{}{}
+			out = append(out, name)
+		}
+	}
+	return out, nil
+}
+
 // find 取上架作品(前台用)。
 func (s *sNovel) find(ctx context.Context, id int64, onlineOnly bool) (*entity.Novel, error) {
 	m := g.Model("novel").Ctx(ctx).Where("site_id", nvSiteId).Where("id", id)

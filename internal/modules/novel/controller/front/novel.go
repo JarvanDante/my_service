@@ -55,6 +55,18 @@ func (c *Controller) List(ctx context.Context, req *v1.ListReq) (res *v1.ListRes
 	return res, nil
 }
 
+func (c *Controller) CategoryList(ctx context.Context, _ *v1.CategoryListReq) (res *v1.CategoryListRes, err error) {
+	names, err := c.svc.FrontCategories(ctx)
+	if err != nil {
+		return nil, err
+	}
+	res = &v1.CategoryListRes{List: make([]v1.FrontCategoryItem, 0, len(names))}
+	for i, name := range names {
+		res.List = append(res.List, v1.FrontCategoryItem{Id: int64(i + 1), Name: name, Kind: 0})
+	}
+	return res, nil
+}
+
 func (c *Controller) Detail(ctx context.Context, req *v1.DetailReq) (res *v1.DetailRes, err error) {
 	d, err := c.svc.Detail(ctx, optionalUid(ctx), req.Id)
 	if err != nil {

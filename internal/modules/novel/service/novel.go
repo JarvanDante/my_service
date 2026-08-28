@@ -105,6 +105,8 @@ type ListFilter struct {
 type INovel interface {
 	// FrontList 只出上架作品; userId>0 时批量标记 is_buy。
 	FrontList(ctx context.Context, userId int64, f ListFilter) ([]*NovelDTO, int, error)
+	// FrontCategories 已上架作品里出现过的分类名, 去重保序。
+	FrontCategories(ctx context.Context) ([]string, error)
 	// Detail 详情并 +1 观看数。
 	Detail(ctx context.Context, userId, id int64) (*DetailDTO, error)
 	// Chapters 目录, 逐章标出 is_free / playable。

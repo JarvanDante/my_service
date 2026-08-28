@@ -39,6 +39,19 @@ type ListRes struct {
 	Total int    `json:"total"`
 }
 
+type FrontCategoryItem struct {
+	Id   int64  `json:"id"`
+	Name string `json:"name"`
+	Kind int    `json:"kind"`
+}
+
+type CategoryListReq struct {
+	g.Meta `path:"/novel/categories" method:"get" tags:"Front/Novel" summary:"小说分类"`
+}
+type CategoryListRes struct {
+	List []FrontCategoryItem `json:"list"`
+}
+
 // DetailReq 小说详情(公开; 带登录态则返回解锁信息)。
 type DetailReq struct {
 	g.Meta `path:"/novel/detail" method:"get" tags:"Front/Novel" summary:"小说详情"`
