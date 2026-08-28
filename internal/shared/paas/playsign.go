@@ -140,6 +140,7 @@ func isMinioHls(u string) bool {
 		return false
 	}
 	return strings.Contains(u, "/my-media/media/hls/") ||
+		strings.Contains(u, "/my-media/video/") ||
 		strings.Contains(u, "/my-media/cartoon/") ||
 		strings.Contains(u, "/my-media/comics/") ||
 		strings.Contains(u, ":19000/my-media/") ||
