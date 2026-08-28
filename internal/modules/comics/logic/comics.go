@@ -125,8 +125,25 @@ func (s *sComics) query(ctx context.Context, f service.ListFilter) ([]*service.C
 	if f.Category != "" {
 		base = base.Where("string_to_array(replace(category, '，', ','), ',') @> ARRAY[?]::text[]", f.Category)
 	}
+	tagNames := make([]string, 0, len(f.Tags)+1)
+	for _, t := range f.Tags {
+		if s := strings.TrimSpace(t); s != "" {
+			tagNames = append(tagNames, s)
+		}
+	}
 	if f.Tag != "" {
-		base = base.Where("tags @> ?::jsonb", encodeJSON([]string{f.Tag}))
+		tagNames = append(tagNames, strings.TrimSpace(f.Tag))
+	}
+	if len(tagNames) == 1 {
+		base = base.Where("tags @> ?::jsonb", encodeJSON([]string{tagNames[0]}))
+	} else if len(tagNames) > 1 {
+		ors := make([]string, 0, len(tagNames))
+		args := make([]any, 0, len(tagNames))
+		for _, t := range tagNames {
+			ors = append(ors, "tags @> ?::jsonb")
+			args = append(args, encodeJSON([]string{t}))
+		}
+		base = base.Where("("+strings.Join(ors, " OR ")+")", args...)
 	}
 	if f.Keyword != "" {
 		kw := "%" + f.Keyword + "%"

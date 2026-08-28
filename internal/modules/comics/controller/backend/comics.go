@@ -12,10 +12,11 @@ import (
 type Controller struct {
 	svc service.IComics
 	cat service.ICategory
+	mod service.IModule
 }
 
-func New(svc service.IComics, cat service.ICategory) *Controller {
-	return &Controller{svc: svc, cat: cat}
+func New(svc service.IComics, cat service.ICategory, mod service.IModule) *Controller {
+	return &Controller{svc: svc, cat: cat, mod: mod}
 }
 
 func toPicDTO(in []v1.Pic) []service.PicDTO {

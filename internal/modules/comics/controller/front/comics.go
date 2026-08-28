@@ -16,10 +16,11 @@ import (
 type Controller struct {
 	svc service.IComics
 	cat service.ICategory
+	mod service.IModule
 }
 
-func New(svc service.IComics, cat service.ICategory) *Controller {
-	return &Controller{svc: svc, cat: cat}
+func New(svc service.IComics, cat service.ICategory, mod service.IModule) *Controller {
+	return &Controller{svc: svc, cat: cat, mod: mod}
 }
 
 // optionalUid 公开接口: 带 token 就取到用户, 不带返回 0(用于标记 is_buy/解锁态)。
@@ -121,6 +122,25 @@ func (c *Controller) MayLike(ctx context.Context, req *v1.MayLikeReq) (res *v1.M
 	res = &v1.MayLikeRes{List: make([]v1.Item, 0, len(list))}
 	for _, d := range list {
 		res.List = append(res.List, toItem(d))
+	}
+	return res, nil
+}
+
+func (c *Controller) ModuleList(ctx context.Context, req *v1.ModuleListReq) (res *v1.ModuleListRes, err error) {
+	list, err := c.mod.FrontRepo(ctx, req.Position)
+	if err != nil {
+		return nil, err
+	}
+	res = &v1.ModuleListRes{List: make([]v1.FrontModuleItem, 0, len(list))}
+	for _, d := range list {
+		row := v1.FrontModuleItem{
+			Id: d.Id, Name: d.Name, Style: d.Style, Icon: d.Icon, Size: d.Size, Tags: d.Tags,
+			Items: make([]v1.Item, 0, len(d.Items)),
+		}
+		for _, item := range d.Items {
+			row.Items = append(row.Items, toItem(item))
+		}
+		res.List = append(res.List, row)
 	}
 	return res, nil
 }
