@@ -15,6 +15,10 @@ type Item struct {
 	Categories  []string `json:"categories"`
 	Duration    int      `json:"duration"`
 	CreatedAt   string   `json:"created_at"`
+	UpUserId    int64    `json:"up_user_id"`
+	UpNickname  string   `json:"up_nickname"`
+	UpAvatar    string   `json:"up_avatar"`
+	Followed    bool     `json:"followed"`
 }
 
 // CategoryListReq 启用中的视频分类, 按权重倒序(公开)。

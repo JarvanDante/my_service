@@ -21,6 +21,8 @@ type VideoDTO struct {
 	Status        int
 	UpUserId      int64
 	UpNickname    string
+	UpAvatar      string
+	Followed      bool
 	CreatedBy     int64
 	CreatedAt     string
 	UpdatedAt     string
@@ -51,8 +53,10 @@ type FrontListInput struct {
 	Tags     []string
 	Kind     int // 0视频 2动漫
 	Sort     int // 0综合(sort权重) 1最新 2时长
-	Page     int
-	Size     int
+	Page       int
+	Size       int
+	ViewerId   int64
+	FollowOnly bool
 }
 
 type SaveInput struct {
@@ -81,7 +85,7 @@ type IVideo interface {
 	// FrontList 前台列表: 只出 status=1 已上架。
 	FrontList(ctx context.Context, in FrontListInput) (*ListDTO, error)
 	// FrontDetail 前台详情: 未上架一律当作不存在(不泄露"存在但下架了")。
-	FrontDetail(ctx context.Context, id int64) (*VideoDTO, error)
+	FrontDetail(ctx context.Context, id, viewerId int64) (*VideoDTO, error)
 
 	List(ctx context.Context, in ListInput) (*ListDTO, error)
 	Create(ctx context.Context, in SaveInput) (int64, error)

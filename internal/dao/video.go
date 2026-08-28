@@ -52,6 +52,9 @@ func (r *videoRepo) List(ctx context.Context, f videodomain.ListFilter, page, si
 		}
 		m = m.Where("("+strings.Join(ors, " OR ")+")", args...)
 	}
+	if len(f.UpUserIds) > 0 {
+		m = m.WhereIn("up_user_id", f.UpUserIds)
+	}
 	m = m.Where("kind", f.Kind)
 	if f.Status != 9 {
 		m = m.Where("status", f.Status)

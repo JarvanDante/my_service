@@ -108,14 +108,28 @@ func (s *sVideo) FrontList(ctx context.Context, in service.FrontListInput) (*ser
 	if t := strings.TrimSpace(in.Tag); t != "" {
 		tags = append(tags, t)
 	}
-	list, total, err := s.repo.List(ctx, domain.ListFilter{
+	filter := domain.ListFilter{
 		Keyword:  strings.TrimSpace(in.Keyword),
 		Category: strings.TrimSpace(in.Category),
 		Tags:     tags,
 		Kind:     normalizeKind(in.Kind),
 		Status:   entity.VideoStatusPublished,
 		Sort:     in.Sort,
-	}, page, size)
+	}
+	if in.FollowOnly {
+		if in.ViewerId <= 0 {
+			return &service.ListDTO{List: []*service.VideoDTO{}, Total: 0, Page: page, Size: size}, nil
+		}
+		ids, err := followedHomeIds(ctx, in.ViewerId)
+		if err != nil {
+			return nil, err
+		}
+		if len(ids) == 0 {
+			return &service.ListDTO{List: []*service.VideoDTO{}, Total: 0, Page: page, Size: size}, nil
+		}
+		filter.UpUserIds = ids
+	}
+	list, total, err := s.repo.List(ctx, filter, page, size)
 	if err != nil {
 		return nil, gerror.WrapCode(gcode.CodeDbOperationError, err, "查询视频失败")
 	}
@@ -124,12 +138,13 @@ func (s *sVideo) FrontList(ctx context.Context, in service.FrontListInput) (*ser
 		out = append(out, toDTO(ctx, v))
 	}
 	s.overlayMediaURLs(ctx, out)
+	fillUpProfiles(ctx, out, in.ViewerId)
 	return &service.ListDTO{List: out, Total: total, Page: page, Size: size}, nil
 }
 
 // FrontDetail 前台详情。草稿/下架与不存在返回同一个错误, 避免前台通过错误文案
 // 探测出"这个 id 有内容, 只是暂时下架"。
-func (s *sVideo) FrontDetail(ctx context.Context, id int64) (*service.VideoDTO, error) {
+func (s *sVideo) FrontDetail(ctx context.Context, id, viewerId int64) (*service.VideoDTO, error) {
 	if id <= 0 {
 		return nil, gerror.NewCode(gcode.CodeInvalidParameter, "ID必填")
 	}
@@ -142,6 +157,7 @@ func (s *sVideo) FrontDetail(ctx context.Context, id int64) (*service.VideoDTO, 
 	}
 	d := toDTO(ctx, v)
 	s.resolvePlay(ctx, d)
+	fillUpProfiles(ctx, []*service.VideoDTO{d}, viewerId)
 	return d, nil
 }
 
@@ -256,6 +272,34 @@ func requireDouyinUp(ctx context.Context, kind, status int, upUserId int64) erro
 }
 
 func fillUpNames(ctx context.Context, list []*service.VideoDTO) {
+	fillUpProfiles(ctx, list, 0)
+}
+
+func followedHomeIds(ctx context.Context, viewerId int64) ([]int64, error) {
+	if viewerId <= 0 {
+		return nil, nil
+	}
+	arr, err := g.Model("user_follow").Ctx(ctx).Where("user_id", viewerId).Fields("home_id").Limit(500).Array()
+	if err != nil {
+		return nil, gerror.WrapCode(gcode.CodeDbOperationError, err, "查询关注失败")
+	}
+	out := make([]int64, 0, len(arr))
+	seen := map[int64]struct{}{}
+	for _, v := range arr {
+		id := v.Int64()
+		if id <= 0 {
+			continue
+		}
+		if _, ok := seen[id]; ok {
+			continue
+		}
+		seen[id] = struct{}{}
+		out = append(out, id)
+	}
+	return out, nil
+}
+
+func fillUpProfiles(ctx context.Context, list []*service.VideoDTO, viewerId int64) {
 	ids := make([]int64, 0)
 	seen := map[int64]struct{}{}
 	for _, d := range list {
@@ -274,18 +318,37 @@ func fillUpNames(ctx context.Context, list []*service.VideoDTO) {
 	var rows []struct {
 		Id       int64  `orm:"id"`
 		Nickname string `orm:"nickname"`
+		Img      string `orm:"img"`
 	}
-	if err := g.Model("users").Ctx(ctx).WhereIn("id", ids).Fields("id,nickname").Scan(&rows); err != nil {
+	if err := g.Model("users").Ctx(ctx).WhereIn("id", ids).Fields("id,nickname,img").Scan(&rows); err != nil {
 		return
 	}
 	names := make(map[int64]string, len(rows))
+	avatars := make(map[int64]string, len(rows))
 	for _, r := range rows {
 		names[r.Id] = r.Nickname
+		avatars[r.Id] = r.Img
+	}
+	followed := map[int64]struct{}{}
+	if viewerId > 0 {
+		arr, err := g.Model("user_follow").Ctx(ctx).
+			Where("user_id", viewerId).WhereIn("home_id", ids).Fields("home_id").Array()
+		if err == nil {
+			for _, v := range arr {
+				if id := v.Int64(); id > 0 {
+					followed[id] = struct{}{}
+				}
+			}
+		}
 	}
 	for _, d := range list {
-		if d != nil {
-			d.UpNickname = names[d.UpUserId]
+		if d == nil || d.UpUserId <= 0 {
+			continue
 		}
+		d.UpNickname = names[d.UpUserId]
+		d.UpAvatar = avatars[d.UpUserId]
+		_, ok := followed[d.UpUserId]
+		d.Followed = ok || viewerId == d.UpUserId
 	}
 }
 

@@ -4,9 +4,12 @@ package front
 import (
 	"context"
 
+	"github.com/gogf/gf/v2/net/ghttp"
+
 	v1 "github.com/JarvanDante/my_service/api/front/video/v1"
 	"github.com/JarvanDante/my_service/internal/model/entity"
 	"github.com/JarvanDante/my_service/internal/modules/video/service"
+	"github.com/JarvanDante/my_service/internal/shared/consts"
 )
 
 type Controller struct {
@@ -32,7 +35,16 @@ func toItem(v *service.VideoDTO) v1.Item {
 		CoverUrl: v.CoverUrl, SourceUrl: v.SourceUrl,
 		Category: v.Category, Categories: v.Categories,
 		Duration: v.Duration, CreatedAt: v.CreatedAt,
+		UpUserId: v.UpUserId, UpNickname: v.UpNickname, UpAvatar: v.UpAvatar, Followed: v.Followed,
 	}
+}
+
+func viewerId(ctx context.Context) int64 {
+	r := ghttp.RequestFromCtx(ctx)
+	if r == nil {
+		return 0
+	}
+	return r.GetCtxVar(consts.CtxUserId).Int64()
 }
 
 func (c *Controller) CategoryList(ctx context.Context, _ *v1.CategoryListReq) (res *v1.CategoryListRes, err error) {
@@ -53,7 +65,7 @@ func (c *Controller) CategoryList(ctx context.Context, _ *v1.CategoryListReq) (r
 func (c *Controller) List(ctx context.Context, req *v1.ListReq) (res *v1.ListRes, err error) {
 	dto, err := c.svc.FrontList(ctx, service.FrontListInput{
 		Keyword: req.Keyword, Category: req.Category, Tag: req.Tag, Kind: entity.VideoKindVideo,
-		Sort: req.Sort, Page: req.Page, Size: req.Size,
+		Sort: req.Sort, Page: req.Page, Size: req.Size, ViewerId: viewerId(ctx),
 	})
 	if err != nil {
 		return nil, err
@@ -66,7 +78,7 @@ func (c *Controller) List(ctx context.Context, req *v1.ListReq) (res *v1.ListRes
 }
 
 func (c *Controller) Detail(ctx context.Context, req *v1.DetailReq) (res *v1.DetailRes, err error) {
-	v, err := c.svc.FrontDetail(ctx, req.Id)
+	v, err := c.svc.FrontDetail(ctx, req.Id, viewerId(ctx))
 	if err != nil {
 		return nil, err
 	}
@@ -91,7 +103,7 @@ func (c *Controller) CartoonCategoryList(ctx context.Context, _ *v1.CartoonCateg
 func (c *Controller) CartoonList(ctx context.Context, req *v1.CartoonListReq) (res *v1.CartoonListRes, err error) {
 	dto, err := c.svc.FrontList(ctx, service.FrontListInput{
 		Keyword: req.Keyword, Category: req.Category, Tag: req.Tag, Kind: entity.VideoKindCartoon,
-		Sort: req.Sort, Page: req.Page, Size: req.Size,
+		Sort: req.Sort, Page: req.Page, Size: req.Size, ViewerId: viewerId(ctx),
 	})
 	if err != nil {
 		return nil, err
@@ -122,6 +134,7 @@ func (c *Controller) DouyinList(ctx context.Context, req *v1.DouyinListReq) (res
 	dto, err := c.svc.FrontList(ctx, service.FrontListInput{
 		Keyword: req.Keyword, Category: req.Category, Tag: req.Tag, Kind: entity.VideoKindDouyin,
 		Sort: req.Sort, Page: req.Page, Size: req.Size,
+		ViewerId: viewerId(ctx), FollowOnly: req.Follow == 1,
 	})
 	if err != nil {
 		return nil, err

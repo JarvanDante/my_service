@@ -16,7 +16,8 @@ type ListFilter struct {
 	// 加在仓储层而不是在 logic 里排内存, 是因为分页必须由 SQL 完成 ——
 	// 内存排序只能排当前这一页, 结果是错的。
 	Sort int
-	Tags []string // 标签名, 命中 tags jsonb 数组中任一项
+	Tags      []string // 标签名, 命中 tags jsonb 数组中任一项
+	UpUserIds []int64  // 只出这些 UP 主的作品(关注流)
 }
 
 type Repository interface {

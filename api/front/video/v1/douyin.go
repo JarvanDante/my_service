@@ -18,6 +18,7 @@ type DouyinListReq struct {
 	Category string `json:"category"`
 	Tag      string `json:"tag"`
 	Sort     int    `json:"sort" v:"in:0,1,2#排序方式非法"`
+	Follow   int    `json:"follow"` // 1=只看已关注的UP主
 	Page     int    `json:"page"`
 	Size     int    `json:"size"`
 }
