@@ -104,3 +104,46 @@ func (c *Controller) CartoonCategoryDelete(ctx context.Context, req *v1.CartoonC
 	}
 	return &v1.CartoonCategoryDeleteRes{}, nil
 }
+
+func (c *Controller) DouyinCategoryList(ctx context.Context, req *v1.DouyinCategoryListReq) (res *v1.DouyinCategoryListRes, err error) {
+	list, total, err := c.douyinCat.List(ctx, service.CategoryFilter{
+		Kind: parseOptionalInt(req.Kind), Status: parseOptionalInt(req.Status),
+		Page: req.Page, Size: req.Size,
+	})
+	if err != nil {
+		return nil, err
+	}
+	res = &v1.DouyinCategoryListRes{Total: total, List: make([]v1.CategoryItem, 0, len(list))}
+	for _, d := range list {
+		res.List = append(res.List, v1.CategoryItem{
+			Id: d.Id, Name: d.Name, Kind: d.Kind, Rank: d.Rank, Status: d.Status, CreatedAt: d.CreatedAt,
+		})
+	}
+	return res, nil
+}
+
+func (c *Controller) DouyinCategoryCreate(ctx context.Context, req *v1.DouyinCategoryCreateReq) (res *v1.DouyinCategoryCreateRes, err error) {
+	id, err := c.douyinCat.Create(ctx, service.CategoryInput{
+		Name: req.Name, Kind: req.Kind, Rank: req.Rank, Status: req.Status,
+	})
+	if err != nil {
+		return nil, err
+	}
+	return &v1.DouyinCategoryCreateRes{Id: id}, nil
+}
+
+func (c *Controller) DouyinCategoryUpdate(ctx context.Context, req *v1.DouyinCategoryUpdateReq) (res *v1.DouyinCategoryUpdateRes, err error) {
+	if err = c.douyinCat.Update(ctx, service.CategoryInput{
+		Id: req.Id, Name: req.Name, Kind: req.Kind, Rank: req.Rank, Status: req.Status,
+	}); err != nil {
+		return nil, err
+	}
+	return &v1.DouyinCategoryUpdateRes{}, nil
+}
+
+func (c *Controller) DouyinCategoryDelete(ctx context.Context, req *v1.DouyinCategoryDeleteReq) (res *v1.DouyinCategoryDeleteRes, err error) {
+	if err = c.douyinCat.Delete(ctx, req.Id); err != nil {
+		return nil, err
+	}
+	return &v1.DouyinCategoryDeleteRes{}, nil
+}

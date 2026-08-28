@@ -16,12 +16,13 @@ type Controller struct {
 	video      service.IVideo
 	cat        service.ICategory
 	cartoonCat service.ICategory
+	douyinCat  service.ICategory
 	videoMod   service.IModule
 	cartoonMod service.IModule
 }
 
-func New(svc service.IVideo, cat, cartoonCat service.ICategory, videoMod, cartoonMod service.IModule) *Controller {
-	return &Controller{video: svc, cat: cat, cartoonCat: cartoonCat, videoMod: videoMod, cartoonMod: cartoonMod}
+func New(svc service.IVideo, cat, cartoonCat, douyinCat service.ICategory, videoMod, cartoonMod service.IModule) *Controller {
+	return &Controller{video: svc, cat: cat, cartoonCat: cartoonCat, douyinCat: douyinCat, videoMod: videoMod, cartoonMod: cartoonMod}
 }
 
 func operatorId(ctx context.Context) (int64, error) {

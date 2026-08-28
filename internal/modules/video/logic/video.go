@@ -315,10 +315,14 @@ func isSiteCustomCover(cover string) bool {
 }
 
 func normalizeKind(kind int) int {
-	if kind == entity.VideoKindCartoon {
+	switch kind {
+	case entity.VideoKindCartoon:
 		return entity.VideoKindCartoon
+	case entity.VideoKindDouyin:
+		return entity.VideoKindDouyin
+	default:
+		return entity.VideoKindVideo
 	}
-	return entity.VideoKindVideo
 }
 
 func (s *sVideo) ListMediaAssets(ctx context.Context, page, size int, keyword string, kind int) ([]service.MediaAssetDTO, int, error) {

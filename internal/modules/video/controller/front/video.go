@@ -13,12 +13,13 @@ type Controller struct {
 	svc        service.IVideo
 	videoCat   service.ICategory
 	cartoonCat service.ICategory
+	douyinCat  service.ICategory
 	videoMod   service.IModule
 	cartoonMod service.IModule
 }
 
-func New(svc service.IVideo, videoCat, cartoonCat service.ICategory, videoMod, cartoonMod service.IModule) *Controller {
-	return &Controller{svc: svc, videoCat: videoCat, cartoonCat: cartoonCat, videoMod: videoMod, cartoonMod: cartoonMod}
+func New(svc service.IVideo, videoCat, cartoonCat, douyinCat service.ICategory, videoMod, cartoonMod service.IModule) *Controller {
+	return &Controller{svc: svc, videoCat: videoCat, cartoonCat: cartoonCat, douyinCat: douyinCat, videoMod: videoMod, cartoonMod: cartoonMod}
 }
 
 // toItem 只挑前台需要的字段, cover_key/source_key/created_by/status 不外发。
@@ -100,6 +101,36 @@ func (c *Controller) CartoonList(ctx context.Context, req *v1.CartoonListReq) (r
 		items = append(items, toItem(v))
 	}
 	return &v1.CartoonListRes{List: items, Total: dto.Total, Page: dto.Page, Size: dto.Size}, nil
+}
+
+func (c *Controller) DouyinCategoryList(ctx context.Context, _ *v1.DouyinCategoryListReq) (res *v1.DouyinCategoryListRes, err error) {
+	if c.douyinCat == nil {
+		return &v1.DouyinCategoryListRes{List: []v1.FrontCategoryItem{}}, nil
+	}
+	list, err := c.douyinCat.Repo(ctx)
+	if err != nil {
+		return nil, err
+	}
+	res = &v1.DouyinCategoryListRes{List: make([]v1.FrontCategoryItem, 0, len(list))}
+	for _, d := range list {
+		res.List = append(res.List, v1.FrontCategoryItem{Id: d.Id, Name: d.Name, Kind: d.Kind})
+	}
+	return res, nil
+}
+
+func (c *Controller) DouyinList(ctx context.Context, req *v1.DouyinListReq) (res *v1.DouyinListRes, err error) {
+	dto, err := c.svc.FrontList(ctx, service.FrontListInput{
+		Keyword: req.Keyword, Category: req.Category, Tag: req.Tag, Kind: entity.VideoKindDouyin,
+		Sort: req.Sort, Page: req.Page, Size: req.Size,
+	})
+	if err != nil {
+		return nil, err
+	}
+	items := make([]v1.Item, 0, len(dto.List))
+	for _, v := range dto.List {
+		items = append(items, toItem(v))
+	}
+	return &v1.DouyinListRes{List: items, Total: dto.Total, Page: dto.Page, Size: dto.Size}, nil
 }
 
 func toFrontModules(list []*service.ModuleFrontDTO) []v1.FrontModuleItem {

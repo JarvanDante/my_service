@@ -11,6 +11,7 @@ const (
 const (
 	VideoKindVideo   = 0
 	VideoKindCartoon = 2
+	VideoKindDouyin  = 3
 )
 
 type Video struct {
@@ -25,7 +26,7 @@ type Video struct {
 	SourceKey     string      `json:"sourceKey"     orm:"source_key"`
 	SourceMediaId int64       `json:"sourceMediaId" orm:"source_media_id"`
 	MediaCode     string      `json:"mediaCode"     orm:"media_code"`
-	Kind          int         `json:"kind"          orm:"kind"` // 0视频 2动漫
+	Kind          int         `json:"kind"          orm:"kind"` // 0视频 2动漫 3抖音
 	Category      string      `json:"category"      orm:"category"`
 	Tags          string      `json:"tags"          orm:"tags"` // jsonb 原文
 	Duration      int         `json:"duration"      orm:"duration"`

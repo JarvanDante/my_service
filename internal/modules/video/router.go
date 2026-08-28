@@ -18,12 +18,14 @@ import (
 func RegisterFront(group *ghttp.RouterGroup, repo domain.Repository) {
 	ctrl := front.New(
 		logic.New(repo), logic.NewCategory(), logic.NewCategoryTable("cartoon_category"),
+		logic.NewCategoryTable("douyin_category"),
 		logic.NewVideoModule(repo), logic.NewCartoonModule(repo),
 	)
 	group.Group("/", func(pub *ghttp.RouterGroup) {
 		pub.Middleware(middleware.AuthOptional)
 		pub.Bind(
 			ctrl.List, ctrl.Detail, ctrl.CategoryList, ctrl.CartoonList, ctrl.CartoonCategoryList,
+			ctrl.DouyinList, ctrl.DouyinCategoryList,
 			ctrl.VideoModuleList, ctrl.CartoonModuleList,
 		)
 	})
@@ -33,6 +35,7 @@ func RegisterFront(group *ghttp.RouterGroup, repo domain.Repository) {
 func RegisterBackend(group *ghttp.RouterGroup, repo domain.Repository) {
 	ctrl := backend.New(
 		logic.New(repo), logic.NewCategory(), logic.NewCategoryTable("cartoon_category"),
+		logic.NewCategoryTable("douyin_category"),
 		logic.NewVideoModule(repo), logic.NewCartoonModule(repo),
 	)
 	group.Bind(
@@ -40,6 +43,7 @@ func RegisterBackend(group *ghttp.RouterGroup, repo domain.Repository) {
 		ctrl.MediaAssets, ctrl.MediaPick, ctrl.SyncMedia,
 		ctrl.CategoryList, ctrl.CategoryCreate, ctrl.CategoryUpdate, ctrl.CategoryDelete,
 		ctrl.CartoonCategoryList, ctrl.CartoonCategoryCreate, ctrl.CartoonCategoryUpdate, ctrl.CartoonCategoryDelete,
+		ctrl.DouyinCategoryList, ctrl.DouyinCategoryCreate, ctrl.DouyinCategoryUpdate, ctrl.DouyinCategoryDelete,
 		ctrl.VideoModuleList, ctrl.VideoModuleCreate, ctrl.VideoModuleUpdate, ctrl.VideoModuleDelete,
 		ctrl.CartoonModuleList, ctrl.CartoonModuleCreate, ctrl.CartoonModuleUpdate, ctrl.CartoonModuleDelete,
 	)

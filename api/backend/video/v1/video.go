@@ -29,7 +29,7 @@ type ListReq struct {
 	g.Meta  `path:"/videos" method:"get" tags:"Backend/Video" summary:"视频列表"`
 	Keyword   string `json:"keyword"`
 	MediaCode string `json:"media_code" dc:"媒资短码, 精确匹配"`
-	Kind      int    `json:"kind" d:"0" dc:"0视频 2动漫"`
+	Kind      int    `json:"kind" d:"0" dc:"0视频 2动漫 3抖音"`
 	Status    int    `json:"status" d:"9" v:"in:0,1,2,9#状态不合法" dc:"9=全部 0草稿 1上架 2下架"`
 	Page    int    `json:"page"`
 	Size    int    `json:"size"`
@@ -52,7 +52,7 @@ type CreateReq struct {
 	SourceKey     string `json:"source_key"`
 	SourceMediaId int64  `json:"source_media_id"`
 	MediaCode     string   `json:"media_code"`
-	Kind          int      `json:"kind" d:"0" dc:"0视频 2动漫"`
+	Kind          int      `json:"kind" d:"0" dc:"0视频 2动漫 3抖音"`
 	Category      string   `json:"category"`
 	Categories    []string `json:"categories"`
 	Tags          []string `json:"tags"`
@@ -111,7 +111,7 @@ type MediaAssetItem struct {
 type MediaAssetListReq struct {
 	g.Meta  `path:"/media-assets" method:"get" tags:"Backend/Video" summary:"媒资中心可选用列表"`
 	Keyword string `json:"keyword"`
-	Kind    int    `json:"kind" d:"0" dc:"0视频 2动漫"`
+	Kind    int    `json:"kind" d:"0" dc:"0视频 2动漫 3抖音"`
 	Page    int    `json:"page"`
 	Size    int    `json:"size"`
 }
@@ -125,7 +125,7 @@ type MediaAssetListRes struct {
 type MediaPickReq struct {
 	g.Meta `path:"/media-assets/{id}/pick" method:"post" tags:"Backend/Video" summary:"选用媒资并写入视频列表"`
 	Id     string `json:"id" v:"required#媒资ID必填"`
-	Kind   int    `json:"kind" d:"0" dc:"0视频 2动漫"`
+	Kind   int    `json:"kind" d:"0" dc:"0视频 2动漫 3抖音"`
 }
 type MediaPickRes struct {
 	Id int64 `json:"id"`
@@ -133,7 +133,7 @@ type MediaPickRes struct {
 
 type SyncMediaReq struct {
 	g.Meta `path:"/videos/sync-media" method:"post" tags:"Backend/Video" summary:"从媒资中心同步视频"`
-	Kind   int `json:"kind" d:"0" dc:"0视频 2动漫"`
+	Kind   int `json:"kind" d:"0" dc:"0视频 2动漫 3抖音"`
 }
 type SyncMediaRes struct {
 	Created int `json:"created"`

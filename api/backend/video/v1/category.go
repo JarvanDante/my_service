@@ -88,3 +88,42 @@ type CartoonCategoryDeleteReq struct {
 	Id     int64  `json:"id" in:"path" v:"required|min:1#分类ID必填"`
 }
 type CartoonCategoryDeleteRes struct{}
+
+type DouyinCategoryListReq struct {
+	g.Meta `path:"/douyin-categories" method:"get" tags:"Backend/Douyin" summary:"抖音分类列表"`
+	Kind   string `json:"kind"`
+	Status string `json:"status"`
+	Page   int    `json:"page"`
+	Size   int    `json:"size"`
+}
+type DouyinCategoryListRes struct {
+	List  []CategoryItem `json:"list"`
+	Total int            `json:"total"`
+}
+
+type DouyinCategoryCreateReq struct {
+	g.Meta `path:"/douyin-categories" method:"post" tags:"Backend/Douyin" summary:"新增抖音分类"`
+	Name   string `json:"name" v:"required#分类名必填"`
+	Kind   int    `json:"kind" v:"in:0,1,2,3#类型非法"`
+	Rank   int    `json:"rank"`
+	Status int    `json:"status" v:"in:0,1#状态非法"`
+}
+type DouyinCategoryCreateRes struct {
+	Id int64 `json:"id"`
+}
+
+type DouyinCategoryUpdateReq struct {
+	g.Meta `path:"/douyin-categories/{id}" method:"put" tags:"Backend/Douyin" summary:"编辑抖音分类"`
+	Id     int64  `json:"id" in:"path" v:"required|min:1#分类ID必填"`
+	Name   string `json:"name"`
+	Kind   int    `json:"kind" v:"in:0,1,2,3#类型非法"`
+	Rank   int    `json:"rank"`
+	Status int    `json:"status" v:"in:0,1#状态非法"`
+}
+type DouyinCategoryUpdateRes struct{}
+
+type DouyinCategoryDeleteReq struct {
+	g.Meta `path:"/douyin-categories/{id}" method:"delete" tags:"Backend/Douyin" summary:"删除抖音分类"`
+	Id     int64  `json:"id" in:"path" v:"required|min:1#分类ID必填"`
+}
+type DouyinCategoryDeleteRes struct{}
