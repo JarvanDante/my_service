@@ -500,7 +500,7 @@ func (c *Controller) RechargeMockPay(ctx context.Context, req *v1.RechargeMockPa
 	return &v1.RechargeMockPayRes{}, nil
 }
 
-// Vip VIP套餐(需登录)。
+// Vip VIP等级列表(需登录, 来自后台 user_group)。
 func (c *Controller) Vip(ctx context.Context, req *v1.VipReq) (res *v1.VipRes, err error) {
 	if _, err = uid(ctx); err != nil {
 		return nil, err

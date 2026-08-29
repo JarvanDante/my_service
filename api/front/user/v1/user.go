@@ -420,15 +420,15 @@ type VipPackage struct {
 	Price float64 `json:"price"`
 }
 type VipReq struct {
-	g.Meta `path:"/user/vip" method:"get" tags:"Front/User" summary:"VIP套餐"`
+	g.Meta `path:"/user/vip" method:"get" tags:"Front/User" summary:"VIP等级列表"`
 }
 type VipRes struct {
 	List []VipPackage `json:"list"`
 }
 
 type VipDoReq struct {
-	g.Meta    `path:"/user/vip/do" method:"post" tags:"Front/User" summary:"开通/续费VIP"`
-	PackageId int64 `json:"package_id" v:"required|min:1#套餐ID必填"`
+	g.Meta    `path:"/user/vip/do" method:"post" tags:"Front/User" summary:"开通/续费VIP等级"`
+	PackageId int64 `json:"package_id" v:"required|min:1#VIP等级ID必填"`
 }
 type VipDoRes struct{}
 

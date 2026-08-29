@@ -894,26 +894,37 @@ func (s *sUser) MockPay(ctx context.Context, userId int64, orderNo string) error
 	return dao.NewFinanceRepo().MarkOrderPaid(ctx, orderNo)
 }
 
+func sellableVipGroup(ug *entity.UserGroup) bool {
+	if ug == nil || ug.Status != 1 || ug.DayNum < 1 {
+		return false
+	}
+	name := strings.TrimSpace(ug.Name)
+	return name != "" && name != "普通用户"
+}
+
 func (s *sUser) VipPackages(ctx context.Context) ([]*service.VipPackageDTO, error) {
-	list, err := s.repo.ListVipPackages(ctx)
+	list, err := s.repo.GroupList(ctx, "")
 	if err != nil {
 		return nil, err
 	}
 	out := make([]*service.VipPackageDTO, 0, len(list))
-	for _, p := range list {
-		out = append(out, &service.VipPackageDTO{Id: p.Id, Name: p.Name, Days: p.Days, Price: p.Price})
+	for _, ug := range list {
+		if !sellableVipGroup(ug) {
+			continue
+		}
+		out = append(out, &service.VipPackageDTO{Id: ug.Id, Name: ug.Name, Days: ug.DayNum, Price: ug.Price})
 	}
 	return out, nil
 }
 
-// DoVip 用金币开通/续费 VIP。
+// DoVip 用金币开通/续费 VIP 等级(package_id 即 user_group.id)。
 func (s *sUser) DoVip(ctx context.Context, userId, packageId int64) error {
-	pkg, err := s.repo.FindVipPackage(ctx, packageId)
+	grp, err := s.repo.GroupFind(ctx, packageId)
 	if err != nil {
 		return err
 	}
-	if pkg == nil {
-		return gerror.New("VIP套餐不存在")
+	if !sellableVipGroup(grp) {
+		return gerror.New("VIP等级不存在")
 	}
 	me, err := s.repo.FindById(ctx, userId)
 	if err != nil {
@@ -927,8 +938,8 @@ func (s *sUser) DoVip(ctx context.Context, userId, packageId int64) error {
 	if me.GroupEndTime > base {
 		base = me.GroupEndTime // 未过期则续期
 	}
-	endAt := base + int64(pkg.Days)*86400
-	return s.repo.OpenVip(ctx, userId, pkg, now, endAt)
+	endAt := base + int64(grp.DayNum)*86400
+	return s.repo.OpenVip(ctx, userId, grp, now, endAt)
 }
 
 func (s *sUser) VipLogs(ctx context.Context, userId int64, page, size int) ([]*service.VipLogDTO, int, error) {

@@ -1,4 +1,4 @@
-// Package v1 后台会员等级(用户组)接口契约(B4)。
+// Package v1 后台 VIP 等级(用户组)接口契约(B4)。
 package v1
 
 import "github.com/gogf/gf/v2/frame/g"
@@ -30,18 +30,18 @@ type UserGroupItem struct {
 	UpdatedAt         string  `json:"updated_at"`
 }
 
-// 会员等级列表
+// VIP等级列表
 type GroupListReq struct {
-	g.Meta `path:"/user-groups" method:"get" tags:"Backend/UserGroup" summary:"会员等级列表"`
+	g.Meta `path:"/user-groups" method:"get" tags:"Backend/UserGroup" summary:"VIP等级列表"`
 	Name   string `json:"name" in:"query"`
 }
 type GroupListRes struct {
 	List []UserGroupItem `json:"list"`
 }
 
-// 创建会员等级
+// 创建VIP等级
 type GroupCreateReq struct {
-	g.Meta           `path:"/user-groups" method:"post" tags:"Backend/UserGroup" summary:"创建会员等级"`
+	g.Meta           `path:"/user-groups" method:"post" tags:"Backend/UserGroup" summary:"创建VIP等级"`
 	Name             string  `json:"name"              v:"required#名称必填"`
 	TitleHeat        string  `json:"title_heat"`
 	TitleDescription string  `json:"title_description"`
@@ -66,9 +66,9 @@ type GroupCreateRes struct {
 	Id int64 `json:"id"`
 }
 
-// 更新会员等级(同步组内用户快照)
+// 更新VIP等级(同步组内用户快照)
 type GroupUpdateReq struct {
-	g.Meta           `path:"/user-groups/{id}" method:"put" tags:"Backend/UserGroup" summary:"更新会员等级"`
+	g.Meta           `path:"/user-groups/{id}" method:"put" tags:"Backend/UserGroup" summary:"更新VIP等级"`
 	Id               int64   `json:"id"                v:"required|min:1#组ID必填|组ID必须大于0"`
 	Name             string  `json:"name"              v:"required#名称必填"`
 	TitleHeat        string  `json:"title_heat"`
@@ -92,9 +92,9 @@ type GroupUpdateReq struct {
 }
 type GroupUpdateRes struct{}
 
-// 删除会员等级
+// 删除VIP等级
 type GroupDeleteReq struct {
-	g.Meta `path:"/user-groups/{id}" method:"delete" tags:"Backend/UserGroup" summary:"删除会员等级"`
+	g.Meta `path:"/user-groups/{id}" method:"delete" tags:"Backend/UserGroup" summary:"删除VIP等级"`
 	Id     int64 `json:"id" v:"required|min:1#组ID必填|组ID必须大于0"`
 }
 type GroupDeleteRes struct{}

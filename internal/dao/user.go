@@ -465,15 +465,15 @@ func (r *userRepo) FindVipPackage(ctx context.Context, id int64) (*entity.VipPac
 	return p, err
 }
 
-// OpenVip 用金币开通/续费 VIP: 事务内扣金币(余额不足则失败) + 设置用户组 + 写记录 + 记账。
-func (r *userRepo) OpenVip(ctx context.Context, userId int64, pkg *entity.VipPackage, startAt, endAt int64) error {
+// OpenVip 用金币开通/续费 VIP 等级: 事务内扣金币 + 写入 user_group 快照 + 写记录。
+func (r *userRepo) OpenVip(ctx context.Context, userId int64, grp *entity.UserGroup, startAt, endAt int64) error {
 	return g.DB().Transaction(ctx, func(ctx context.Context, tx gdb.TX) error {
 		res, err := tx.Model("users").Ctx(ctx).
-			Where("id", userId).Where("balance >= ?", pkg.Price).
+			Where("id", userId).Where("balance >= ?", grp.Price).
 			Data(g.Map{
-				"balance":        &gdb.Counter{Field: "balance", Value: -pkg.Price},
-				"group_id":       pkg.GroupId,
-				"group_name":     pkg.Name,
+				"balance":        &gdb.Counter{Field: "balance", Value: -grp.Price},
+				"group_id":       grp.Id,
+				"group_name":     grp.Name,
 				"group_end_time": endAt,
 			}).Update()
 		if err != nil {
@@ -483,14 +483,14 @@ func (r *userRepo) OpenVip(ctx context.Context, userId int64, pkg *entity.VipPac
 			return gerror.New("金币余额不足")
 		}
 		if _, err = tx.Model("vip_log").Ctx(ctx).Data(g.Map{
-			"user_id": userId, "package_id": pkg.Id, "days": pkg.Days,
-			"price": pkg.Price, "start_at": startAt, "end_at": endAt,
+			"user_id": userId, "package_id": grp.Id, "days": grp.DayNum,
+			"price": grp.Price, "start_at": startAt, "end_at": endAt,
 		}).Insert(); err != nil {
 			return err
 		}
 		_, err = tx.Model("user_balance_log").Ctx(ctx).Data(g.Map{
 			"user_id": userId, "direction": 2, "scene": "vip",
-			"amount": pkg.Price, "remark": "开通VIP:" + pkg.Name,
+			"amount": grp.Price, "remark": "开通VIP等级:" + grp.Name,
 		}).Insert()
 		return err
 	})

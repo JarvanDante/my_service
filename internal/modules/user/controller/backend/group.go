@@ -1,4 +1,4 @@
-// Package backend 后台会员等级配置控制器(B4)。
+// Package backend 后台 VIP 等级配置控制器(B4)。
 package backend
 
 import (
@@ -59,7 +59,7 @@ func groupItem(ug *service.UserGroupDTO) v1.UserGroupItem {
 	}
 }
 
-// GroupList 会员等级列表。
+// GroupList VIP等级列表。
 func (c *Controller) GroupList(ctx context.Context, req *v1.GroupListReq) (res *v1.GroupListRes, err error) {
 	list, err := c.user.AdminGroups(ctx, req.Name)
 	if err != nil {
@@ -72,7 +72,7 @@ func (c *Controller) GroupList(ctx context.Context, req *v1.GroupListReq) (res *
 	return &v1.GroupListRes{List: items}, nil
 }
 
-// GroupCreate 创建会员等级。
+// GroupCreate 创建VIP等级。
 func (c *Controller) GroupCreate(ctx context.Context, req *v1.GroupCreateReq) (res *v1.GroupCreateRes, err error) {
 	id, err := c.user.AdminCreateGroup(ctx, groupInputFromCreate(req))
 	if err != nil {
@@ -81,7 +81,7 @@ func (c *Controller) GroupCreate(ctx context.Context, req *v1.GroupCreateReq) (r
 	return &v1.GroupCreateRes{Id: id}, nil
 }
 
-// GroupUpdate 更新会员等级(同步组内用户快照)。
+// GroupUpdate 更新VIP等级(同步组内用户快照)。
 func (c *Controller) GroupUpdate(ctx context.Context, req *v1.GroupUpdateReq) (res *v1.GroupUpdateRes, err error) {
 	if err = c.user.AdminUpdateGroup(ctx, groupInputFromUpdate(req)); err != nil {
 		return nil, err
@@ -89,7 +89,7 @@ func (c *Controller) GroupUpdate(ctx context.Context, req *v1.GroupUpdateReq) (r
 	return &v1.GroupUpdateRes{}, nil
 }
 
-// GroupDelete 删除会员等级。
+// GroupDelete 删除VIP等级。
 func (c *Controller) GroupDelete(ctx context.Context, req *v1.GroupDeleteReq) (res *v1.GroupDeleteRes, err error) {
 	if err = c.user.AdminDeleteGroup(ctx, req.Id); err != nil {
 		return nil, err

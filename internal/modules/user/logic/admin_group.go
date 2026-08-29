@@ -1,4 +1,4 @@
-// Package logic — B4 会员等级(用户组)管理实现。
+// Package logic — B4 VIP等级(用户组)管理实现。
 package logic
 
 import (
@@ -36,7 +36,7 @@ func checkGroup(in service.UserGroupInput) error {
 		return gerror.New("会员头衔最多输入5个字符")
 	}
 	if utf8.RuneCountInString(in.TitleDescription) > 21 {
-		return gerror.New("头部会员卡描述最多输入21个字符")
+		return gerror.New("VIP等级描述最多输入21个字符")
 	}
 	if in.Rate < -2 || in.Rate > 100 {
 		return gerror.New("折扣须在 -2~100")

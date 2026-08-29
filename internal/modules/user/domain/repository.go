@@ -137,7 +137,7 @@ type Repository interface {
 	FindRechargeOrder(ctx context.Context, orderNo string) (*entity.RechargeOrder, error)
 	ListVipPackages(ctx context.Context) ([]*entity.VipPackage, error)
 	FindVipPackage(ctx context.Context, id int64) (*entity.VipPackage, error)
-	OpenVip(ctx context.Context, userId int64, pkg *entity.VipPackage, startAt, endAt int64) error
+	OpenVip(ctx context.Context, userId int64, grp *entity.UserGroup, startAt, endAt int64) error
 	VipLogs(ctx context.Context, userId int64, page, size int) ([]*entity.VipLog, int, error)
 	ExchangeCreditToCoin(ctx context.Context, userId int64, creditCost, coinGain float64) error
 	// 私信
