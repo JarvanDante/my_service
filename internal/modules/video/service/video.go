@@ -57,6 +57,7 @@ type FrontListInput struct {
 	Size       int
 	ViewerId   int64
 	FollowOnly bool
+	UpUserId   int64 // >0 只出该 UP 主
 }
 
 type SaveInput struct {

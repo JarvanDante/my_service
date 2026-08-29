@@ -116,7 +116,9 @@ func (s *sVideo) FrontList(ctx context.Context, in service.FrontListInput) (*ser
 		Status:   entity.VideoStatusPublished,
 		Sort:     in.Sort,
 	}
-	if in.FollowOnly {
+	if in.UpUserId > 0 {
+		filter.UpUserIds = []int64{in.UpUserId}
+	} else if in.FollowOnly {
 		if in.ViewerId <= 0 {
 			return &service.ListDTO{List: []*service.VideoDTO{}, Total: 0, Page: page, Size: size}, nil
 		}

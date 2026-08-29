@@ -134,7 +134,7 @@ func (c *Controller) DouyinList(ctx context.Context, req *v1.DouyinListReq) (res
 	dto, err := c.svc.FrontList(ctx, service.FrontListInput{
 		Keyword: req.Keyword, Category: req.Category, Tag: req.Tag, Kind: entity.VideoKindDouyin,
 		Sort: req.Sort, Page: req.Page, Size: req.Size,
-		ViewerId: viewerId(ctx), FollowOnly: req.Follow == 1,
+		ViewerId: viewerId(ctx), FollowOnly: req.Follow == 1, UpUserId: req.UpUserId,
 	})
 	if err != nil {
 		return nil, err
