@@ -113,9 +113,14 @@ func (s *sVideo) FrontList(ctx context.Context, in service.FrontListInput) (*ser
 	if t := strings.TrimSpace(in.Tag); t != "" {
 		tags = append(tags, t)
 	}
+	category := strings.TrimSpace(in.Category)
+	// 「发现」是抖音二级导航，不是作品分类；按名过滤会漏掉只打了「甜妹」等分类的用户稿。
+	if normalizeKind(in.Kind) == entity.VideoKindDouyin && category == "发现" {
+		category = ""
+	}
 	filter := domain.ListFilter{
 		Keyword:      strings.TrimSpace(in.Keyword),
-		Category:     strings.TrimSpace(in.Category),
+		Category:     category,
 		Tags:         tags,
 		Kind:         normalizeKind(in.Kind),
 		Status:       entity.VideoStatusPublished,
