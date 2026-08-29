@@ -49,11 +49,47 @@ func (c *Controller) Unread(ctx context.Context, req *v1.UnreadReq) (res *v1.Unr
 	if err != nil {
 		return nil, err
 	}
-	count, err := c.svc.UnreadCount(ctx, userId)
+	u, err := c.svc.UnreadAll(ctx, userId)
 	if err != nil {
 		return nil, err
 	}
-	return &v1.UnreadRes{Count: count}, nil
+	return &v1.UnreadRes{
+		Count: u.Sys + u.Comment + u.Like, Sys: u.Sys, Comment: u.Comment, Like: u.Like,
+	}, nil
+}
+
+func (c *Controller) InteractList(ctx context.Context, req *v1.InteractListReq) (res *v1.InteractListRes, err error) {
+	userId, err := uid(ctx)
+	if err != nil {
+		return nil, err
+	}
+	list, total, err := c.svc.InteractList(ctx, userId, req.Channel, req.Page, req.Size)
+	if err != nil {
+		return nil, err
+	}
+	res = &v1.InteractListRes{Total: total, List: make([]v1.InteractItem, 0, len(list))}
+	for _, r := range list {
+		res.List = append(res.List, v1.InteractItem{
+			Id: r.Id, Channel: r.Channel, SubType: r.SubType, IsRead: r.IsRead,
+			CreatedAt: r.CreatedAt, ActorId: r.ActorId, ActorName: r.ActorName,
+			ActorAvatar: r.ActorAvatar, ActorSex: r.ActorSex, ActorCount: r.ActorCount,
+			MediaType: r.MediaType, ContentId: r.ContentId, ObjectTitle: r.ObjectTitle,
+			TargetType: r.TargetType, CommentId: r.CommentId, RootCommentId: r.RootCommentId,
+			Snippet: r.Snippet,
+		})
+	}
+	return res, nil
+}
+
+func (c *Controller) InteractRead(ctx context.Context, req *v1.InteractReadReq) (res *v1.InteractReadRes, err error) {
+	userId, err := uid(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if err = c.svc.MarkInteractRead(ctx, userId, req.Id, req.All, req.Channel); err != nil {
+		return nil, err
+	}
+	return &v1.InteractReadRes{}, nil
 }
 
 func (c *Controller) Read(ctx context.Context, req *v1.ReadReq) (res *v1.ReadRes, err error) {

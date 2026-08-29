@@ -10,6 +10,7 @@ import (
 
 	"github.com/JarvanDante/my_service/internal/model/entity"
 	"github.com/JarvanDante/my_service/internal/modules/collect/service"
+	msglogic "github.com/JarvanDante/my_service/internal/modules/message/logic"
 )
 
 const (
@@ -46,9 +47,20 @@ func (s *sCollect) Operate(ctx context.Context, in service.OperateInput) error {
 		}
 		// InsertIgnore 在 PG 生成 ON CONFLICT DO NOTHING, 重复添加幂等
 		_, err := g.Model("user_collect").Ctx(ctx).Data(rows).InsertIgnore()
+		if err == nil && in.Type == 2 && in.MediaType == 2 {
+			for _, id := range in.Ids {
+				msglogic.NotifyPostLike(ctx, in.UserId, id, true)
+			}
+		}
 		return err
 	}
-	return s.Delete(ctx, in.UserId, in.Ids, in.MediaType, in.Type)
+	err := s.Delete(ctx, in.UserId, in.Ids, in.MediaType, in.Type)
+	if err == nil && in.Type == 2 && in.MediaType == 2 {
+		for _, id := range in.Ids {
+			msglogic.NotifyPostLike(ctx, in.UserId, id, false)
+		}
+	}
+	return err
 }
 
 // Delete 批量取消。

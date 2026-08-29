@@ -16,6 +16,7 @@ import (
 
 	"github.com/JarvanDante/my_service/internal/model/entity"
 	"github.com/JarvanDante/my_service/internal/modules/comment/service"
+	msglogic "github.com/JarvanDante/my_service/internal/modules/message/logic"
 	"github.com/JarvanDante/my_service/internal/shared/paywall"
 )
 
@@ -148,6 +149,9 @@ func (s *sComment) Add(ctx context.Context, in service.AddInput) (int64, int, er
 	if err != nil {
 		return 0, 0, err
 	}
+	if status == statusLive {
+		notifyCommentLive(ctx, in.UserId, in.MediaType, in.ContentId, newId, in.ParentId, rootId, content, pics)
+	}
 	return newId, status, nil
 }
 
@@ -279,6 +283,7 @@ func (s *sComment) Like(ctx context.Context, userId, commentId int64, flag bool)
 	if err != nil {
 		return 0, false, err
 	}
+	msglogic.NotifyCommentLike(ctx, userId, row.UserId, row.MediaType, row.ContentId, commentId, commentSnippet(row.Content, row.Pics), flag)
 	var fresh *entity.Comment
 	_ = g.Model("comment").Ctx(ctx).Where("id", commentId).Fields("like_count").Scan(&fresh)
 	count := 0
@@ -471,8 +476,8 @@ func (s *sComment) Audit(ctx context.Context, id int64, pass bool) error {
 	if !pass {
 		newStatus = statusReject
 	}
-	return g.DB().Transaction(ctx, func(ctx context.Context, tx gdb.TX) error {
-		var row *entity.Comment
+	var row *entity.Comment
+	err := g.DB().Transaction(ctx, func(ctx context.Context, tx gdb.TX) error {
 		if err := tx.Model("comment").Ctx(ctx).
 			Where("site_id", cmtSiteId).Where("id", id).Where("status", statusPending).
 			LockUpdate().Scan(&row); err != nil {
@@ -490,4 +495,45 @@ func (s *sComment) Audit(ctx context.Context, id int64, pass bool) error {
 		}
 		return nil
 	})
+	if err == nil && pass && row != nil {
+		notifyCommentLive(ctx, row.UserId, row.MediaType, row.ContentId, row.Id, row.ParentId, row.RootId, row.Content, row.Pics)
+	}
+	return err
+}
+
+func notifyCommentLive(ctx context.Context, actorId int64, mediaType int, contentId, commentId, parentId, rootId int64, content, pics string) {
+	snippet := commentSnippet(content, pics)
+	if parentId <= 0 {
+		msglogic.NotifyWorkComment(ctx, actorId, mediaType, contentId, commentId, snippet)
+		return
+	}
+	var parent *entity.Comment
+	if err := g.Model("comment").Ctx(ctx).Where("id", parentId).Fields("id,user_id,root_id").Scan(&parent); err != nil || parent == nil {
+		return
+	}
+	mention := parent.RootId > 0
+	root := rootId
+	if root <= 0 {
+		if parent.RootId > 0 {
+			root = parent.RootId
+		} else {
+			root = parent.Id
+		}
+	}
+	msglogic.NotifyReply(ctx, actorId, parent.UserId, mediaType, contentId, commentId, root, mention, snippet)
+}
+
+func commentSnippet(content, pics string) string {
+	text := strings.TrimSpace(content)
+	if text != "" {
+		runes := []rune(text)
+		if len(runes) > 80 {
+			return string(runes[:80])
+		}
+		return text
+	}
+	if pics != "" && pics != "[]" {
+		return "[图片]"
+	}
+	return ""
 }
