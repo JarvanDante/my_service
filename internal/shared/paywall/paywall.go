@@ -44,14 +44,24 @@ type Access struct {
 	Reason   string  `json:"reason"`   // 不可看的原因文案
 }
 
-// IsVipActive 是否有生效中的 VIP(vip_log.end_at 为秒级时间戳)。
+// IsVipActive 是否有生效中的 VIP。
+// 后台改用户组写的是 users.group_id / group_end_time；前台开通还会写 vip_log。两处任一未过期即算 VIP。
 func IsVipActive(ctx context.Context, userId int64) (bool, error) {
 	if userId <= 0 {
 		return false, nil
 	}
-	n, err := g.Model("vip_log").Ctx(ctx).
+	now := gtime.Now().Unix()
+	n, err := g.Model("users").Ctx(ctx).Where("id", userId).
+		Where("group_id > ?", 0).Where("group_end_time > ?", now).Count()
+	if err != nil {
+		return false, err
+	}
+	if n > 0 {
+		return true, nil
+	}
+	n, err = g.Model("vip_log").Ctx(ctx).
 		Where("site_id", pwSiteId).Where("user_id", userId).
-		Where("end_at > ?", gtime.Now().Unix()).Count()
+		Where("end_at > ?", now).Count()
 	if err != nil {
 		return false, err
 	}

@@ -14,7 +14,8 @@ type UserInfo struct {
 	Level     int     `json:"level"`
 	Balance   float64 `json:"balance"`
 	Credit    float64 `json:"credit"`
-	GroupName string  `json:"group_name"`
+	GroupName    string  `json:"group_name"`
+	GroupEndTime int64   `json:"group_end_time"`
 	Fans      int     `json:"fans"`
 	Follow      int  `json:"follow"`
 	HasPassword bool `json:"has_password"`

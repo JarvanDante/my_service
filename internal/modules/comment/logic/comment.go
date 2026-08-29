@@ -331,11 +331,10 @@ func fillFrontUsers(ctx context.Context, list []service.ItemDTO, viewerId int64)
 		}
 		vipSet := map[int64]bool{}
 		now := gtime.Now().Unix()
-		vipRows, _ := g.Model("vip_log").Ctx(ctx).
-			Where("site_id", cmtSiteId).WhereIn("user_id", ids).
-			Where("end_at > ?", now).Fields("user_id").All()
+		vipRows, _ := g.Model("users").Ctx(ctx).WhereIn("id", ids).
+			Where("group_id > ?", 0).Where("group_end_time > ?", now).Fields("id").All()
 		for _, row := range vipRows {
-			vipSet[row["user_id"].Int64()] = true
+			vipSet[row["id"].Int64()] = true
 		}
 		walkItems(list, func(d *service.ItemDTO) {
 			if a, ok := users[d.UserId]; ok {
@@ -451,11 +450,10 @@ func fillAdminUsers(ctx context.Context, list []*service.AdminItemDTO) {
 	}
 	vipSet := map[int64]bool{}
 	now := gtime.Now().Unix()
-	vipRows, _ := g.Model("vip_log").Ctx(ctx).
-		Where("site_id", cmtSiteId).WhereIn("user_id", ids).
-		Where("end_at > ?", now).Fields("user_id").All()
+	vipRows, _ := g.Model("users").Ctx(ctx).WhereIn("id", ids).
+		Where("group_id > ?", 0).Where("group_end_time > ?", now).Fields("id").All()
 	for _, row := range vipRows {
-		vipSet[row["user_id"].Int64()] = true
+		vipSet[row["id"].Int64()] = true
 	}
 	for _, d := range list {
 		if d == nil {
