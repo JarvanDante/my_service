@@ -13,10 +13,13 @@ import (
 // RegisterFront 列表公开; 发表需登录。
 func RegisterFront(group *ghttp.RouterGroup) {
 	ctrl := front.New(logic.New())
-	group.Bind(ctrl.List)
+	group.Group("/", func(pub *ghttp.RouterGroup) {
+		pub.Middleware(middleware.AuthOptional)
+		pub.Bind(ctrl.List)
+	})
 	group.Group("/", func(auth *ghttp.RouterGroup) {
 		auth.Middleware(middleware.Auth, middleware.UserRateLimit)
-		auth.Bind(ctrl.Add)
+		auth.Bind(ctrl.Add, ctrl.Like)
 	})
 }
 

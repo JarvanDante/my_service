@@ -12,6 +12,7 @@ type Comment struct {
 	ParentId   int64       `json:"parentId"   orm:"parent_id"`
 	RootId     int64       `json:"rootId"     orm:"root_id"`
 	Content    string      `json:"content"    orm:"content"`
+	Pics       string      `json:"pics"       orm:"pics"`
 	LikeCount  int         `json:"likeCount"  orm:"like_count"`
 	ReplyCount int         `json:"replyCount" orm:"reply_count"`
 	Status     int         `json:"status"     orm:"status"`

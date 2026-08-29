@@ -6,6 +6,7 @@ package logic
 
 import (
 	"context"
+	"encoding/json"
 	"strings"
 
 	"github.com/gogf/gf/v2/database/gdb"
@@ -18,7 +19,11 @@ import (
 	"github.com/JarvanDante/my_service/internal/shared/paywall"
 )
 
-const cmtSiteId = 1 // 单站点样板
+const (
+	cmtSiteId           = 1
+	collectMediaComment = 6 // user_collect.media_type, 评论点赞
+	collectLike         = 2
+)
 
 const (
 	statusPending = 0
@@ -45,9 +50,51 @@ func hitFilterWord(ctx context.Context, text string) (string, error) {
 	return "", nil
 }
 
+func decodePics(raw string) []string {
+	out := []string{}
+	if raw == "" {
+		return out
+	}
+	_ = json.Unmarshal([]byte(raw), &out)
+	return out
+}
+
+func encodePics(list []string) string {
+	clean := make([]string, 0, len(list))
+	for _, p := range list {
+		p = strings.TrimSpace(p)
+		if p != "" {
+			clean = append(clean, p)
+		}
+	}
+	if len(clean) > 3 {
+		clean = clean[:3]
+	}
+	b, err := json.Marshal(clean)
+	if err != nil {
+		return "[]"
+	}
+	return string(b)
+}
+
+func (s *sComment) rejectIfMuted(ctx context.Context, userId int64) error {
+	var u *entity.Users
+	if err := g.Model("users").Ctx(ctx).Where("id", userId).Fields("comment_muted").Scan(&u); err != nil {
+		return err
+	}
+	if u != nil && u.CommentMuted == 1 {
+		return gerror.New("你已被禁言，暂时不能评论")
+	}
+	return nil
+}
+
 func (s *sComment) Add(ctx context.Context, in service.AddInput) (int64, int, error) {
+	if err := s.rejectIfMuted(ctx, in.UserId); err != nil {
+		return 0, 0, err
+	}
 	content := strings.TrimSpace(in.Content)
-	if content == "" {
+	pics := encodePics(in.Pics)
+	if content == "" && pics == "[]" {
 		return 0, 0, gerror.New("评论内容不能为空")
 	}
 	if hit, err := hitFilterWord(ctx, content); err != nil {
@@ -87,7 +134,7 @@ func (s *sComment) Add(ctx context.Context, in service.AddInput) (int64, int, er
 		id, err := tx.Model("comment").Ctx(ctx).Data(g.Map{
 			"site_id": cmtSiteId, "user_id": in.UserId, "media_type": in.MediaType,
 			"content_id": in.ContentId, "parent_id": in.ParentId, "root_id": rootId,
-			"content": content, "status": status,
+			"content": content, "pics": pics, "status": status,
 		}).InsertAndGetId()
 		if err != nil {
 			return err
@@ -130,12 +177,12 @@ func toDTO(r *entity.Comment) service.ItemDTO {
 	}
 	return service.ItemDTO{
 		Id: r.Id, UserId: r.UserId, ParentId: r.ParentId, RootId: r.RootId,
-		Content: r.Content, LikeCount: r.LikeCount, ReplyCount: r.ReplyCount,
+		Content: r.Content, Pics: decodePics(r.Pics), LikeCount: r.LikeCount, ReplyCount: r.ReplyCount,
 		CreatedAt: created,
 	}
 }
 
-func (s *sComment) List(ctx context.Context, mediaType int, contentId int64, page, size int) ([]service.ItemDTO, int, error) {
+func (s *sComment) List(ctx context.Context, mediaType int, contentId int64, page, size, sort int, viewerId int64) ([]service.ItemDTO, int, error) {
 	if page <= 0 {
 		page = 1
 	}
@@ -152,7 +199,13 @@ func (s *sComment) List(ctx context.Context, mediaType int, contentId int64, pag
 		return nil, 0, err
 	}
 	var tops []*entity.Comment
-	if err := top.Clone().OrderDesc("id").Page(page, size).Scan(&tops); err != nil {
+	q := top.Clone()
+	if sort == 1 {
+		q = q.OrderDesc("like_count").OrderDesc("id")
+	} else {
+		q = q.OrderDesc("id")
+	}
+	if err := q.Page(page, size).Scan(&tops); err != nil {
 		return nil, 0, err
 	}
 	if len(tops) == 0 {
@@ -177,7 +230,142 @@ func (s *sComment) List(ctx context.Context, mediaType int, contentId int64, pag
 		d.Replies = replyMap[t.Id]
 		out = append(out, d)
 	}
+	fillFrontUsers(ctx, out, viewerId)
 	return out, total, nil
+}
+
+func (s *sComment) Like(ctx context.Context, userId, commentId int64, flag bool) (int, bool, error) {
+	if userId <= 0 || commentId <= 0 {
+		return 0, false, gerror.New("参数非法")
+	}
+	var row *entity.Comment
+	if err := g.Model("comment").Ctx(ctx).Where("site_id", cmtSiteId).Where("id", commentId).
+		Where("status", statusLive).Scan(&row); err != nil {
+		return 0, false, err
+	}
+	if row == nil {
+		return 0, false, gerror.New("评论不存在")
+	}
+	err := g.DB().Transaction(ctx, func(ctx context.Context, tx gdb.TX) error {
+		if flag {
+			res, err := tx.Model("user_collect").Ctx(ctx).Data(g.Map{
+				"site_id": cmtSiteId, "user_id": userId, "op_type": collectLike,
+				"media_type": collectMediaComment, "content_id": commentId,
+			}).InsertIgnore()
+			if err != nil {
+				return err
+			}
+			n, _ := res.RowsAffected()
+			if n > 0 {
+				_, err = tx.Model("comment").Ctx(ctx).Where("id", commentId).
+					Data(g.Map{"like_count": &gdb.Counter{Field: "like_count", Value: 1}}).Update()
+			}
+			return err
+		}
+		res, err := tx.Model("user_collect").Ctx(ctx).
+			Where("site_id", cmtSiteId).Where("user_id", userId).
+			Where("op_type", collectLike).Where("media_type", collectMediaComment).
+			Where("content_id", commentId).Delete()
+		if err != nil {
+			return err
+		}
+		n, _ := res.RowsAffected()
+		if n > 0 {
+			_, err = tx.Model("comment").Ctx(ctx).Where("id", commentId).Where("like_count > ?", 0).
+				Data(g.Map{"like_count": &gdb.Counter{Field: "like_count", Value: -1}}).Update()
+		}
+		return err
+	})
+	if err != nil {
+		return 0, false, err
+	}
+	var fresh *entity.Comment
+	_ = g.Model("comment").Ctx(ctx).Where("id", commentId).Fields("like_count").Scan(&fresh)
+	count := 0
+	if fresh != nil {
+		count = fresh.LikeCount
+	}
+	return count, flag, nil
+}
+
+func walkItems(list []service.ItemDTO, fn func(*service.ItemDTO)) {
+	for i := range list {
+		fn(&list[i])
+		if len(list[i].Replies) > 0 {
+			walkItems(list[i].Replies, fn)
+		}
+	}
+}
+
+func fillFrontUsers(ctx context.Context, list []service.ItemDTO, viewerId int64) {
+	ids := make([]int64, 0)
+	cids := make([]int64, 0)
+	seenU, seenC := map[int64]struct{}{}, map[int64]struct{}{}
+	byId := map[int64]*service.ItemDTO{}
+	walkItems(list, func(d *service.ItemDTO) {
+		byId[d.Id] = d
+		if d.UserId > 0 {
+			if _, ok := seenU[d.UserId]; !ok {
+				seenU[d.UserId] = struct{}{}
+				ids = append(ids, d.UserId)
+			}
+		}
+		if _, ok := seenC[d.Id]; !ok {
+			seenC[d.Id] = struct{}{}
+			cids = append(cids, d.Id)
+		}
+	})
+	type author struct{ nickname, img string }
+	users := map[int64]author{}
+	if len(ids) > 0 {
+		rows, err := g.Model("users").Ctx(ctx).WhereIn("id", ids).Fields("id,nickname,img").All()
+		if err == nil {
+			for _, row := range rows {
+				users[row["id"].Int64()] = author{row["nickname"].String(), row["img"].String()}
+			}
+		}
+		vipSet := map[int64]bool{}
+		now := gtime.Now().Unix()
+		vipRows, _ := g.Model("vip_log").Ctx(ctx).
+			Where("site_id", cmtSiteId).WhereIn("user_id", ids).
+			Where("end_at > ?", now).Fields("user_id").All()
+		for _, row := range vipRows {
+			vipSet[row["user_id"].Int64()] = true
+		}
+		walkItems(list, func(d *service.ItemDTO) {
+			if a, ok := users[d.UserId]; ok {
+				d.Nickname, d.Img = a.nickname, a.img
+			}
+			d.IsVip = vipSet[d.UserId]
+			if d.ParentId > 0 {
+				if p := byId[d.ParentId]; p != nil {
+					d.ReplyUserId = p.UserId
+					if a, ok := users[p.UserId]; ok && a.nickname != "" {
+						d.ReplyNickname = a.nickname
+					}
+				}
+			}
+		})
+	}
+	if viewerId <= 0 || len(cids) == 0 {
+		return
+	}
+	likedRows, err := g.Model("user_collect").Ctx(ctx).
+		Where("site_id", cmtSiteId).Where("user_id", viewerId).
+		Where("op_type", collectLike).Where("media_type", collectMediaComment).
+		WhereIn("content_id", cids).Fields("content_id").Array()
+	if err != nil {
+		return
+	}
+	liked := map[int64]struct{}{}
+	for _, v := range likedRows {
+		if id := v.Int64(); id > 0 {
+			liked[id] = struct{}{}
+		}
+	}
+	walkItems(list, func(d *service.ItemDTO) {
+		_, d.Liked = liked[d.Id]
+	})
 }
 
 func (s *sComment) AdminList(ctx context.Context, f service.AdminListFilter) ([]*service.AdminItemDTO, int, error) {
