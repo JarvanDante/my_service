@@ -52,6 +52,9 @@ type InteractItem struct {
 	CommentId     int64  `json:"comment_id"`
 	RootCommentId int64  `json:"root_comment_id"`
 	Snippet       string `json:"snippet"`
+	Page          int    `json:"page"`
+	PageSize      int    `json:"page_size"`
+	Deleted       bool   `json:"deleted"`
 }
 
 // InteractListReq 评论/点赞互动列表。channel=comment|like。

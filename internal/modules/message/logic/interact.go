@@ -28,6 +28,9 @@ const (
 	targetComment = "comment"
 	targetReply   = "reply"
 	targetPost    = "post"
+
+	jumpPageSize = 15 // 与帖子详情定位拉评一致(公司 latest 算法)
+	statusLive   = 1
 )
 
 func (s *sMessage) UnreadAll(ctx context.Context, userId int64) (service.UnreadBreakdown, error) {
@@ -80,6 +83,7 @@ func (s *sMessage) InteractList(ctx context.Context, userId int64, channel strin
 		out = append(out, toInteractDTO(r))
 	}
 	fillActors(ctx, out)
+	fillJumps(ctx, out)
 	return out, total, nil
 }
 
@@ -316,8 +320,50 @@ func toInteractDTO(r *entity.InteractMessage) service.InteractDTO {
 		CreatedAt: created, ActorId: r.ActorId, ActorCount: count,
 		MediaType: r.MediaType, ContentId: r.ContentId, ObjectTitle: r.ObjectTitle,
 		TargetType: r.TargetType, CommentId: r.CommentId, RootCommentId: r.RootCommentId,
-		Snippet: r.Snippet,
+		Snippet: r.Snippet, Page: 1, PageSize: jumpPageSize,
 	}
+}
+
+func fillJumps(ctx context.Context, list []service.InteractDTO) {
+	for i := range list {
+		page, deleted := locateJump(ctx, list[i])
+		list[i].Page = page
+		list[i].PageSize = jumpPageSize
+		list[i].Deleted = deleted
+	}
+}
+
+// locateJump 按评论列表 latest(id DESC) 现算顶层评页码。楼中楼回复已随该页一次带回，不再算 reply_page。
+func locateJump(ctx context.Context, d service.InteractDTO) (int, bool) {
+	if d.ContentId <= 0 || d.MediaType <= 0 {
+		return 1, d.CommentId > 0
+	}
+	rootId := d.RootCommentId
+	if rootId <= 0 {
+		rootId = d.CommentId
+	}
+	if rootId <= 0 {
+		return 1, false
+	}
+	var root *entity.Comment
+	if err := g.Model("comment").Ctx(ctx).Where("id", rootId).
+		Fields("id,status,media_type,content_id").Scan(&root); err != nil || root == nil || root.Status != statusLive {
+		return 1, true
+	}
+	newer, err := g.Model("comment").Ctx(ctx).
+		Where("site_id", msgSiteId).Where("media_type", d.MediaType).Where("content_id", d.ContentId).
+		Where("status", statusLive).Where("root_id", 0).Where("id > ?", root.Id).Count()
+	if err != nil {
+		return 1, true
+	}
+	page := newer/jumpPageSize + 1
+	if d.CommentId > 0 && d.CommentId != rootId {
+		var reply *entity.Comment
+		if err := g.Model("comment").Ctx(ctx).Where("id", d.CommentId).Fields("id,status").Scan(&reply); err != nil || reply == nil || reply.Status != statusLive {
+			return page, true
+		}
+	}
+	return page, false
 }
 
 func fillActors(ctx context.Context, list []service.InteractDTO) {

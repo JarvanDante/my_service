@@ -55,6 +55,9 @@ type InteractDTO struct {
 	CommentId     int64
 	RootCommentId int64
 	Snippet       string
+	Page          int
+	PageSize      int
+	Deleted       bool
 }
 
 type UnreadBreakdown struct {

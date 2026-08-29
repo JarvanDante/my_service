@@ -75,7 +75,7 @@ func (c *Controller) InteractList(ctx context.Context, req *v1.InteractListReq) 
 			ActorAvatar: r.ActorAvatar, ActorSex: r.ActorSex, ActorCount: r.ActorCount,
 			MediaType: r.MediaType, ContentId: r.ContentId, ObjectTitle: r.ObjectTitle,
 			TargetType: r.TargetType, CommentId: r.CommentId, RootCommentId: r.RootCommentId,
-			Snippet: r.Snippet,
+			Snippet: r.Snippet, Page: r.Page, PageSize: r.PageSize, Deleted: r.Deleted,
 		})
 	}
 	return res, nil
