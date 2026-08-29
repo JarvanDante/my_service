@@ -301,6 +301,14 @@ func resolveObject(ctx context.Context, mediaType int, contentId int64) (int64, 
 		}
 		return p.UserId, p.Title
 	}
+	if mediaType == 1 {
+		var v *entity.Video
+		if err := g.Model("video").Ctx(ctx).Where("id", contentId).
+			Fields("up_user_id,title").Scan(&v); err != nil || v == nil {
+			return 0, ""
+		}
+		return v.UpUserId, v.Title
+	}
 	return 0, ""
 }
 

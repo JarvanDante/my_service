@@ -23,6 +23,7 @@ type VideoDTO struct {
 	UpNickname    string
 	UpAvatar      string
 	Followed      bool
+	CommentCount  int
 	CreatedBy     int64
 	CreatedAt     string
 	UpdatedAt     string

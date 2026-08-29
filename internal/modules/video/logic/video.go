@@ -141,6 +141,7 @@ func (s *sVideo) FrontList(ctx context.Context, in service.FrontListInput) (*ser
 	}
 	s.overlayMediaURLs(ctx, out)
 	fillUpProfiles(ctx, out, in.ViewerId)
+	overlayCommentCounts(ctx, out)
 	return &service.ListDTO{List: out, Total: total, Page: page, Size: size}, nil
 }
 
@@ -160,6 +161,7 @@ func (s *sVideo) FrontDetail(ctx context.Context, id, viewerId int64) (*service.
 	d := toDTO(ctx, v)
 	s.resolvePlay(ctx, d)
 	fillUpProfiles(ctx, []*service.VideoDTO{d}, viewerId)
+	overlayCommentCounts(ctx, []*service.VideoDTO{d})
 	return d, nil
 }
 
@@ -351,6 +353,40 @@ func fillUpProfiles(ctx context.Context, list []*service.VideoDTO, viewerId int6
 		d.UpAvatar = avatars[d.UpUserId]
 		_, ok := followed[d.UpUserId]
 		d.Followed = ok || viewerId == d.UpUserId
+	}
+}
+
+func overlayCommentCounts(ctx context.Context, list []*service.VideoDTO) {
+	ids := make([]int64, 0, len(list))
+	seen := map[int64]struct{}{}
+	for _, d := range list {
+		if d == nil || d.Id <= 0 {
+			continue
+		}
+		if _, ok := seen[d.Id]; ok {
+			continue
+		}
+		seen[d.Id] = struct{}{}
+		ids = append(ids, d.Id)
+	}
+	if len(ids) == 0 {
+		return
+	}
+	rows, err := g.Model("comment").Ctx(ctx).
+		Where("site_id", 1).Where("media_type", 1).WhereIn("content_id", ids).
+		Where("status", 1).Fields("content_id, count(1) AS cnt").Group("content_id").All()
+	if err != nil {
+		return
+	}
+	counts := map[int64]int{}
+	for _, row := range rows {
+		counts[row["content_id"].Int64()] = row["cnt"].Int()
+	}
+	for _, d := range list {
+		if d == nil {
+			continue
+		}
+		d.CommentCount = counts[d.Id]
 	}
 }
 

@@ -18,7 +18,8 @@ type Item struct {
 	UpUserId    int64    `json:"up_user_id"`
 	UpNickname  string   `json:"up_nickname"`
 	UpAvatar    string   `json:"up_avatar"`
-	Followed    bool     `json:"followed"`
+	Followed      bool     `json:"followed"`
+	CommentCount  int      `json:"comment_count"`
 }
 
 // CategoryListReq 启用中的视频分类, 按权重倒序(公开)。
