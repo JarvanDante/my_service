@@ -29,6 +29,10 @@ func RegisterFront(group *ghttp.RouterGroup, repo domain.Repository) {
 			ctrl.VideoModuleList, ctrl.CartoonModuleList,
 		)
 	})
+	group.Group("/", func(auth *ghttp.RouterGroup) {
+		auth.Middleware(middleware.Auth, middleware.UserRateLimit)
+		auth.Bind(ctrl.DouyinSubmit, ctrl.DouyinMy)
+	})
 }
 
 // RegisterBackend 后台视频 CRUD + 分类 CRUD + 首页模块(挂权限组)。
@@ -39,7 +43,7 @@ func RegisterBackend(group *ghttp.RouterGroup, repo domain.Repository) {
 		logic.NewVideoModule(repo), logic.NewCartoonModule(repo),
 	)
 	group.Bind(
-		ctrl.List, ctrl.Create, ctrl.Update, ctrl.Delete, ctrl.Status,
+		ctrl.List, ctrl.Create, ctrl.Update, ctrl.Delete, ctrl.Status, ctrl.Audit,
 		ctrl.MediaAssets, ctrl.MediaPick, ctrl.SyncMedia,
 		ctrl.CategoryList, ctrl.CategoryCreate, ctrl.CategoryUpdate, ctrl.CategoryDelete,
 		ctrl.CartoonCategoryList, ctrl.CartoonCategoryCreate, ctrl.CartoonCategoryUpdate, ctrl.CartoonCategoryDelete,

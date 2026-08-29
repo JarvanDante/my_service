@@ -20,6 +20,8 @@ type VideoItem struct {
 	Duration      int      `json:"duration"`
 	Sort          int      `json:"sort"`
 	Status        int      `json:"status"`
+	SubmitSource  int      `json:"submit_source"`
+	RejectReason  string   `json:"reject_reason"`
 	UpUserId      int64    `json:"up_user_id"`
 	UpNickname    string   `json:"up_nickname"`
 	CreatedBy     int64    `json:"created_by"`
@@ -31,8 +33,9 @@ type ListReq struct {
 	g.Meta  `path:"/videos" method:"get" tags:"Backend/Video" summary:"视频列表"`
 	Keyword   string `json:"keyword"`
 	MediaCode string `json:"media_code" dc:"媒资短码, 精确匹配"`
-	Kind      int    `json:"kind" d:"0" dc:"0视频 2动漫 3抖音"`
-	Status    int    `json:"status" d:"9" v:"in:0,1,2,9#状态不合法" dc:"9=全部 0草稿 1上架 2下架"`
+	Kind         int `json:"kind" d:"0" dc:"0视频 2动漫 3抖音"`
+	Status       int `json:"status" d:"9" v:"in:0,1,2,3,4,8,9#状态不合法" dc:"9=全部 0草稿 1上架 2下架 3待审 4拒绝 8=草稿+下架"`
+	SubmitSource int `json:"submit_source" d:"9" v:"in:0,1,9#来源不合法" dc:"9=全部 0后台 1用户"`
 	Page    int    `json:"page"`
 	Size    int    `json:"size"`
 }
@@ -101,6 +104,14 @@ type StatusReq struct {
 	Status int   `json:"status" v:"in:0,1,2#status 仅支持 0/1/2"`
 }
 type StatusRes struct{}
+
+type AuditReq struct {
+	g.Meta       `path:"/videos/{id}/audit" method:"post" tags:"Backend/Video" summary:"审核用户上传抖音"`
+	Id           int64  `json:"id" v:"required|min:1#ID必填"`
+	Pass         bool   `json:"pass"`
+	RejectReason string `json:"reject_reason"`
+}
+type AuditRes struct{}
 
 type MediaAssetItem struct {
 	Id          string `json:"id"`

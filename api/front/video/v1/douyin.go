@@ -29,3 +29,36 @@ type DouyinListRes struct {
 	Page  int    `json:"page"`
 	Size  int    `json:"size"`
 }
+
+type DouyinSubmitReq struct {
+	g.Meta      `path:"/douyin/submit" method:"post" tags:"Front/Douyin" summary:"提交抖音(待审)"`
+	Title       string   `json:"title" v:"required#标题必填"`
+	Description string   `json:"description"`
+	CoverUrl    string   `json:"cover_url" v:"required#请上传封面"`
+	CoverKey    string   `json:"cover_key"`
+	SourceUrl   string   `json:"source_url" v:"required#请上传视频"`
+	SourceKey   string   `json:"source_key"`
+	Duration    int      `json:"duration" v:"min:0#时长不合法"`
+	Tags        []string `json:"tags"`
+}
+type DouyinSubmitRes struct {
+	Id int64 `json:"id"`
+}
+
+type DouyinMineItem struct {
+	Item
+	Status       int    `json:"status"`
+	RejectReason string `json:"reject_reason"`
+}
+
+type DouyinMyReq struct {
+	g.Meta `path:"/douyin/my" method:"get" tags:"Front/Douyin" summary:"我的抖音"`
+	Page   int `json:"page"`
+	Size   int `json:"size"`
+}
+type DouyinMyRes struct {
+	List  []DouyinMineItem `json:"list"`
+	Total int              `json:"total"`
+	Page  int              `json:"page"`
+	Size  int              `json:"size"`
+}

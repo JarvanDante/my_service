@@ -4,6 +4,8 @@ package front
 import (
 	"context"
 
+	"github.com/gogf/gf/v2/errors/gcode"
+	"github.com/gogf/gf/v2/errors/gerror"
 	"github.com/gogf/gf/v2/net/ghttp"
 
 	v1 "github.com/JarvanDante/my_service/api/front/video/v1"
@@ -46,6 +48,14 @@ func viewerId(ctx context.Context) int64 {
 		return 0
 	}
 	return r.GetCtxVar(consts.CtxUserId).Int64()
+}
+
+func uid(ctx context.Context) (int64, error) {
+	id := viewerId(ctx)
+	if id <= 0 {
+		return 0, gerror.NewCode(gcode.CodeNotAuthorized, "未登录")
+	}
+	return id, nil
 }
 
 func (c *Controller) CategoryList(ctx context.Context, _ *v1.CategoryListReq) (res *v1.CategoryListRes, err error) {
@@ -145,6 +155,41 @@ func (c *Controller) DouyinList(ctx context.Context, req *v1.DouyinListReq) (res
 		items = append(items, toItem(v))
 	}
 	return &v1.DouyinListRes{List: items, Total: dto.Total, Page: dto.Page, Size: dto.Size}, nil
+}
+
+func (c *Controller) DouyinSubmit(ctx context.Context, req *v1.DouyinSubmitReq) (res *v1.DouyinSubmitRes, err error) {
+	id, err := uid(ctx)
+	if err != nil {
+		return nil, err
+	}
+	vid, err := c.svc.SubmitDouyin(ctx, service.SubmitDouyinInput{
+		UserId: id, Title: req.Title, Description: req.Description,
+		CoverUrl: req.CoverUrl, CoverKey: req.CoverKey,
+		SourceUrl: req.SourceUrl, SourceKey: req.SourceKey,
+		Duration: req.Duration, Tags: req.Tags,
+	})
+	if err != nil {
+		return nil, err
+	}
+	return &v1.DouyinSubmitRes{Id: vid}, nil
+}
+
+func (c *Controller) DouyinMy(ctx context.Context, req *v1.DouyinMyReq) (res *v1.DouyinMyRes, err error) {
+	id, err := uid(ctx)
+	if err != nil {
+		return nil, err
+	}
+	dto, err := c.svc.MyDouyin(ctx, id, req.Page, req.Size)
+	if err != nil {
+		return nil, err
+	}
+	items := make([]v1.DouyinMineItem, 0, len(dto.List))
+	for _, v := range dto.List {
+		items = append(items, v1.DouyinMineItem{
+			Item: toItem(v), Status: v.Status, RejectReason: v.RejectReason,
+		})
+	}
+	return &v1.DouyinMyRes{List: items, Total: dto.Total, Page: dto.Page, Size: dto.Size}, nil
 }
 
 func toFrontModules(list []*service.ModuleFrontDTO) []v1.FrontModuleItem {

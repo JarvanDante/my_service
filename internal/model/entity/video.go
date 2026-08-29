@@ -6,6 +6,15 @@ const (
 	VideoStatusDraft     = 0
 	VideoStatusPublished = 1
 	VideoStatusOffline   = 2
+	VideoStatusPending   = 3
+	VideoStatusRejected  = 4
+	// VideoStatusOfflineGroup 仅后台筛选用: 草稿+下架都算「已下架」。
+	VideoStatusOfflineGroup = 8
+)
+
+const (
+	VideoSubmitAdmin = 0
+	VideoSubmitUser  = 1
 )
 
 const (
@@ -32,6 +41,10 @@ type Video struct {
 	Duration      int         `json:"duration"      orm:"duration"`
 	Sort          int         `json:"sort"          orm:"sort"`
 	Status        int         `json:"status"        orm:"status"`
+	SubmitSource  int         `json:"submitSource"  orm:"submit_source"`
+	RejectReason  string      `json:"rejectReason"  orm:"reject_reason"`
+	AuditBy       int64       `json:"auditBy"       orm:"audit_by"`
+	AuditAt       *gtime.Time `json:"auditAt"       orm:"audit_at"`
 	UpUserId      int64       `json:"upUserId"      orm:"up_user_id"`
 	CreatedBy     int64       `json:"createdBy"     orm:"created_by"`
 	CreatedAt     *gtime.Time `json:"createdAt"     orm:"created_at"`

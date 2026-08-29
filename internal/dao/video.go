@@ -56,7 +56,12 @@ func (r *videoRepo) List(ctx context.Context, f videodomain.ListFilter, page, si
 		m = m.WhereIn("up_user_id", f.UpUserIds)
 	}
 	m = m.Where("kind", f.Kind)
-	if f.Status != 9 {
+	if f.SubmitSource != 9 {
+		m = m.Where("submit_source", f.SubmitSource)
+	}
+	if f.Status == entity.VideoStatusOfflineGroup {
+		m = m.WhereIn("status", []int{entity.VideoStatusDraft, entity.VideoStatusOffline})
+	} else if f.Status != 9 {
 		m = m.Where("status", f.Status)
 	}
 	total, err := m.Clone().Count()
@@ -97,6 +102,7 @@ func (r *videoRepo) Create(ctx context.Context, v *entity.Video) (int64, error) 
 		"source_url": v.SourceUrl, "source_key": v.SourceKey, "source_media_id": v.SourceMediaId,
 		"media_code": v.MediaCode, "kind": v.Kind, "category": v.Category, "tags": v.Tags,
 		"duration": v.Duration, "sort": v.Sort, "status": v.Status,
+		"submit_source": v.SubmitSource, "reject_reason": v.RejectReason,
 		"up_user_id": v.UpUserId, "created_by": v.CreatedBy,
 	}).Insert()
 	if err != nil {
@@ -127,4 +133,17 @@ func (r *videoRepo) SetStatus(ctx context.Context, id int64, status int) error {
 		"status": status, "updated_at": gtime.Now(),
 	}).Update()
 	return err
+}
+
+func (r *videoRepo) Audit(ctx context.Context, id int64, status int, reason string, operatorId int64) (int64, error) {
+	res, err := g.Model("video").Ctx(ctx).
+		Where("id", id).Where("kind", entity.VideoKindDouyin).Where("status", entity.VideoStatusPending).
+		Data(g.Map{
+			"status": status, "reject_reason": reason,
+			"audit_by": operatorId, "audit_at": gtime.Now(), "updated_at": gtime.Now(),
+		}).Update()
+	if err != nil {
+		return 0, err
+	}
+	return res.RowsAffected()
 }

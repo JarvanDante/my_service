@@ -35,7 +35,8 @@ func operatorId(ctx context.Context) (int64, error) {
 
 func (c *Controller) List(ctx context.Context, req *v1.ListReq) (res *v1.ListRes, err error) {
 	dto, err := c.video.List(ctx, service.ListInput{
-		Keyword: req.Keyword, MediaCode: req.MediaCode, Kind: req.Kind, Status: req.Status, Page: req.Page, Size: req.Size,
+		Keyword: req.Keyword, MediaCode: req.MediaCode, Kind: req.Kind,
+		Status: req.Status, SubmitSource: req.SubmitSource, Page: req.Page, Size: req.Size,
 	})
 	if err != nil {
 		return nil, err
@@ -88,6 +89,14 @@ func (c *Controller) Delete(ctx context.Context, req *v1.DeleteReq) (res *v1.Del
 
 func (c *Controller) Status(ctx context.Context, req *v1.StatusReq) (res *v1.StatusRes, err error) {
 	return &v1.StatusRes{}, c.video.SetStatus(ctx, req.Id, req.Status)
+}
+
+func (c *Controller) Audit(ctx context.Context, req *v1.AuditReq) (res *v1.AuditRes, err error) {
+	op, err := operatorId(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return &v1.AuditRes{}, c.video.Audit(ctx, req.Id, req.Pass, req.RejectReason, op)
 }
 
 func (c *Controller) MediaAssets(ctx context.Context, req *v1.MediaAssetListReq) (res *v1.MediaAssetListRes, err error) {
@@ -146,6 +155,7 @@ func toItem(v *service.VideoDTO) v1.VideoItem {
 		SourceUrl: v.SourceUrl, SourceKey: v.SourceKey, SourceMediaId: v.SourceMediaId,
 		MediaCode: v.MediaCode, Category: v.Category, Categories: v.Categories, Tags: v.Tags,
 		Duration: v.Duration, Sort: v.Sort, Status: v.Status,
+		SubmitSource: v.SubmitSource, RejectReason: v.RejectReason,
 		UpUserId: v.UpUserId, UpNickname: v.UpNickname, CreatedBy: v.CreatedBy,
 		CreatedAt: v.CreatedAt, UpdatedAt: v.UpdatedAt,
 	}

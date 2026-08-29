@@ -10,8 +10,9 @@ type ListFilter struct {
 	Keyword   string
 	MediaCode string
 	Category  string // 作品分类名, 命中 category 逗号列表中的一项
-	Kind      int    // 0视频 2动漫
-	Status    int    // 9=全部
+	Kind         int // 0视频 2动漫 3抖音
+	Status       int // 9=全部 8=草稿+下架
+	SubmitSource int // 9=全部 0后台 1用户
 	// Sort 排序方式: 0综合(人工 sort 权重, 后台与前台默认) 1最新 2时长。
 	// 加在仓储层而不是在 logic 里排内存, 是因为分页必须由 SQL 完成 ——
 	// 内存排序只能排当前这一页, 结果是错的。
@@ -28,4 +29,5 @@ type Repository interface {
 	Update(ctx context.Context, v *entity.Video) error
 	Delete(ctx context.Context, id int64) error
 	SetStatus(ctx context.Context, id int64, status int) error
+	Audit(ctx context.Context, id int64, status int, reason string, operatorId int64) (int64, error)
 }

@@ -19,6 +19,8 @@ type VideoDTO struct {
 	Duration      int
 	Sort          int
 	Status        int
+	SubmitSource  int
+	RejectReason  string
 	UpUserId      int64
 	UpNickname    string
 	UpAvatar      string
@@ -30,12 +32,13 @@ type VideoDTO struct {
 }
 
 type ListInput struct {
-	Keyword   string
-	MediaCode string
-	Kind      int
-	Status    int
-	Page      int
-	Size      int
+	Keyword      string
+	MediaCode    string
+	Kind         int
+	Status       int
+	SubmitSource int
+	Page         int
+	Size         int
 }
 
 type ListDTO struct {
@@ -79,6 +82,7 @@ type SaveInput struct {
 	Duration      int
 	Sort          int
 	Status        int
+	SubmitSource  int
 	UpUserId      int64
 	OperatorId    int64
 }
@@ -94,9 +98,24 @@ type IVideo interface {
 	Update(ctx context.Context, in SaveInput) error
 	Delete(ctx context.Context, id int64) error
 	SetStatus(ctx context.Context, id int64, status int) error
+	Audit(ctx context.Context, id int64, pass bool, reason string, operatorId int64) error
+	SubmitDouyin(ctx context.Context, in SubmitDouyinInput) (int64, error)
+	MyDouyin(ctx context.Context, userId int64, page, size int) (*ListDTO, error)
 	ListMediaAssets(ctx context.Context, page, size int, keyword string, kind int) ([]MediaAssetDTO, int, error)
 	PickMedia(ctx context.Context, code string, operatorId int64, kind int) (int64, error)
 	SyncMedia(ctx context.Context, operatorId int64, kind int) (*SyncMediaDTO, error)
+}
+
+type SubmitDouyinInput struct {
+	UserId      int64
+	Title       string
+	Description string
+	CoverUrl    string
+	CoverKey    string
+	SourceUrl   string
+	SourceKey   string
+	Duration    int
+	Tags        []string
 }
 
 type MediaAssetDTO struct {

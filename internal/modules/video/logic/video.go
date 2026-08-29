@@ -13,6 +13,7 @@ import (
 	"github.com/JarvanDante/my_service/internal/modules/video/domain"
 	"github.com/JarvanDante/my_service/internal/modules/video/service"
 	"github.com/JarvanDante/my_service/internal/shared/paas"
+	"github.com/JarvanDante/my_service/internal/shared/storage"
 )
 
 func decodeTags(raw string) []string {
@@ -75,9 +76,13 @@ func (s *sVideo) List(ctx context.Context, in service.ListInput) (*service.ListD
 	if size <= 0 {
 		size = 20
 	}
+	src := in.SubmitSource
+	if src != entity.VideoSubmitAdmin && src != entity.VideoSubmitUser {
+		src = 9
+	}
 	list, total, err := s.repo.List(ctx, domain.ListFilter{
 		Keyword: strings.TrimSpace(in.Keyword), MediaCode: strings.TrimSpace(in.MediaCode),
-		Kind: normalizeKind(in.Kind), Status: in.Status,
+		Kind: normalizeKind(in.Kind), Status: in.Status, SubmitSource: src,
 	}, page, size)
 	if err != nil {
 		return nil, gerror.WrapCode(gcode.CodeDbOperationError, err, "查询视频失败")
@@ -109,12 +114,13 @@ func (s *sVideo) FrontList(ctx context.Context, in service.FrontListInput) (*ser
 		tags = append(tags, t)
 	}
 	filter := domain.ListFilter{
-		Keyword:  strings.TrimSpace(in.Keyword),
-		Category: strings.TrimSpace(in.Category),
-		Tags:     tags,
-		Kind:     normalizeKind(in.Kind),
-		Status:   entity.VideoStatusPublished,
-		Sort:     in.Sort,
+		Keyword:      strings.TrimSpace(in.Keyword),
+		Category:     strings.TrimSpace(in.Category),
+		Tags:         tags,
+		Kind:         normalizeKind(in.Kind),
+		Status:       entity.VideoStatusPublished,
+		SubmitSource: 9,
+		Sort:         in.Sort,
 	}
 	if in.UpUserId > 0 {
 		filter.UpUserIds = []int64{in.UpUserId}
@@ -176,6 +182,7 @@ func (s *sVideo) Create(ctx context.Context, in service.SaveInput) (int64, error
 		SourceUrl: in.SourceUrl, SourceKey: in.SourceKey, SourceMediaId: in.SourceMediaId,
 		MediaCode: strings.TrimSpace(in.MediaCode), Kind: normalizeKind(in.Kind), Category: in.Category, Tags: encodeJSON(in.Tags),
 		Duration: in.Duration, Sort: in.Sort, Status: in.Status,
+		SubmitSource: entity.VideoSubmitAdmin,
 		UpUserId: in.UpUserId, CreatedBy: in.OperatorId,
 	})
 }
@@ -192,7 +199,11 @@ func (s *sVideo) Update(ctx context.Context, in service.SaveInput) error {
 		return gerror.NewCode(gcode.CodeNotFound, "视频不存在")
 	}
 	in.Kind = old.Kind
+	in.SubmitSource = old.SubmitSource
 	in.Category = resolveCategory(&in)
+	if old.Status == entity.VideoStatusPending || old.Status == entity.VideoStatusRejected {
+		in.Status = old.Status
+	}
 	if err := validateSave(ctx, in); err != nil {
 		return err
 	}
@@ -227,13 +238,103 @@ func (s *sVideo) SetStatus(ctx context.Context, id int64, status int) error {
 	if old == nil || old.Id == 0 {
 		return gerror.NewCode(gcode.CodeNotFound, "视频不存在")
 	}
+	if old.Status == entity.VideoStatusPending || old.Status == entity.VideoStatusRejected {
+		return gerror.NewCode(gcode.CodeInvalidParameter, "请先审核通过再上架")
+	}
 	if status == entity.VideoStatusPublished && strings.TrimSpace(old.Category) == "" {
 		return gerror.NewCode(gcode.CodeInvalidParameter, "请先编辑并选择本站分类后再上架")
 	}
-	if err := requireDouyinUp(ctx, old.Kind, status, old.UpUserId); err != nil {
+	if err := requireDouyinUp(ctx, old.Kind, status, old.UpUserId, old.SubmitSource); err != nil {
 		return err
 	}
 	return s.repo.SetStatus(ctx, id, status)
+}
+
+func (s *sVideo) Audit(ctx context.Context, id int64, pass bool, reason string, operatorId int64) error {
+	if id <= 0 {
+		return gerror.NewCode(gcode.CodeInvalidParameter, "ID必填")
+	}
+	old, err := s.repo.Find(ctx, id)
+	if err != nil {
+		return gerror.WrapCode(gcode.CodeDbOperationError, err, "查询视频失败")
+	}
+	if old == nil || old.Id == 0 || old.Kind != entity.VideoKindDouyin {
+		return gerror.NewCode(gcode.CodeNotFound, "抖音不存在")
+	}
+	if old.Status != entity.VideoStatusPending {
+		return gerror.NewCode(gcode.CodeInvalidParameter, "当前状态不允许审核")
+	}
+	status := entity.VideoStatusOffline
+	reason = strings.TrimSpace(reason)
+	if !pass {
+		if reason == "" {
+			return gerror.NewCode(gcode.CodeInvalidParameter, "拒绝原因必填")
+		}
+		status = entity.VideoStatusRejected
+	} else {
+		reason = ""
+	}
+	n, err := s.repo.Audit(ctx, id, status, reason, operatorId)
+	if err != nil {
+		return gerror.WrapCode(gcode.CodeDbOperationError, err, "审核失败")
+	}
+	if n == 0 {
+		return gerror.NewCode(gcode.CodeInvalidParameter, "当前状态不允许审核")
+	}
+	return nil
+}
+
+func (s *sVideo) SubmitDouyin(ctx context.Context, in service.SubmitDouyinInput) (int64, error) {
+	title := strings.TrimSpace(in.Title)
+	if title == "" {
+		return 0, gerror.NewCode(gcode.CodeInvalidParameter, "标题必填")
+	}
+	if strings.TrimSpace(in.SourceUrl) == "" && strings.TrimSpace(in.SourceKey) == "" {
+		return 0, gerror.NewCode(gcode.CodeInvalidParameter, "请上传视频")
+	}
+	if strings.TrimSpace(in.CoverUrl) == "" {
+		return 0, gerror.NewCode(gcode.CodeInvalidParameter, "请上传封面")
+	}
+	if hit, err := hitFilterWord(ctx, title+" "+in.Description); err != nil {
+		return 0, err
+	} else if hit != "" {
+		return 0, gerror.NewCode(gcode.CodeInvalidParameter, "标题或简介包含敏感词")
+	}
+	return s.repo.Create(ctx, &entity.Video{
+		Title: title, Description: strings.TrimSpace(in.Description),
+		CoverUrl: in.CoverUrl, CoverKey: in.CoverKey,
+		SourceUrl: in.SourceUrl, SourceKey: in.SourceKey,
+		Kind: entity.VideoKindDouyin, Tags: encodeJSON(in.Tags),
+		Duration: in.Duration, Status: entity.VideoStatusPending,
+		SubmitSource: entity.VideoSubmitUser, UpUserId: in.UserId,
+	})
+}
+
+func (s *sVideo) MyDouyin(ctx context.Context, userId int64, page, size int) (*service.ListDTO, error) {
+	if userId <= 0 {
+		return nil, gerror.NewCode(gcode.CodeNotAuthorized, "未登录")
+	}
+	if page <= 0 {
+		page = 1
+	}
+	if size <= 0 {
+		size = 20
+	}
+	if size > 100 {
+		size = 100
+	}
+	list, total, err := s.repo.List(ctx, domain.ListFilter{
+		Kind: entity.VideoKindDouyin, Status: 9, SubmitSource: 9,
+		UpUserIds: []int64{userId}, Sort: 1,
+	}, page, size)
+	if err != nil {
+		return nil, gerror.WrapCode(gcode.CodeDbOperationError, err, "查询失败")
+	}
+	out := make([]*service.VideoDTO, 0, len(list))
+	for _, v := range list {
+		out = append(out, toDTO(ctx, v))
+	}
+	return &service.ListDTO{List: out, Total: total, Page: page, Size: size}, nil
 }
 
 func validateSave(ctx context.Context, in service.SaveInput) error {
@@ -243,16 +344,16 @@ func validateSave(ctx context.Context, in service.SaveInput) error {
 	if strings.TrimSpace(in.SourceUrl) == "" && strings.TrimSpace(in.SourceKey) == "" && strings.TrimSpace(in.MediaCode) == "" {
 		return gerror.NewCode(gcode.CodeInvalidParameter, "请先上传视频或选用媒资")
 	}
-	if in.Status < 0 || in.Status > 2 {
+	if in.Status < 0 || in.Status > 4 {
 		return gerror.NewCode(gcode.CodeInvalidParameter, "状态不合法")
 	}
 	if in.Status == entity.VideoStatusPublished && in.Category == "" {
 		return gerror.NewCode(gcode.CodeInvalidParameter, "上架前请选择本站分类")
 	}
-	return requireDouyinUp(ctx, in.Kind, in.Status, in.UpUserId)
+	return requireDouyinUp(ctx, in.Kind, in.Status, in.UpUserId, in.SubmitSource)
 }
 
-func requireDouyinUp(ctx context.Context, kind, status int, upUserId int64) error {
+func requireDouyinUp(ctx context.Context, kind, status int, upUserId int64, submitSource int) error {
 	if normalizeKind(kind) != entity.VideoKindDouyin || status != entity.VideoStatusPublished {
 		return nil
 	}
@@ -269,10 +370,23 @@ func requireDouyinUp(ctx context.Context, kind, status int, upUserId int64) erro
 	if u.IsDisabled == 1 {
 		return gerror.NewCode(gcode.CodeInvalidParameter, "UP主已被禁用，无法上架")
 	}
-	if u.IsUp != 1 {
+	if submitSource != entity.VideoSubmitUser && u.IsUp != 1 {
 		return gerror.NewCode(gcode.CodeInvalidParameter, "该用户不是UP主")
 	}
 	return nil
+}
+
+func hitFilterWord(ctx context.Context, text string) (string, error) {
+	var words []*entity.FilterWord
+	if err := g.Model("filter_word").Ctx(ctx).Where("site_id", 1).Fields("word").Scan(&words); err != nil {
+		return "", err
+	}
+	for _, w := range words {
+		if w.Word != "" && strings.Contains(text, w.Word) {
+			return w.Word, nil
+		}
+	}
+	return "", nil
 }
 
 func fillUpNames(ctx context.Context, list []*service.VideoDTO) {
@@ -400,6 +514,7 @@ func toDTO(ctx context.Context, v *entity.Video) *service.VideoDTO {
 		SourceUrl: v.SourceUrl, SourceKey: v.SourceKey, SourceMediaId: v.SourceMediaId,
 		MediaCode: v.MediaCode, Category: v.Category, Categories: parseCategories(v.Category), Tags: decodeTags(v.Tags),
 		Duration: v.Duration, Sort: v.Sort, Status: v.Status,
+		SubmitSource: v.SubmitSource, RejectReason: v.RejectReason,
 		UpUserId: v.UpUserId, CreatedBy: v.CreatedBy,
 	}
 	if v.CreatedAt != nil {
@@ -409,6 +524,9 @@ func toDTO(ctx context.Context, v *entity.Video) *service.VideoDTO {
 		d.UpdatedAt = v.UpdatedAt.String()
 	}
 	d.CoverUrl, d.SourceUrl = paas.ApplyGatewayURLs(ctx, d.CoverUrl, d.SourceUrl, d.MediaCode)
+	if strings.TrimSpace(d.MediaCode) == "" {
+		d.SourceUrl = storage.SignPlayURL(ctx, d.SourceUrl)
+	}
 	return d
 }
 
