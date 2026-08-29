@@ -334,6 +334,7 @@ func (s *sVideo) MyDouyin(ctx context.Context, userId int64, page, size int) (*s
 	for _, v := range list {
 		out = append(out, toDTO(ctx, v))
 	}
+	fillUpProfiles(ctx, out, userId)
 	return &service.ListDTO{List: out, Total: total, Page: page, Size: size}, nil
 }
 
