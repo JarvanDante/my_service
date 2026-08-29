@@ -87,7 +87,7 @@ type UpdateReq struct {
 	Tags          []string `json:"tags"`
 	Duration      int      `json:"duration" v:"min:0#时长不合法"`
 	Sort          int      `json:"sort"`
-	Status        int      `json:"status" v:"in:0,1,2#status 仅支持 0/1/2"`
+	Status        int      `json:"status" v:"in:0,1,2,3,4#status 不合法"`
 	UpUserId      int64    `json:"up_user_id"`
 }
 type UpdateRes struct{}
