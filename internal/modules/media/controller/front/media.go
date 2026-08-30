@@ -2,6 +2,10 @@ package front
 
 import (
 	"context"
+	"fmt"
+	"io"
+	"net/http"
+	"strconv"
 	"strings"
 
 	"github.com/gogf/gf/v2/errors/gcode"
@@ -12,6 +16,7 @@ import (
 	"github.com/JarvanDante/my_service/internal/modules/media/service"
 	"github.com/JarvanDante/my_service/internal/shared/aesbnc"
 	"github.com/JarvanDante/my_service/internal/shared/consts"
+	"github.com/JarvanDante/my_service/internal/shared/storage"
 )
 
 type Controller struct{ media service.IMedia }
@@ -27,6 +32,16 @@ func uid(ctx context.Context) (int64, error) {
 }
 
 func (c *Controller) Object(ctx context.Context, req *v1.ObjectReq) (res *v1.ObjectRes, err error) {
+	name := req.Url
+	if name == "" {
+		name = req.ObjectKey
+	}
+	if !aesbnc.IsEncryptedName(name) {
+		if err = c.streamPlainObject(ctx, req); err != nil {
+			return nil, err
+		}
+		return nil, nil
+	}
 	data, name, err := c.media.ReadObject(ctx, req.Url, req.ObjectKey)
 	if err != nil {
 		return nil, err
@@ -41,6 +56,105 @@ func (c *Controller) Object(ctx context.Context, req *v1.ObjectReq) (res *v1.Obj
 	r.Response.Write(data)
 	r.ExitAll()
 	return nil, nil
+}
+
+func (c *Controller) streamPlainObject(ctx context.Context, req *v1.ObjectReq) error {
+	bucket, key, name, err := c.media.ResolveObjectRef(ctx, req.Url, req.ObjectKey)
+	if err != nil {
+		return err
+	}
+	client, err := storage.Get(ctx)
+	if err != nil {
+		return gerror.WrapCode(gcode.CodeInternalError, err, "对象存储不可用")
+	}
+	info, err := client.StatIn(ctx, bucket, key)
+	if err != nil {
+		return gerror.WrapCode(gcode.CodeNotFound, err, "对象不存在")
+	}
+	size := info.Size
+	start, end, partial := parseBytesRange(ghttp.RequestFromCtx(ctx).Header.Get("Range"), size)
+	length := int64(0)
+	if partial {
+		length = end - start + 1
+	}
+	obj, _, err := client.OpenIn(ctx, bucket, key, start, length)
+	if err != nil {
+		return gerror.WrapCode(gcode.CodeNotFound, err, "对象不存在")
+	}
+	defer obj.Close()
+
+	r := ghttp.RequestFromCtx(ctx)
+	ct := info.ContentType
+	if ct == "" || ct == "application/octet-stream" {
+		ct = sniffVideoType(name)
+	}
+	r.Response.Header().Set("Content-Type", ct)
+	r.Response.Header().Set("Accept-Ranges", "bytes")
+	r.Response.Header().Set("Cache-Control", "private, max-age=120")
+	if partial {
+		r.Response.Header().Set("Content-Range", fmt.Sprintf("bytes %d-%d/%d", start, end, size))
+		r.Response.Header().Set("Content-Length", strconv.FormatInt(end-start+1, 10))
+		r.Response.WriteHeader(http.StatusPartialContent)
+	} else {
+		r.Response.Header().Set("Content-Length", strconv.FormatInt(size, 10))
+	}
+	_, _ = io.Copy(r.Response.Writer, obj)
+	r.ExitAll()
+	return nil
+}
+
+func parseBytesRange(header string, size int64) (start, end int64, partial bool) {
+	end = size - 1
+	if size <= 0 || !strings.HasPrefix(header, "bytes=") {
+		return 0, end, false
+	}
+	spec := strings.TrimPrefix(header, "bytes=")
+	if i := strings.IndexByte(spec, ','); i >= 0 {
+		spec = spec[:i]
+	}
+	parts := strings.SplitN(spec, "-", 2)
+	if len(parts) != 2 {
+		return 0, end, false
+	}
+	if parts[0] == "" {
+		n, err := strconv.ParseInt(parts[1], 10, 64)
+		if err != nil || n <= 0 {
+			return 0, end, false
+		}
+		if n > size {
+			n = size
+		}
+		return size - n, end, true
+	}
+	n, err := strconv.ParseInt(parts[0], 10, 64)
+	if err != nil || n < 0 || n >= size {
+		return 0, end, false
+	}
+	start = n
+	if parts[1] != "" {
+		n, err = strconv.ParseInt(parts[1], 10, 64)
+		if err != nil || n < start {
+			return 0, end, false
+		}
+		if n < size {
+			end = n
+		}
+	}
+	return start, end, true
+}
+
+func sniffVideoType(name string) string {
+	low := strings.ToLower(name)
+	switch {
+	case strings.Contains(low, ".webm"):
+		return "video/webm"
+	case strings.Contains(low, ".mov"):
+		return "video/quicktime"
+	case strings.Contains(low, ".mkv"):
+		return "video/x-matroska"
+	default:
+		return "video/mp4"
+	}
 }
 
 func (c *Controller) Upload(ctx context.Context, req *v1.UploadReq) (res *v1.UploadRes, err error) {

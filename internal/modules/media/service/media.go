@@ -123,6 +123,7 @@ type IMedia interface {
 	InitStorageUpload(ctx context.Context, in StorageInitInput) (*StorageInitDTO, error)
 	ConfirmStorageUpload(ctx context.Context, id string) (*StorageConfirmDTO, error)
 	ReadObject(ctx context.Context, rawURL, objectKey string) ([]byte, string, error)
+	ResolveObjectRef(ctx context.Context, rawURL, objectKey string) (bucket, key, name string, err error)
 	MultipartInit(ctx context.Context, in MultipartInitInput) (*MultipartInitDTO, error)
 	MultipartPresign(ctx context.Context, in MultipartPresignInput) ([]MultipartPresignItemDTO, error)
 	MultipartUploadPart(ctx context.Context, in MultipartUploadPartInput) (*MultipartPartDTO, error)

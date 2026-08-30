@@ -228,10 +228,10 @@ func (s *sMedia) ConfirmStorageUpload(ctx context.Context, id string) (*service.
 	}, nil
 }
 
-func (s *sMedia) ReadObject(ctx context.Context, rawURL, objectKey string) ([]byte, string, error) {
+func (s *sMedia) ResolveObjectRef(ctx context.Context, rawURL, objectKey string) (string, string, string, error) {
 	client, err := storage.Get(ctx)
 	if err != nil {
-		return nil, "", gerror.WrapCode(gcode.CodeInternalError, err, "对象存储不可用")
+		return "", "", "", gerror.WrapCode(gcode.CodeInternalError, err, "对象存储不可用")
 	}
 	bucket, key := storage.ParseURL(rawURL, "")
 	if key == "" {
@@ -248,15 +248,27 @@ func (s *sMedia) ReadObject(ctx context.Context, rawURL, objectKey string) ([]by
 		}
 	}
 	if key == "" {
-		return nil, "", gerror.NewCode(gcode.CodeInvalidParameter, "无法识别的图片地址")
-	}
-	data, err := client.GetIn(ctx, bucket, key)
-	if err != nil {
-		return nil, "", gerror.WrapCode(gcode.CodeNotFound, err, "对象不存在")
+		return "", "", "", gerror.NewCode(gcode.CodeInvalidParameter, "无法识别的图片地址")
 	}
 	name := key
 	if rawURL != "" {
 		name = rawURL
+	}
+	return bucket, key, name, nil
+}
+
+func (s *sMedia) ReadObject(ctx context.Context, rawURL, objectKey string) ([]byte, string, error) {
+	client, err := storage.Get(ctx)
+	if err != nil {
+		return nil, "", gerror.WrapCode(gcode.CodeInternalError, err, "对象存储不可用")
+	}
+	bucket, key, name, err := s.ResolveObjectRef(ctx, rawURL, objectKey)
+	if err != nil {
+		return nil, "", err
+	}
+	data, err := client.GetIn(ctx, bucket, key)
+	if err != nil {
+		return nil, "", gerror.WrapCode(gcode.CodeNotFound, err, "对象不存在")
 	}
 	return data, name, nil
 }

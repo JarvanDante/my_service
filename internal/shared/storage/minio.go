@@ -151,6 +151,51 @@ func (c *Client) GetIn(ctx context.Context, bucket, objectKey string) ([]byte, e
 	return io.ReadAll(obj)
 }
 
+// StatIn 按桶取对象元数据。
+func (c *Client) StatIn(ctx context.Context, bucket, objectKey string) (minio.ObjectInfo, error) {
+	if bucket == "" {
+		bucket = c.bucket
+	}
+	key := strings.TrimLeft(objectKey, "/")
+	if key == "" || strings.Contains(key, "..") {
+		return minio.ObjectInfo{}, fmt.Errorf("对象路径无效")
+	}
+	info, err := c.mc.StatObject(ctx, bucket, key, minio.StatObjectOptions{})
+	if err != nil {
+		return minio.ObjectInfo{}, fmt.Errorf("读取对象失败: %w", err)
+	}
+	return info, nil
+}
+
+// OpenIn 按桶打开对象；length<=0 表示从 offset 读到结尾。
+func (c *Client) OpenIn(ctx context.Context, bucket, objectKey string, offset, length int64) (io.ReadCloser, minio.ObjectInfo, error) {
+	if bucket == "" {
+		bucket = c.bucket
+	}
+	key := strings.TrimLeft(objectKey, "/")
+	if key == "" || strings.Contains(key, "..") {
+		return nil, minio.ObjectInfo{}, fmt.Errorf("对象路径无效")
+	}
+	opts := minio.GetObjectOptions{}
+	if length > 0 {
+		if err := opts.SetRange(offset, offset+length-1); err != nil {
+			return nil, minio.ObjectInfo{}, err
+		}
+	} else if offset > 0 {
+		opts.Set("Range", fmt.Sprintf("bytes=%d-", offset))
+	}
+	obj, err := c.mc.GetObject(ctx, bucket, key, opts)
+	if err != nil {
+		return nil, minio.ObjectInfo{}, fmt.Errorf("读取对象失败: %w", err)
+	}
+	info, err := obj.Stat()
+	if err != nil {
+		_ = obj.Close()
+		return nil, minio.ObjectInfo{}, fmt.Errorf("读取对象失败: %w", err)
+	}
+	return obj, info, nil
+}
+
 // ParseURL 从 my-media / my-storage 地址解析桶和 key。
 func ParseURL(raw, defaultBucket string) (bucket, key string) {
 	u := strings.TrimSpace(raw)
