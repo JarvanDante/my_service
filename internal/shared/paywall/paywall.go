@@ -68,6 +68,45 @@ func IsVipActive(ctx context.Context, userId int64) (bool, error) {
 	return n > 0, nil
 }
 
+// ActiveVipSet 批量判断哪些用户当前是 VIP（用户组未过期或 vip_log 未过期）。
+func ActiveVipSet(ctx context.Context, userIds []int64) (map[int64]bool, error) {
+	out := map[int64]bool{}
+	ids := make([]int64, 0, len(userIds))
+	seen := map[int64]struct{}{}
+	for _, id := range userIds {
+		if id <= 0 {
+			continue
+		}
+		if _, ok := seen[id]; ok {
+			continue
+		}
+		seen[id] = struct{}{}
+		ids = append(ids, id)
+	}
+	if len(ids) == 0 {
+		return out, nil
+	}
+	now := gtime.Now().Unix()
+	groupRows, err := g.Model("users").Ctx(ctx).WhereIn("id", ids).
+		Where("group_id > ?", 0).Where("group_end_time > ?", now).Fields("id").All()
+	if err != nil {
+		return nil, err
+	}
+	for _, row := range groupRows {
+		out[row["id"].Int64()] = true
+	}
+	logRows, err := g.Model("vip_log").Ctx(ctx).
+		Where("site_id", pwSiteId).WhereIn("user_id", ids).
+		Where("end_at > ?", now).Fields("user_id").All()
+	if err != nil {
+		return nil, err
+	}
+	for _, row := range logRows {
+		out[row["user_id"].Int64()] = true
+	}
+	return out, nil
+}
+
 // Purchased 是否已购买该内容。
 func Purchased(ctx context.Context, userId int64, mediaType int, contentId int64) (bool, error) {
 	if userId <= 0 {

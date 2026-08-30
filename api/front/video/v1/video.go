@@ -17,6 +17,7 @@ type Item struct {
 	CreatedAt   string   `json:"created_at"`
 	UpUserId    int64    `json:"up_user_id"`
 	UpNickname  string   `json:"up_nickname"`
+	UpIsVip     bool     `json:"up_is_vip"`
 	UpAvatar    string   `json:"up_avatar"`
 	Followed      bool     `json:"followed"`
 	CommentCount  int      `json:"comment_count"`

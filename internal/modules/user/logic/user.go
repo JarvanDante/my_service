@@ -17,6 +17,7 @@ import (
 	"github.com/JarvanDante/my_service/internal/modules/user/domain"
 	"github.com/JarvanDante/my_service/internal/modules/user/service"
 	"github.com/JarvanDante/my_service/internal/shared/kit"
+	"github.com/JarvanDante/my_service/internal/shared/paywall"
 	"github.com/JarvanDante/my_service/internal/shared/siteconf"
 )
 
@@ -88,7 +89,7 @@ func (s *sUser) Login(ctx context.Context, in service.LoginInput) (*service.Logi
 	}
 	return &service.LoginDTO{
 		Token: token,
-		User:  toUserInfo(u),
+		User:  decorateUserInfo(ctx, toUserInfo(u)),
 	}, nil
 }
 
@@ -134,7 +135,7 @@ func (s *sUser) Restore(ctx context.Context, in service.RestoreInput) (*service.
 	if err != nil {
 		return nil, err
 	}
-	return &service.LoginDTO{Token: token, User: toUserInfo(u)}, nil
+	return &service.LoginDTO{Token: token, User: decorateUserInfo(ctx, toUserInfo(u))}, nil
 }
 
 func hashUserPassword(password, slat string) string {
@@ -216,7 +217,7 @@ func (s *sUser) AccountLogin(ctx context.Context, in service.AccountLoginInput) 
 	if err != nil {
 		return nil, err
 	}
-	return &service.LoginDTO{Token: token, User: toUserInfo(u)}, nil
+	return &service.LoginDTO{Token: token, User: decorateUserInfo(ctx, toUserInfo(u))}, nil
 }
 
 // SetPassword 首次设密或修改密码。已设过则必须校验旧密码。
@@ -260,7 +261,7 @@ func (s *sUser) Info(ctx context.Context, userId int64) (*service.UserInfoDTO, e
 		return nil, gerror.New("用户不存在")
 	}
 	u = s.ensureEncodedUsername(ctx, u)
-	return toUserInfo(u), nil
+	return decorateUserInfo(ctx, toUserInfo(u)), nil
 }
 
 func (s *sUser) GetUser(ctx context.Context, id int64) (*service.UserDTO, error) {
@@ -303,6 +304,32 @@ func toUserInfo(u *entity.Users) *service.UserInfoDTO {
 		GroupEndTime: u.GroupEndTime,
 		HasPassword:  u.Password != "",
 		HasParent:    u.ParentId != 0,
+	}
+}
+
+func decorateUserInfo(ctx context.Context, d *service.UserInfoDTO) *service.UserInfoDTO {
+	if d == nil {
+		return d
+	}
+	d.IsVip, _ = paywall.IsVipActive(ctx, d.Id)
+	return d
+}
+
+func attachPublicVip(ctx context.Context, list []*service.PublicUserDTO) {
+	ids := make([]int64, 0, len(list))
+	for _, d := range list {
+		if d != nil && d.Id > 0 {
+			ids = append(ids, d.Id)
+		}
+	}
+	set, err := paywall.ActiveVipSet(ctx, ids)
+	if err != nil {
+		return
+	}
+	for _, d := range list {
+		if d != nil {
+			d.IsVip = set[d.Id]
+		}
 	}
 }
 
@@ -371,7 +398,9 @@ func (s *sUser) Home(ctx context.Context, viewerId, homeId int64) (*service.Home
 	if viewerId > 0 && viewerId != homeId {
 		followed, _ = s.repo.ExistsFollow(ctx, viewerId, homeId)
 	}
-	return &service.HomeDTO{User: toPublic(u), IsFollowed: followed}, nil
+	pub := toPublic(u)
+	attachPublicVip(ctx, []*service.PublicUserDTO{pub})
+	return &service.HomeDTO{User: pub, IsFollowed: followed}, nil
 }
 
 // UpdateProfile 改资料: 仅更新传了值的字段。
@@ -430,7 +459,9 @@ func (s *sUser) FindByAccount(ctx context.Context, account string) (*service.Pub
 	if u == nil {
 		return nil, nil
 	}
-	return toPublic(u), nil
+	pub := toPublic(u)
+	attachPublicVip(ctx, []*service.PublicUserDTO{pub})
+	return pub, nil
 }
 
 func toPublic(u *entity.Users) *service.PublicUserDTO {
@@ -486,7 +517,9 @@ func (s *sUser) Following(ctx context.Context, userId int64, page, size int) ([]
 	if err != nil {
 		return nil, 0, err
 	}
-	return toPublicList(list), total, nil
+	out := toPublicList(list)
+	attachPublicVip(ctx, out)
+	return out, total, nil
 }
 
 // Fans 我的粉丝列表。
@@ -496,7 +529,9 @@ func (s *sUser) Fans(ctx context.Context, userId int64, page, size int) ([]*serv
 	if err != nil {
 		return nil, 0, err
 	}
-	return toPublicList(list), total, nil
+	out := toPublicList(list)
+	attachPublicVip(ctx, out)
+	return out, total, nil
 }
 
 func normalizePage(page, size int) (int, int) {

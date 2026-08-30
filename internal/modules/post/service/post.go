@@ -9,6 +9,7 @@ type PostDTO struct {
 	Nickname     string
 	Img          string
 	Sex          int
+	IsVip        bool
 	Title        string
 	Content      string
 	Pics         []string

@@ -47,6 +47,7 @@ type InteractDTO struct {
 	ActorName     string
 	ActorAvatar   string
 	ActorSex      int
+	ActorIsVip    bool
 	ActorCount    int
 	MediaType     int
 	ContentId     int64

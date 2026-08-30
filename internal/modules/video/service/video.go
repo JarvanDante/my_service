@@ -24,6 +24,7 @@ type VideoDTO struct {
 	UpUserId      int64
 	UpNickname    string
 	UpAvatar      string
+	UpIsVip       bool
 	Followed      bool
 	CommentCount  int
 	PreviewSec    int

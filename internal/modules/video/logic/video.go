@@ -475,6 +475,13 @@ func fillUpProfiles(ctx context.Context, list []*service.VideoDTO, viewerId int6
 		_, ok := followed[d.UpUserId]
 		d.Followed = ok || viewerId == d.UpUserId
 	}
+	if set, err := paywall.ActiveVipSet(ctx, ids); err == nil {
+		for _, d := range list {
+			if d != nil {
+				d.UpIsVip = set[d.UpUserId]
+			}
+		}
+	}
 }
 
 func overlayCommentCounts(ctx context.Context, list []*service.VideoDTO) {

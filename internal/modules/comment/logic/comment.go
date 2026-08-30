@@ -12,7 +12,6 @@ import (
 	"github.com/gogf/gf/v2/database/gdb"
 	"github.com/gogf/gf/v2/errors/gerror"
 	"github.com/gogf/gf/v2/frame/g"
-	"github.com/gogf/gf/v2/os/gtime"
 
 	"github.com/JarvanDante/my_service/internal/model/entity"
 	"github.com/JarvanDante/my_service/internal/modules/comment/service"
@@ -329,13 +328,7 @@ func fillFrontUsers(ctx context.Context, list []service.ItemDTO, viewerId int64)
 				users[row["id"].Int64()] = author{row["nickname"].String(), row["img"].String()}
 			}
 		}
-		vipSet := map[int64]bool{}
-		now := gtime.Now().Unix()
-		vipRows, _ := g.Model("users").Ctx(ctx).WhereIn("id", ids).
-			Where("group_id > ?", 0).Where("group_end_time > ?", now).Fields("id").All()
-		for _, row := range vipRows {
-			vipSet[row["id"].Int64()] = true
-		}
+		vipSet, _ := paywall.ActiveVipSet(ctx, ids)
 		walkItems(list, func(d *service.ItemDTO) {
 			if a, ok := users[d.UserId]; ok {
 				d.Nickname, d.Img = a.nickname, a.img
@@ -550,13 +543,7 @@ func fillAdminUsers(ctx context.Context, list []*service.AdminItemDTO) {
 	for _, row := range rows {
 		m[row["id"].Int64()] = author{row["nickname"].String(), row["img"].String()}
 	}
-	vipSet := map[int64]bool{}
-	now := gtime.Now().Unix()
-	vipRows, _ := g.Model("users").Ctx(ctx).WhereIn("id", ids).
-		Where("group_id > ?", 0).Where("group_end_time > ?", now).Fields("id").All()
-	for _, row := range vipRows {
-		vipSet[row["id"].Int64()] = true
-	}
+	vipSet, _ := paywall.ActiveVipSet(ctx, ids)
 	for _, d := range list {
 		if d == nil {
 			continue

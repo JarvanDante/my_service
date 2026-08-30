@@ -14,6 +14,7 @@ import (
 
 	"github.com/JarvanDante/my_service/internal/model/entity"
 	"github.com/JarvanDante/my_service/internal/modules/post/service"
+	"github.com/JarvanDante/my_service/internal/shared/paywall"
 	"github.com/JarvanDante/my_service/internal/shared/storage"
 )
 
@@ -102,6 +103,13 @@ func fillAuthors(ctx context.Context, list []*service.PostDTO) {
 		}
 		if a, ok := m[d.UserId]; ok {
 			d.Nickname, d.Img, d.Sex = a.nickname, a.img, a.sex
+		}
+	}
+	if set, err := paywall.ActiveVipSet(ctx, ids); err == nil {
+		for _, d := range list {
+			if d != nil {
+				d.IsVip = set[d.UserId]
+			}
 		}
 	}
 }

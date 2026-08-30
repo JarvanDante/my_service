@@ -44,6 +44,7 @@ type InteractItem struct {
 	ActorName     string `json:"actor_name"`
 	ActorAvatar   string `json:"actor_avatar"`
 	ActorSex      int    `json:"actor_sex"`
+	ActorIsVip    bool   `json:"actor_is_vip"`
 	ActorCount    int    `json:"actor_count"`
 	MediaType     int    `json:"media_type"`
 	ContentId     int64  `json:"content_id"`

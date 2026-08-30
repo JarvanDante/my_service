@@ -72,7 +72,7 @@ func (c *Controller) InteractList(ctx context.Context, req *v1.InteractListReq) 
 		res.List = append(res.List, v1.InteractItem{
 			Id: r.Id, Channel: r.Channel, SubType: r.SubType, IsRead: r.IsRead,
 			CreatedAt: r.CreatedAt, ActorId: r.ActorId, ActorName: r.ActorName,
-			ActorAvatar: r.ActorAvatar, ActorSex: r.ActorSex, ActorCount: r.ActorCount,
+			ActorAvatar: r.ActorAvatar, ActorSex: r.ActorSex, ActorIsVip: r.ActorIsVip, ActorCount: r.ActorCount,
 			MediaType: r.MediaType, ContentId: r.ContentId, ObjectTitle: r.ObjectTitle,
 			TargetType: r.TargetType, CommentId: r.CommentId, RootCommentId: r.RootCommentId,
 			Snippet: r.Snippet, Page: r.Page, PageSize: r.PageSize, Deleted: r.Deleted,

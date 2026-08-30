@@ -9,6 +9,7 @@ type Item struct {
 	Nickname     string   `json:"nickname"`
 	Img          string   `json:"img"`
 	Sex          int      `json:"sex"`
+	IsVip        bool     `json:"is_vip"`
 	Title        string   `json:"title"`
 	Content      string   `json:"content"`
 	Pics         []string `json:"pics"`

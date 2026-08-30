@@ -51,6 +51,7 @@ type UserInfoDTO struct {
 	GroupEndTime int64
 	HasPassword  bool
 	HasParent    bool
+	IsVip        bool
 }
 
 // PublicUserDTO 对外公开信息(看他人时用, 不含手机/余额)。
@@ -65,6 +66,7 @@ type PublicUserDTO struct {
 	Fans      int
 	Follow    int
 	ShareNum  int
+	IsVip     bool
 }
 
 // HomeDTO 他人主页。

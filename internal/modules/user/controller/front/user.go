@@ -209,7 +209,7 @@ func toPublicApi(d *service.PublicUserDTO) v1.PublicUser {
 	return v1.PublicUser{
 		Id: d.Id, Nickname: d.Nickname, Img: d.Img, BgImg: d.BgImg,
 		Signature: d.Signature, Sex: d.Sex, Level: d.Level,
-		Fans: d.Fans, Follow: d.Follow, ShareNum: d.ShareNum,
+		Fans: d.Fans, Follow: d.Follow, ShareNum: d.ShareNum, IsVip: d.IsVip,
 	}
 }
 
@@ -656,7 +656,7 @@ func toApiUser(ctx context.Context, d *service.UserInfoDTO) v1.UserInfo {
 		Id: d.Id, Username: d.Username, Nickname: d.Nickname, Phone: d.Phone,
 		Img: d.Img, Signature: d.Signature, Sex: d.Sex, Level: d.Level,
 		Balance: d.Balance, Credit: d.Credit, GroupName: d.GroupName, GroupEndTime: d.GroupEndTime,
-		Fans: d.Fans, Follow: d.Follow, HasPassword: d.HasPassword, HasParent: d.HasParent,
+		Fans: d.Fans, Follow: d.Follow, HasPassword: d.HasPassword, HasParent: d.HasParent, IsVip: d.IsVip,
 		// 站点差异字段: 仅返回 Nacos response.user_info_extra 白名单内的 key
 		Ext: siteconf.PickExt(ctx, "user_info", map[string]interface{}{
 			"bg_img":         d.BgImg,

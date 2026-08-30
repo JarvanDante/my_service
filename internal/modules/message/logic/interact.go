@@ -13,6 +13,7 @@ import (
 
 	"github.com/JarvanDante/my_service/internal/model/entity"
 	"github.com/JarvanDante/my_service/internal/modules/message/service"
+	"github.com/JarvanDante/my_service/internal/shared/paywall"
 )
 
 const (
@@ -424,6 +425,11 @@ func fillActors(ctx context.Context, list []service.InteractDTO) {
 			list[i].ActorName = a.name
 			list[i].ActorAvatar = a.img
 			list[i].ActorSex = a.sex
+		}
+	}
+	if set, err := paywall.ActiveVipSet(ctx, ids); err == nil {
+		for i := range list {
+			list[i].ActorIsVip = set[list[i].ActorId]
 		}
 	}
 }
