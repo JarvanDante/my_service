@@ -99,6 +99,7 @@ type ChapterInput struct {
 
 type ListFilter struct {
 	Category      string
+	Categories    []string
 	Tag           string
 	Tags          []string
 	Keyword       string

@@ -3,13 +3,14 @@ package v1
 import "github.com/gogf/gf/v2/frame/g"
 
 type FrontModuleItem struct {
-	Id    int64    `json:"id"`
-	Name  string   `json:"name"`
-	Style int      `json:"style"`
-	Icon  int      `json:"icon"`
-	Size  int      `json:"size"`
-	Tags  []string `json:"tags"`
-	Items []Item   `json:"items"`
+	Id         int64    `json:"id"`
+	Name       string   `json:"name"`
+	Style      int      `json:"style"`
+	Icon       int      `json:"icon"`
+	Size       int      `json:"size"`
+	Tags       []string `json:"tags"`
+	Categories []string `json:"categories"`
+	Items      []Item   `json:"items"`
 }
 
 // ModuleListReq 启用中的漫画首页模块, 按权重倒序(公开)。

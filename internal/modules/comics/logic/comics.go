@@ -122,8 +122,19 @@ func (s *sComics) query(ctx context.Context, f service.ListFilter) ([]*service.C
 	if f.Status >= 0 {
 		base = base.Where("status", f.Status)
 	}
-	if f.Category != "" {
-		base = base.Where("string_to_array(replace(category, '，', ','), ',') @> ARRAY[?]::text[]", f.Category)
+	cates := make([]string, 0, len(f.Categories)+1)
+	if s := strings.TrimSpace(f.Category); s != "" {
+		cates = append(cates, s)
+	}
+	for _, c := range f.Categories {
+		if s := strings.TrimSpace(c); s != "" {
+			cates = append(cates, s)
+		}
+	}
+	if len(cates) == 1 {
+		base = base.Where("string_to_array(replace(category, '，', ','), ',') @> ARRAY[?]::text[]", cates[0])
+	} else if len(cates) > 1 {
+		base = base.Where("string_to_array(replace(category, '，', ','), ',') && string_to_array(?, ',')", strings.Join(cates, ","))
 	}
 	tagNames := make([]string, 0, len(f.Tags)+1)
 	for _, t := range f.Tags {
