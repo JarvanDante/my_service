@@ -20,6 +20,7 @@ import (
 	"github.com/JarvanDante/my_service/internal/modules/media/domain"
 	"github.com/JarvanDante/my_service/internal/modules/media/service"
 	"github.com/JarvanDante/my_service/internal/shared/aesbnc"
+	"github.com/JarvanDante/my_service/internal/shared/imgopt"
 	"github.com/JarvanDante/my_service/internal/shared/paas"
 	"github.com/JarvanDante/my_service/internal/shared/storage"
 )
@@ -90,6 +91,10 @@ func (s *sMedia) Upload(ctx context.Context, in service.UploadInput) (*service.U
 		raw, err := io.ReadAll(f)
 		if err != nil {
 			return nil, gerror.WrapCode(gcode.CodeInternalError, err, "读取上传文件失败")
+		}
+		if packed, ok := imgopt.Compress(raw, purpose); ok {
+			raw = packed
+			filename = imgopt.JpegName(filename)
 		}
 		enc, err := aesbnc.Encrypt(raw)
 		if err != nil {
