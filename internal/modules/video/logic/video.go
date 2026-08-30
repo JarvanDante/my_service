@@ -8,13 +8,18 @@ import (
 	"github.com/gogf/gf/v2/errors/gcode"
 	"github.com/gogf/gf/v2/errors/gerror"
 	"github.com/gogf/gf/v2/frame/g"
+	"github.com/gogf/gf/v2/net/ghttp"
 
 	"github.com/JarvanDante/my_service/internal/model/entity"
 	"github.com/JarvanDante/my_service/internal/modules/video/domain"
 	"github.com/JarvanDante/my_service/internal/modules/video/service"
+	"github.com/JarvanDante/my_service/internal/shared/consts"
 	"github.com/JarvanDante/my_service/internal/shared/paas"
+	"github.com/JarvanDante/my_service/internal/shared/paywall"
 	"github.com/JarvanDante/my_service/internal/shared/storage"
 )
+
+const playTrialSec = 5
 
 func decodeTags(raw string) []string {
 	out := []string{}
@@ -149,6 +154,7 @@ func (s *sVideo) FrontList(ctx context.Context, in service.FrontListInput) (*ser
 	s.overlayMediaURLs(ctx, out)
 	fillUpProfiles(ctx, out, in.ViewerId)
 	overlayCommentCounts(ctx, out)
+	applyViewerPlay(ctx, out, in.ViewerId)
 	return &service.ListDTO{List: out, Total: total, Page: page, Size: size}, nil
 }
 
@@ -169,6 +175,7 @@ func (s *sVideo) FrontDetail(ctx context.Context, id, viewerId int64) (*service.
 	s.resolvePlay(ctx, d)
 	fillUpProfiles(ctx, []*service.VideoDTO{d}, viewerId)
 	overlayCommentCounts(ctx, []*service.VideoDTO{d})
+	applyViewerPlay(ctx, []*service.VideoDTO{d}, viewerId)
 	return d, nil
 }
 
@@ -336,6 +343,7 @@ func (s *sVideo) MyDouyin(ctx context.Context, userId int64, page, size int) (*s
 		out = append(out, toDTO(ctx, v))
 	}
 	fillUpProfiles(ctx, out, userId)
+	applyViewerPlay(ctx, out, userId)
 	return &service.ListDTO{List: out, Total: total, Page: page, Size: size}, nil
 }
 
@@ -530,6 +538,39 @@ func toDTO(ctx context.Context, v *entity.Video) *service.VideoDTO {
 		d.SourceUrl = storage.SignPlayURL(ctx, d.SourceUrl)
 	}
 	return d
+}
+
+func resolveViewerId(ctx context.Context, viewerId int64) int64 {
+	if viewerId > 0 {
+		return viewerId
+	}
+	if r := ghttp.RequestFromCtx(ctx); r != nil {
+		return r.GetCtxVar(consts.CtxUserId).Int64()
+	}
+	return 0
+}
+
+func trialSecForViewer(ctx context.Context, viewerId int64) int {
+	ok, err := paywall.IsVipActive(ctx, resolveViewerId(ctx, viewerId))
+	if err == nil && ok {
+		return 0
+	}
+	return playTrialSec
+}
+
+func applyViewerPlay(ctx context.Context, list []*service.VideoDTO, viewerId int64) {
+	d := trialSecForViewer(ctx, viewerId)
+	for _, item := range list {
+		if item == nil {
+			continue
+		}
+		item.PreviewSec = d
+		item.NeedVip = d > 0
+		if item.MediaCode == "" {
+			continue
+		}
+		item.CoverUrl, item.SourceUrl = paas.ApplyGatewayURLsPreview(ctx, item.CoverUrl, item.SourceUrl, item.MediaCode, d)
+	}
 }
 
 func (s *sVideo) overlayMediaURLs(ctx context.Context, list []*service.VideoDTO) {

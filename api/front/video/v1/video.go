@@ -20,6 +20,8 @@ type Item struct {
 	UpAvatar    string   `json:"up_avatar"`
 	Followed      bool     `json:"followed"`
 	CommentCount  int      `json:"comment_count"`
+	PreviewSec    int      `json:"preview_sec"`
+	NeedVip       bool     `json:"need_vip"`
 }
 
 // CategoryListReq 启用中的视频分类, 按权重倒序(公开)。

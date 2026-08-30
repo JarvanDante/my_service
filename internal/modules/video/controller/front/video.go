@@ -39,6 +39,7 @@ func toItem(v *service.VideoDTO) v1.Item {
 		Duration: v.Duration, CreatedAt: v.CreatedAt,
 		UpUserId: v.UpUserId, UpNickname: v.UpNickname, UpAvatar: v.UpAvatar, Followed: v.Followed,
 		CommentCount: v.CommentCount,
+		PreviewSec: v.PreviewSec, NeedVip: v.NeedVip,
 	}
 }
 

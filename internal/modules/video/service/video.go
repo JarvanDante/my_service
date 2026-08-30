@@ -26,6 +26,8 @@ type VideoDTO struct {
 	UpAvatar      string
 	Followed      bool
 	CommentCount  int
+	PreviewSec    int
+	NeedVip       bool
 	CreatedBy     int64
 	CreatedAt     string
 	UpdatedAt     string
