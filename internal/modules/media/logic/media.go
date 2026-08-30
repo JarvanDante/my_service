@@ -45,8 +45,8 @@ var purposeDefaults = map[string]struct {
 	"avatar":     {avatarMimes, 2048},
 	"ad":         {imageMimes, 5120},
 	"post":       {imageMimes, 5120},
-	"video":      {videoMimes, 2097152},
-	"post_video": {videoMimes, 2097152},
+	"video":      {videoMimes, 614400},
+	"post_video": {videoMimes, 614400},
 }
 
 func (s *sMedia) Upload(ctx context.Context, in service.UploadInput) (*service.UploadDTO, error) {
@@ -293,6 +293,9 @@ func (s *sMedia) validateSize(ctx context.Context, purpose string, size int64) e
 		maxKB = purposeDefaults[purpose].maxSize
 	}
 	if size > maxKB*1024 {
+		if purpose == "video" || purpose == "post_video" {
+			return gerror.NewCode(gcode.CodeInvalidParameter, "视频不能超过 600M，请压缩后再上传")
+		}
 		return gerror.NewCodef(gcode.CodeInvalidParameter, "文件大小不能超过 %dKB", maxKB)
 	}
 	return nil
