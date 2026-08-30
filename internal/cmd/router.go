@@ -14,8 +14,9 @@ import (
 	configmod "github.com/JarvanDante/my_service/internal/modules/config"
 	couponmod "github.com/JarvanDante/my_service/internal/modules/coupon"
 	feedbackmod "github.com/JarvanDante/my_service/internal/modules/feedback"
-	groupmod "github.com/JarvanDante/my_service/internal/modules/group"
 	finmod "github.com/JarvanDante/my_service/internal/modules/finance"
+	groupmod "github.com/JarvanDante/my_service/internal/modules/group"
+	kingkongmod "github.com/JarvanDante/my_service/internal/modules/kingkong"
 	lotterymod "github.com/JarvanDante/my_service/internal/modules/lottery"
 	mediamod "github.com/JarvanDante/my_service/internal/modules/media"
 	msgmod "github.com/JarvanDante/my_service/internal/modules/message"
@@ -72,6 +73,7 @@ func mountFront(s *ghttp.Server) {
 		aimod.RegisterFront(group)
 		videomod.RegisterFront(group, dao.NewVideoRepo())
 		mediamod.RegisterFront(group, dao.NewMediaRepo())
+		kingkongmod.RegisterFront(group)
 	})
 
 	// ---- v2(将来大改时启用; 老的 v1 继续并存)----
@@ -130,6 +132,7 @@ func mountBackend(s *ghttp.Server) {
 			lotterymod.RegisterBackend(perm)
 			aimod.RegisterBackend(perm)
 			checkinmod.RegisterBackend(perm)
+			kingkongmod.RegisterBackend(perm)
 		})
 	})
 }
