@@ -14,6 +14,7 @@ import (
 	"github.com/JarvanDante/my_service/internal/modules/video/domain"
 	"github.com/JarvanDante/my_service/internal/modules/video/service"
 	"github.com/JarvanDante/my_service/internal/shared/consts"
+	"github.com/JarvanDante/my_service/internal/shared/kit"
 	"github.com/JarvanDante/my_service/internal/shared/paas"
 	"github.com/JarvanDante/my_service/internal/shared/paywall"
 	"github.com/JarvanDante/my_service/internal/shared/storage"
@@ -114,15 +115,11 @@ func (s *sVideo) FrontList(ctx context.Context, in service.FrontListInput) (*ser
 	if size > 100 { // 前台是公开接口, 限一下单页上限, 免得被拿来整表拉取
 		size = 100
 	}
-	tags := append([]string{}, in.Tags...)
-	if t := strings.TrimSpace(in.Tag); t != "" {
-		tags = append(tags, t)
-	}
 	filter := domain.ListFilter{
 		Keyword:      strings.TrimSpace(in.Keyword),
 		Category:     strings.TrimSpace(in.Category),
 		Categories:   in.Categories,
-		Tags:         tags,
+		Tags:         kit.MergeNames(kit.NamesCSV(in.Tag), in.Tags),
 		Kind:         normalizeKind(in.Kind),
 		Status:       entity.VideoStatusPublished,
 		SubmitSource: 9,

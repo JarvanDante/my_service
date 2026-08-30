@@ -11,6 +11,7 @@ import (
 	v1 "github.com/JarvanDante/my_service/api/front/comics/v1"
 	"github.com/JarvanDante/my_service/internal/modules/comics/service"
 	"github.com/JarvanDante/my_service/internal/shared/consts"
+	"github.com/JarvanDante/my_service/internal/shared/kit"
 )
 
 type Controller struct {
@@ -48,7 +49,8 @@ func toItem(d *service.ComicsDTO) v1.Item {
 
 func (c *Controller) List(ctx context.Context, req *v1.ListReq) (res *v1.ListRes, err error) {
 	list, total, err := c.svc.FrontList(ctx, optionalUid(ctx), service.ListFilter{
-		Category: req.Category, Tag: req.Tag, Keyword: req.Keyword,
+		Category: req.Category, Categories: kit.NamesCSV(req.Categories),
+		Tag: req.Tag, Tags: kit.NamesCSV(req.Tags), Keyword: req.Keyword,
 		Sort: req.Sort, PayType: req.PayType, OnlyRecommend: req.Recommend == 1, Page: req.Page, Size: req.Size,
 	})
 	if err != nil {

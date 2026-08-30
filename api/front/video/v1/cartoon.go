@@ -19,13 +19,15 @@ type CartoonCategoryListRes struct {
 // CartoonListReq 动漫列表(公开, video.kind=2 且已上架)。
 // sort: 0综合(人工 sort 权重) 1最新 2时长。
 type CartoonListReq struct {
-	g.Meta   `path:"/cartoon/list" method:"get" tags:"Front/Cartoon" summary:"动漫列表"`
-	Keyword  string `json:"keyword"`
-	Category string `json:"category"`
-	Tag      string `json:"tag"`
-	Sort     int    `json:"sort" v:"in:0,1,2#排序方式非法"`
-	Page     int    `json:"page"`
-	Size     int    `json:"size"`
+	g.Meta     `path:"/cartoon/list" method:"get" tags:"Front/Cartoon" summary:"动漫列表"`
+	Keyword    string `json:"keyword"`
+	Category   string `json:"category"`
+	Categories string `json:"categories"` // 逗号分隔多个分类，与 category 合并；命中任一
+	Tag        string `json:"tag"`
+	Tags       string `json:"tags"` // 逗号分隔多个标签，与 tag 合并；命中任一
+	Sort       int    `json:"sort" v:"in:0,1,2#排序方式非法"`
+	Page       int    `json:"page"`
+	Size       int    `json:"size"`
 }
 type CartoonListRes struct {
 	List  []Item `json:"list"`

@@ -35,13 +35,15 @@ type CategoryListRes struct {
 // ListReq 视频列表(公开, 只出已上架 kind=0)。
 // sort: 0综合(人工 sort 权重) 1最新 2时长。
 type ListReq struct {
-	g.Meta   `path:"/video/list" method:"get" tags:"Front/Video" summary:"视频列表"`
-	Keyword  string `json:"keyword"`
-	Category string `json:"category"`
-	Tag      string `json:"tag"`
-	Sort     int    `json:"sort" v:"in:0,1,2#排序方式非法"`
-	Page     int    `json:"page"`
-	Size     int    `json:"size"`
+	g.Meta     `path:"/video/list" method:"get" tags:"Front/Video" summary:"视频列表"`
+	Keyword    string `json:"keyword"`
+	Category   string `json:"category"`
+	Categories string `json:"categories"` // 逗号分隔多个分类，与 category 合并；命中任一
+	Tag        string `json:"tag"`
+	Tags       string `json:"tags"` // 逗号分隔多个标签，与 tag 合并；命中任一
+	Sort       int    `json:"sort" v:"in:0,1,2#排序方式非法"`
+	Page       int    `json:"page"`
+	Size       int    `json:"size"`
 }
 type ListRes struct {
 	List  []Item `json:"list"`

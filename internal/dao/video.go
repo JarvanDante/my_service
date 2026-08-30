@@ -10,6 +10,7 @@ import (
 
 	"github.com/JarvanDante/my_service/internal/model/entity"
 	videodomain "github.com/JarvanDante/my_service/internal/modules/video/domain"
+	"github.com/JarvanDante/my_service/internal/shared/kit"
 )
 
 type videoRepo struct{}
@@ -30,26 +31,11 @@ func (r *videoRepo) List(ctx context.Context, f videodomain.ListFilter, page, si
 	if f.MediaCode != "" {
 		m = m.Where("media_code", f.MediaCode)
 	}
-	cates := make([]string, 0, len(f.Categories)+1)
-	if s := strings.TrimSpace(f.Category); s != "" {
-		cates = append(cates, s)
+	cates := kit.MergeNames(kit.NamesCSV(f.Category), f.Categories)
+	if len(cates) > 0 {
+		m = m.Where(kit.CategoryOverlapWhere(), strings.Join(cates, ","))
 	}
-	for _, c := range f.Categories {
-		if s := strings.TrimSpace(c); s != "" {
-			cates = append(cates, s)
-		}
-	}
-	if len(cates) == 1 {
-		m = m.Where("string_to_array(replace(category, '，', ','), ',') @> ARRAY[?]::text[]", cates[0])
-	} else if len(cates) > 1 {
-		m = m.Where("string_to_array(replace(category, '，', ','), ',') && string_to_array(?, ',')", strings.Join(cates, ","))
-	}
-	tagNames := make([]string, 0, len(f.Tags))
-	for _, t := range f.Tags {
-		if s := strings.TrimSpace(t); s != "" {
-			tagNames = append(tagNames, s)
-		}
-	}
+	tagNames := kit.MergeNames(f.Tags)
 	if len(tagNames) == 1 {
 		raw, _ := json.Marshal([]string{tagNames[0]})
 		m = m.Where("tags @> ?::jsonb", string(raw))

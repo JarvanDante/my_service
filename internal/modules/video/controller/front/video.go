@@ -12,6 +12,7 @@ import (
 	"github.com/JarvanDante/my_service/internal/model/entity"
 	"github.com/JarvanDante/my_service/internal/modules/video/service"
 	"github.com/JarvanDante/my_service/internal/shared/consts"
+	"github.com/JarvanDante/my_service/internal/shared/kit"
 )
 
 type Controller struct {
@@ -76,7 +77,8 @@ func (c *Controller) CategoryList(ctx context.Context, _ *v1.CategoryListReq) (r
 
 func (c *Controller) List(ctx context.Context, req *v1.ListReq) (res *v1.ListRes, err error) {
 	dto, err := c.svc.FrontList(ctx, service.FrontListInput{
-		Keyword: req.Keyword, Category: req.Category, Tag: req.Tag, Kind: entity.VideoKindVideo,
+		Keyword: req.Keyword, Category: req.Category, Categories: kit.NamesCSV(req.Categories),
+		Tag: req.Tag, Tags: kit.NamesCSV(req.Tags), Kind: entity.VideoKindVideo,
 		Sort: req.Sort, Page: req.Page, Size: req.Size, ViewerId: viewerId(ctx),
 	})
 	if err != nil {
@@ -114,7 +116,8 @@ func (c *Controller) CartoonCategoryList(ctx context.Context, _ *v1.CartoonCateg
 
 func (c *Controller) CartoonList(ctx context.Context, req *v1.CartoonListReq) (res *v1.CartoonListRes, err error) {
 	dto, err := c.svc.FrontList(ctx, service.FrontListInput{
-		Keyword: req.Keyword, Category: req.Category, Tag: req.Tag, Kind: entity.VideoKindCartoon,
+		Keyword: req.Keyword, Category: req.Category, Categories: kit.NamesCSV(req.Categories),
+		Tag: req.Tag, Tags: kit.NamesCSV(req.Tags), Kind: entity.VideoKindCartoon,
 		Sort: req.Sort, Page: req.Page, Size: req.Size, ViewerId: viewerId(ctx),
 	})
 	if err != nil {
