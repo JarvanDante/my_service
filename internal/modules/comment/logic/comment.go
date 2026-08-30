@@ -196,12 +196,12 @@ func (s *sComment) List(ctx context.Context, mediaType int, contentId int64, pag
 	base := g.Model("comment").Ctx(ctx).
 		Where("site_id", cmtSiteId).Where("media_type", mediaType).
 		Where("content_id", contentId).Where("status", statusLive)
-	// 顶层分页
-	top := base.Clone().Where("root_id", 0)
-	total, err := top.Clone().Count()
+	// 外层数量=主评+回复；分页仍按顶层
+	total, err := base.Clone().Count()
 	if err != nil {
 		return nil, 0, err
 	}
+	top := base.Clone().Where("root_id", 0)
 	var tops []*entity.Comment
 	q := top.Clone()
 	if sort == 1 {
