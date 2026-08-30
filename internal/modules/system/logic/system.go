@@ -56,6 +56,21 @@ func (s *sSystem) Notices(ctx context.Context, in service.NoticeListInput) (*ser
 	return &service.NoticeListDTO{List: out, Total: total, Page: in.Page, Size: in.Size}, nil
 }
 
+func (s *sSystem) FrontNotices(ctx context.Context) ([]*service.NoticeDTO, error) {
+	list, _, err := s.repo.NoticeList(ctx, domain.NoticeFilter{Type: "notice", Status: 1}, 1, 20)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]*service.NoticeDTO, 0, len(list))
+	for _, n := range list {
+		out = append(out, &service.NoticeDTO{
+			Id: n.Id, Title: n.Title, Content: n.Content, Type: n.Type,
+			Status: n.Status, CreatedBy: n.CreatedBy, CreatedAt: fmtTime(n.CreatedAt),
+		})
+	}
+	return out, nil
+}
+
 func (s *sSystem) SetNoticeStatus(ctx context.Context, id int64, status int) error {
 	if id <= 0 {
 		return gerror.New("公告ID无效")

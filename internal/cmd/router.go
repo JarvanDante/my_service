@@ -74,6 +74,7 @@ func mountFront(s *ghttp.Server) {
 		videomod.RegisterFront(group, dao.NewVideoRepo())
 		mediamod.RegisterFront(group, dao.NewMediaRepo())
 		kingkongmod.RegisterFront(group)
+		sysmod.RegisterFront(group, dao.NewSystemRepo())
 	})
 
 	// ---- v2(将来大改时启用; 老的 v1 继续并存)----

@@ -38,6 +38,7 @@ type ISystem interface {
 	// 公告 / 推送
 	Push(ctx context.Context, in PushInput) (int64, error)
 	Notices(ctx context.Context, in NoticeListInput) (*NoticeListDTO, error)
+	FrontNotices(ctx context.Context) ([]*NoticeDTO, error)
 	SetNoticeStatus(ctx context.Context, id int64, status int) error
 	// 配置
 	GetCustomerUrl(ctx context.Context) (string, error)
