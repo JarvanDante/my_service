@@ -3,48 +3,53 @@ package service
 import "context"
 
 type ModuleDTO struct {
-	Id        int64
-	Name      string
-	Position  string
-	Style     int
-	Icon      int
-	TagIds    []int64
-	TagNames  []string
-	Size      int
-	Rank      int
-	Status    int
-	CreatedAt string
-	UpdatedAt string
+	Id            int64
+	Name          string
+	Position      string
+	Style         int
+	Icon          int
+	CategoryIds   []int64
+	CategoryNames []string
+	TagIds        []int64
+	TagNames      []string
+	Size          int
+	Rank          int
+	Status        int
+	CreatedAt     string
+	UpdatedAt     string
 }
 
 type ModuleInput struct {
-	Id       int64
-	Name     string
-	Position string
-	Style    int
-	Icon     int
-	TagIds   []int64
-	Size     int
-	Rank     int
-	Status   int
+	Id          int64
+	Name        string
+	Position    string
+	Style       int
+	Icon        int
+	CategoryIds []int64
+	TagIds      []int64
+	Size        int
+	Rank        int
+	Status      int
 }
 
 type ModuleFilter struct {
-	Name     string
-	Position string
-	Status   int
-	Page     int
-	Size     int
+	Name       string
+	Position   string
+	CategoryId int64
+	Status     int
+	Page       int
+	Size       int
 }
 
 type ModuleFrontDTO struct {
-	Id    int64
-	Name  string
-	Style int
-	Icon  int
-	Size  int
-	Tags  []string
-	Items []*VideoDTO
+	Id         int64
+	Name       string
+	Style      int
+	Icon       int
+	Size       int
+	Tags       []string
+	Categories []string
+	Items      []*VideoDTO
 }
 
 type IModule interface {

@@ -15,10 +15,11 @@ import (
 )
 
 type moduleSpec struct {
-	Table      string
-	TagType    int
-	VideoKind  int
-	DefaultPos string
+	Table         string
+	CategoryTable string
+	TagType       int
+	VideoKind     int
+	DefaultPos    string
 }
 
 type sModule struct {
@@ -28,14 +29,14 @@ type sModule struct {
 
 func NewVideoModule(repo domain.Repository) service.IModule {
 	return &sModule{
-		spec:  moduleSpec{Table: "video_module", TagType: 1, VideoKind: entity.VideoKindVideo, DefaultPos: entity.VideoModulePosHome},
+		spec:  moduleSpec{Table: "video_module", CategoryTable: "video_category", TagType: 1, VideoKind: entity.VideoKindVideo, DefaultPos: entity.VideoModulePosHome},
 		video: New(repo),
 	}
 }
 
 func NewCartoonModule(repo domain.Repository) service.IModule {
 	return &sModule{
-		spec:  moduleSpec{Table: "cartoon_module", TagType: 3, VideoKind: entity.VideoKindCartoon, DefaultPos: entity.CartoonModulePosHome},
+		spec:  moduleSpec{Table: "cartoon_module", CategoryTable: "cartoon_category", TagType: 3, VideoKind: entity.VideoKindCartoon, DefaultPos: entity.CartoonModulePosHome},
 		video: New(repo),
 	}
 }
@@ -97,6 +98,29 @@ func normalizeSize(n, style int) int {
 	return n
 }
 
+func (s *sModule) categoryNames(ctx context.Context, ids []int64) []string {
+	if len(ids) == 0 {
+		return []string{}
+	}
+	var rows []struct {
+		Id   int64  `orm:"id"`
+		Name string `orm:"name"`
+	}
+	_ = g.Model(s.spec.CategoryTable).Ctx(ctx).
+		Where("site_id", vdSiteId).WhereIn("id", ids).Scan(&rows)
+	byID := make(map[int64]string, len(rows))
+	for _, r := range rows {
+		byID[r.Id] = r.Name
+	}
+	out := make([]string, 0, len(ids))
+	for _, id := range ids {
+		if name := byID[id]; name != "" {
+			out = append(out, name)
+		}
+	}
+	return out
+}
+
 func (s *sModule) tagNames(ctx context.Context, ids []int64) []string {
 	if len(ids) == 0 {
 		return []string{}
@@ -121,7 +145,7 @@ func (s *sModule) tagNames(ctx context.Context, ids []int64) []string {
 	return out
 }
 
-func toModuleDTO(r *entity.VideoModule, names []string) *service.ModuleDTO {
+func toModuleDTO(r *entity.VideoModule, catNames, tagNames []string) *service.ModuleDTO {
 	created, updated := "", ""
 	if r.CreatedAt != nil {
 		created = r.CreatedAt.String()
@@ -129,12 +153,16 @@ func toModuleDTO(r *entity.VideoModule, names []string) *service.ModuleDTO {
 	if r.UpdatedAt != nil {
 		updated = r.UpdatedAt.String()
 	}
-	if names == nil {
-		names = []string{}
+	if catNames == nil {
+		catNames = []string{}
+	}
+	if tagNames == nil {
+		tagNames = []string{}
 	}
 	return &service.ModuleDTO{
 		Id: r.Id, Name: r.Name, Position: r.Position, Style: r.Style, Icon: r.Icon,
-		TagIds: decodeI64s(r.TagIds), TagNames: names, Size: r.Size, Rank: r.Rank, Status: r.Status,
+		CategoryIds: decodeI64s(r.CategoryIds), CategoryNames: catNames,
+		TagIds: decodeI64s(r.TagIds), TagNames: tagNames, Size: r.Size, Rank: r.Rank, Status: r.Status,
 		CreatedAt: created, UpdatedAt: updated,
 	}
 }
@@ -153,6 +181,9 @@ func (s *sModule) List(ctx context.Context, f service.ModuleFilter) ([]*service.
 	if pos := strings.TrimSpace(f.Position); pos != "" {
 		m = m.Where("position", pos)
 	}
+	if f.CategoryId > 0 {
+		m = m.Where("category_ids @> ?::jsonb", encodeI64s([]int64{f.CategoryId}))
+	}
 	if f.Status >= 0 {
 		m = m.Where("status", f.Status)
 	}
@@ -166,7 +197,7 @@ func (s *sModule) List(ctx context.Context, f service.ModuleFilter) ([]*service.
 	}
 	out := make([]*service.ModuleDTO, 0, len(list))
 	for _, r := range list {
-		out = append(out, toModuleDTO(r, s.tagNames(ctx, decodeI64s(r.TagIds))))
+		out = append(out, toModuleDTO(r, s.categoryNames(ctx, decodeI64s(r.CategoryIds)), s.tagNames(ctx, decodeI64s(r.TagIds))))
 	}
 	return out, total, nil
 }
@@ -181,15 +212,16 @@ func (s *sModule) Create(ctx context.Context, in service.ModuleInput) (int64, er
 	}
 	style := normalizeStyle(in.Style)
 	return g.Model(s.spec.Table).Ctx(ctx).Data(g.Map{
-		"site_id":  vdSiteId,
-		"name":     name,
-		"position": s.normalizePosition(in.Position),
-		"style":    style,
-		"icon":     normalizeIcon(in.Icon),
-		"tag_ids":  encodeI64s(in.TagIds),
-		"size":     normalizeSize(in.Size, style),
-		"rank":     in.Rank,
-		"status":   in.Status,
+		"site_id":      vdSiteId,
+		"name":         name,
+		"position":     s.normalizePosition(in.Position),
+		"style":        style,
+		"icon":         normalizeIcon(in.Icon),
+		"category_ids": encodeI64s(in.CategoryIds),
+		"tag_ids":      encodeI64s(in.TagIds),
+		"size":         normalizeSize(in.Size, style),
+		"rank":         in.Rank,
+		"status":       in.Status,
 	}).InsertAndGetId()
 }
 
@@ -199,13 +231,14 @@ func (s *sModule) Update(ctx context.Context, in service.ModuleInput) error {
 	}
 	style := normalizeStyle(in.Style)
 	data := g.Map{
-		"position":   s.normalizePosition(in.Position),
-		"style":      style,
-		"icon":       normalizeIcon(in.Icon),
-		"tag_ids":    encodeI64s(in.TagIds),
-		"size":       normalizeSize(in.Size, style),
-		"rank":       in.Rank,
-		"updated_at": gtime.Now(),
+		"position":     s.normalizePosition(in.Position),
+		"style":        style,
+		"icon":         normalizeIcon(in.Icon),
+		"category_ids": encodeI64s(in.CategoryIds),
+		"tag_ids":      encodeI64s(in.TagIds),
+		"size":         normalizeSize(in.Size, style),
+		"rank":         in.Rank,
+		"updated_at":   gtime.Now(),
 	}
 	if name := strings.TrimSpace(in.Name); name != "" {
 		data["name"] = name
@@ -238,10 +271,11 @@ func (s *sModule) FrontRepo(ctx context.Context, position string) ([]*service.Mo
 	}
 	out := make([]*service.ModuleFrontDTO, 0, len(list))
 	for _, r := range list {
-		names := s.tagNames(ctx, decodeI64s(r.TagIds))
+		tagNames := s.tagNames(ctx, decodeI64s(r.TagIds))
+		catNames := s.categoryNames(ctx, decodeI64s(r.CategoryIds))
 		size := normalizeSize(r.Size, r.Style)
 		dto, err := s.video.FrontList(ctx, service.FrontListInput{
-			Tags: names, Kind: s.spec.VideoKind, Sort: 1, Page: 1, Size: size,
+			Categories: catNames, Tags: tagNames, Kind: s.spec.VideoKind, Sort: 1, Page: 1, Size: size,
 		})
 		var items []*service.VideoDTO
 		if err == nil && dto != nil {
@@ -249,7 +283,7 @@ func (s *sModule) FrontRepo(ctx context.Context, position string) ([]*service.Mo
 		}
 		out = append(out, &service.ModuleFrontDTO{
 			Id: r.Id, Name: r.Name, Style: normalizeStyle(r.Style), Icon: normalizeIcon(r.Icon),
-			Size: size, Tags: names, Items: items,
+			Size: size, Tags: tagNames, Categories: catNames, Items: items,
 		})
 	}
 	return out, nil

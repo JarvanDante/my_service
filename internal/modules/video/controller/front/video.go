@@ -196,7 +196,7 @@ func toFrontModules(list []*service.ModuleFrontDTO) []v1.FrontModuleItem {
 	out := make([]v1.FrontModuleItem, 0, len(list))
 	for _, d := range list {
 		row := v1.FrontModuleItem{
-			Id: d.Id, Name: d.Name, Style: d.Style, Icon: d.Icon, Size: d.Size, Tags: d.Tags,
+			Id: d.Id, Name: d.Name, Style: d.Style, Icon: d.Icon, Size: d.Size, Tags: d.Tags, Categories: d.Categories,
 			Items: make([]v1.Item, 0, len(d.Items)),
 		}
 		for _, item := range d.Items {

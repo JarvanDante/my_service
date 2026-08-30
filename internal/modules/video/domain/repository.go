@@ -7,16 +7,17 @@ import (
 )
 
 type ListFilter struct {
-	Keyword   string
-	MediaCode string
-	Category  string // 作品分类名, 命中 category 逗号列表中的一项
-	Kind         int // 0视频 2动漫 3抖音
-	Status       int // 9=全部 8=草稿+下架
-	SubmitSource int // 9=全部 0后台 1用户
+	Keyword      string
+	MediaCode    string
+	Category     string   // 作品分类名, 命中 category 逗号列表中的一项
+	Categories   []string // 多个分类名, 命中任一项
+	Kind         int      // 0视频 2动漫 3抖音
+	Status       int      // 9=全部 8=草稿+下架
+	SubmitSource int      // 9=全部 0后台 1用户
 	// Sort 排序方式: 0综合(人工 sort 权重, 后台与前台默认) 1最新 2时长。
 	// 加在仓储层而不是在 logic 里排内存, 是因为分页必须由 SQL 完成 ——
 	// 内存排序只能排当前这一页, 结果是错的。
-	Sort int
+	Sort      int
 	Tags      []string // 标签名, 命中 tags jsonb 数组中任一项
 	UpUserIds []int64  // 只出这些 UP 主的作品(关注流)
 }

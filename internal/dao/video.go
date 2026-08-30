@@ -30,8 +30,19 @@ func (r *videoRepo) List(ctx context.Context, f videodomain.ListFilter, page, si
 	if f.MediaCode != "" {
 		m = m.Where("media_code", f.MediaCode)
 	}
-	if f.Category != "" {
-		m = m.Where("string_to_array(replace(category, '，', ','), ',') @> ARRAY[?]::text[]", f.Category)
+	cates := make([]string, 0, len(f.Categories)+1)
+	if s := strings.TrimSpace(f.Category); s != "" {
+		cates = append(cates, s)
+	}
+	for _, c := range f.Categories {
+		if s := strings.TrimSpace(c); s != "" {
+			cates = append(cates, s)
+		}
+	}
+	if len(cates) == 1 {
+		m = m.Where("string_to_array(replace(category, '，', ','), ',') @> ARRAY[?]::text[]", cates[0])
+	} else if len(cates) > 1 {
+		m = m.Where("string_to_array(replace(category, '，', ','), ',') && string_to_array(?, ',')", strings.Join(cates, ","))
 	}
 	tagNames := make([]string, 0, len(f.Tags))
 	for _, t := range f.Tags {

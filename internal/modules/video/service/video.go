@@ -51,12 +51,13 @@ type ListDTO struct {
 // FrontListInput 前台列表入参。刻意不带 Status —— 前台永远只看已上架,
 // 不给调用方留下"传个 status 就能看到草稿"的口子。
 type FrontListInput struct {
-	Keyword  string
-	Category string
-	Tag      string
-	Tags     []string
-	Kind     int // 0视频 2动漫
-	Sort     int // 0综合(sort权重) 1最新 2时长
+	Keyword    string
+	Category   string
+	Categories []string
+	Tag        string
+	Tags       []string
+	Kind       int // 0视频 2动漫
+	Sort       int // 0综合(sort权重) 1最新 2时长
 	Page       int
 	Size       int
 	ViewerId   int64

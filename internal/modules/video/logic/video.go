@@ -116,6 +116,7 @@ func (s *sVideo) FrontList(ctx context.Context, in service.FrontListInput) (*ser
 	filter := domain.ListFilter{
 		Keyword:      strings.TrimSpace(in.Keyword),
 		Category:     strings.TrimSpace(in.Category),
+		Categories:   in.Categories,
 		Tags:         tags,
 		Kind:         normalizeKind(in.Kind),
 		Status:       entity.VideoStatusPublished,
@@ -183,7 +184,7 @@ func (s *sVideo) Create(ctx context.Context, in service.SaveInput) (int64, error
 		MediaCode: strings.TrimSpace(in.MediaCode), Kind: normalizeKind(in.Kind), Category: in.Category, Tags: encodeJSON(in.Tags),
 		Duration: in.Duration, Sort: in.Sort, Status: in.Status,
 		SubmitSource: entity.VideoSubmitAdmin,
-		UpUserId: in.UpUserId, CreatedBy: in.OperatorId,
+		UpUserId:     in.UpUserId, CreatedBy: in.OperatorId,
 	})
 }
 
