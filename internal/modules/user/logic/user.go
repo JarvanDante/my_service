@@ -597,7 +597,7 @@ func (s *sUser) BindParent(ctx context.Context, userId int64, account string) er
 	if me.ParentId != 0 {
 		return gerror.New("已绑定推荐人, 不可修改")
 	}
-	parentName := kit.EncodeUserId(inviter.Id)
+	parentName := kit.EncodePublicId(inviter.Id)
 	if parentName == "" {
 		parentName = inviter.Username
 	}

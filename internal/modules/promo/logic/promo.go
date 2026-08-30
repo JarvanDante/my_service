@@ -12,6 +12,7 @@ import (
 	"github.com/JarvanDante/my_service/internal/model/entity"
 	"github.com/JarvanDante/my_service/internal/modules/promo/domain"
 	"github.com/JarvanDante/my_service/internal/modules/promo/service"
+	"github.com/JarvanDante/my_service/internal/shared/kit"
 )
 
 type sPromo struct {
@@ -180,8 +181,12 @@ func (s *sPromo) ShareStats(ctx context.Context, startDate, endDate string, top 
 	}
 	ranks := make([]service.InviteRankDTO, 0, len(rank))
 	for _, r := range rank {
+		name := kit.EncodePublicId(r.UserId)
+		if name == "" {
+			name = r.Username
+		}
 		ranks = append(ranks, service.InviteRankDTO{
-			UserId: r.UserId, Username: r.Username, InviteCount: r.InviteCount,
+			UserId: r.UserId, Username: name, InviteCount: r.InviteCount,
 		})
 	}
 	return &service.ShareStatsDTO{
