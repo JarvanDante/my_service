@@ -309,6 +309,22 @@ func resolveObject(ctx context.Context, mediaType int, contentId int64) (int64, 
 		}
 		return v.UpUserId, v.Title
 	}
+	if mediaType == 4 {
+		var c *entity.Comics
+		if err := g.Model("comics").Ctx(ctx).Where("site_id", msgSiteId).Where("id", contentId).
+			Fields("title").Scan(&c); err != nil || c == nil {
+			return 0, ""
+		}
+		return 0, c.Title
+	}
+	if mediaType == 7 {
+		var n *entity.Novel
+		if err := g.Model("novel").Ctx(ctx).Where("site_id", msgSiteId).Where("id", contentId).
+			Fields("title").Scan(&n); err != nil || n == nil {
+			return 0, ""
+		}
+		return 0, n.Title
+	}
 	return 0, ""
 }
 

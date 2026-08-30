@@ -395,9 +395,11 @@ func (s *sComment) AdminList(ctx context.Context, f service.AdminListFilter) ([]
 	if f.UserId > 0 {
 		m = m.Where("user_id", f.UserId)
 	}
-	if f.MediaType > 0 {
-		m = m.Where("media_type", f.MediaType)
+	filtered, err := applyAdminMediaFilter(ctx, m, f.MediaType)
+	if err != nil {
+		return nil, 0, err
 	}
+	m = filtered
 	total, err := m.Clone().Count()
 	if err != nil {
 		return nil, 0, err
@@ -416,11 +418,111 @@ func (s *sComment) AdminList(ctx context.Context, f service.AdminListFilter) ([]
 			Id: r.Id, UserId: r.UserId, MediaType: r.MediaType, ContentId: r.ContentId,
 			ParentId: r.ParentId, RootId: r.RootId, Content: r.Content,
 			LikeCount: r.LikeCount, ReplyCount: r.ReplyCount, Status: r.Status,
-			CreatedAt: created,
+			BelongLabel: mediaBelongLabel(r.MediaType), CreatedAt: created,
 		})
 	}
 	fillAdminUsers(ctx, out)
+	fillBelongLabels(ctx, out)
 	return out, total, nil
+}
+
+const (
+	adminFilterCartoon = 8 // 审核筛选项：video.kind=动漫
+	adminFilterDouyin  = 9 // 审核筛选项：video.kind=抖音
+)
+
+func applyAdminMediaFilter(ctx context.Context, m *gdb.Model, mediaType int) (*gdb.Model, error) {
+	if mediaType <= 0 {
+		return m, nil
+	}
+	kind := 0
+	switch mediaType {
+	case adminFilterCartoon:
+		kind = entity.VideoKindCartoon
+	case adminFilterDouyin:
+		kind = entity.VideoKindDouyin
+	case 1:
+		kind = entity.VideoKindVideo
+	default:
+		return m.Where("media_type", mediaType), nil
+	}
+	ids, err := videoIDsByKind(ctx, kind)
+	if err != nil {
+		return m, err
+	}
+	m = m.Where("media_type", 1)
+	if len(ids) == 0 {
+		return m.Where("1 = 0"), nil
+	}
+	return m.WhereIn("content_id", ids), nil
+}
+
+func videoIDsByKind(ctx context.Context, kind int) ([]int64, error) {
+	arr, err := g.Model("video").Ctx(ctx).Where("kind", kind).Fields("id").Array()
+	if err != nil {
+		return nil, err
+	}
+	out := make([]int64, 0, len(arr))
+	for _, v := range arr {
+		if id := v.Int64(); id > 0 {
+			out = append(out, id)
+		}
+	}
+	return out, nil
+}
+
+func mediaBelongLabel(mediaType int) string {
+	switch mediaType {
+	case 1:
+		return "视频"
+	case 2:
+		return "帖子"
+	case 4:
+		return "漫画"
+	case 7:
+		return "小说"
+	default:
+		return ""
+	}
+}
+
+func fillBelongLabels(ctx context.Context, list []*service.AdminItemDTO) {
+	ids := make([]int64, 0)
+	seen := map[int64]struct{}{}
+	for _, d := range list {
+		if d == nil || d.MediaType != 1 || d.ContentId <= 0 {
+			continue
+		}
+		if _, ok := seen[d.ContentId]; ok {
+			continue
+		}
+		seen[d.ContentId] = struct{}{}
+		ids = append(ids, d.ContentId)
+	}
+	if len(ids) == 0 {
+		return
+	}
+	rows, err := g.Model("video").Ctx(ctx).WhereIn("id", ids).Fields("id,kind").All()
+	if err != nil {
+		return
+	}
+	kinds := map[int64]int{}
+	for _, row := range rows {
+		kinds[row["id"].Int64()] = row["kind"].Int()
+	}
+	for _, d := range list {
+		if d == nil || d.MediaType != 1 {
+			continue
+		}
+		switch kinds[d.ContentId] {
+		case entity.VideoKindCartoon:
+			d.BelongLabel = "动漫"
+		case entity.VideoKindDouyin:
+			d.BelongLabel = "抖音"
+		default:
+			d.BelongLabel = "视频"
+		}
+	}
 }
 
 func fillAdminUsers(ctx context.Context, list []*service.AdminItemDTO) {

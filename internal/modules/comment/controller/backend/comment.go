@@ -34,7 +34,7 @@ func (c *Controller) List(ctx context.Context, req *v1.ListReq) (res *v1.ListRes
 			Id: d.Id, UserId: d.UserId, Nickname: d.Nickname, Img: d.Img, IsVip: d.IsVip,
 			MediaType: d.MediaType, ContentId: d.ContentId, ParentId: d.ParentId, RootId: d.RootId,
 			Content: d.Content, LikeCount: d.LikeCount, ReplyCount: d.ReplyCount,
-			Status: d.Status, CreatedAt: d.CreatedAt,
+			Status: d.Status, BelongLabel: d.BelongLabel, CreatedAt: d.CreatedAt,
 		})
 	}
 	return res, nil

@@ -35,8 +35,9 @@ type AdminItemDTO struct {
 	Content    string
 	LikeCount  int
 	ReplyCount int
-	Status     int
-	CreatedAt  string
+	Status      int
+	BelongLabel string
+	CreatedAt   string
 }
 
 type AddInput struct {

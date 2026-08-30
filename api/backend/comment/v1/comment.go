@@ -16,8 +16,9 @@ type Item struct {
 	Content    string `json:"content"`
 	LikeCount  int    `json:"like_count"`
 	ReplyCount int    `json:"reply_count"`
-	Status     int    `json:"status"` // 0待审 1已上墙 2已拒绝
-	CreatedAt  string `json:"created_at"`
+	Status      int    `json:"status"` // 0待审 1已上墙 2已拒绝
+	BelongLabel string `json:"belong_label"`
+	CreatedAt   string `json:"created_at"`
 }
 
 type ListReq struct {
@@ -26,7 +27,7 @@ type ListReq struct {
 	Kind      string `json:"kind"`       // 空=全部 main=主评 reply=回复
 	Keyword   string `json:"keyword"`    // 内容模糊
 	UserId    int64  `json:"user_id"`    // 0=全部
-	MediaType int    `json:"media_type"` // 0=全部 1视频 2帖子 4漫画 7小说
+	MediaType int    `json:"media_type"` // 0=全部 1视频 2帖子 4漫画 7小说 8动漫 9抖音（8/9 仅筛选，仍存 media_type=1）
 	Page      int    `json:"page"`
 	Size      int    `json:"size"`
 }
