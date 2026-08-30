@@ -7,6 +7,7 @@ import (
 	adminmod "github.com/JarvanDante/my_service/internal/modules/admin"
 	aimod "github.com/JarvanDante/my_service/internal/modules/aitask"
 	appmod "github.com/JarvanDante/my_service/internal/modules/application"
+	bannermod "github.com/JarvanDante/my_service/internal/modules/banner"
 	checkinmod "github.com/JarvanDante/my_service/internal/modules/checkin"
 	collectmod "github.com/JarvanDante/my_service/internal/modules/collect"
 	comicsmod "github.com/JarvanDante/my_service/internal/modules/comics"
@@ -74,6 +75,7 @@ func mountFront(s *ghttp.Server) {
 		videomod.RegisterFront(group, dao.NewVideoRepo())
 		mediamod.RegisterFront(group, dao.NewMediaRepo())
 		kingkongmod.RegisterFront(group)
+		bannermod.RegisterFront(group)
 		sysmod.RegisterFront(group, dao.NewSystemRepo())
 	})
 
@@ -134,6 +136,7 @@ func mountBackend(s *ghttp.Server) {
 			aimod.RegisterBackend(perm)
 			checkinmod.RegisterBackend(perm)
 			kingkongmod.RegisterBackend(perm)
+			bannermod.RegisterBackend(perm)
 		})
 	})
 }
