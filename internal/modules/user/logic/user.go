@@ -16,6 +16,7 @@ import (
 	"github.com/JarvanDante/my_service/internal/model/entity"
 	"github.com/JarvanDante/my_service/internal/modules/user/domain"
 	"github.com/JarvanDante/my_service/internal/modules/user/service"
+	"github.com/JarvanDante/my_service/internal/shared/appcfg"
 	"github.com/JarvanDante/my_service/internal/shared/kit"
 	"github.com/JarvanDante/my_service/internal/shared/paywall"
 	"github.com/JarvanDante/my_service/internal/shared/siteconf"
@@ -701,9 +702,13 @@ func (s *sUser) ShareInfo(ctx context.Context, userId int64) (*service.ShareDTO,
 	if code == "" {
 		code = me.Username
 	}
+	shareUrl := strings.TrimSpace(appcfg.String(ctx, "share_url", ""))
+	if strings.Contains(strings.ToLower(shareUrl), "example.com") {
+		shareUrl = ""
+	}
 	return &service.ShareDTO{
 		ShareCode: code,
-		ShareUrl:  "",
+		ShareUrl:  shareUrl,
 		ShareNum:  me.ShareNum,
 	}, nil
 }
