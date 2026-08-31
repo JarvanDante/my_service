@@ -1,5 +1,6 @@
 // Package aiprotocol 是 my_service 与 my_ai_worker 的 Kafka JSON 契约。
 // 只传对象引用，不传图片字节；输入输出都在 my-storage。
+// 换脸与去衣共用 jobs/results topic，靠 JobMessage.Biz 分发。
 package aiprotocol
 
 const (
@@ -7,6 +8,7 @@ const (
 	TopicResults = "ai.faceswap.results"
 
 	BizFaceSwap = "faceswap"
+	BizUndress  = "undress"
 
 	MediaPhoto = "photo"
 	MediaVideo = "video"

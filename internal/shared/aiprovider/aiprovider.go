@@ -12,7 +12,7 @@
 //  2. 在它的 init() 里 Register("xxx", &xxxProvider{});
 //  3. 把 app_config 的 ai_provider 改成 "xxx"。
 //
-// 自建换脸工人用 adapter 名 "local": Submit 发 Kafka, 结果由 my_ai_worker 回写。
+// 自建工人用 adapter 名 "local": Submit 发 Kafka(换脸/去衣), 结果由 my_ai_worker 回写。
 //
 // 业务层(internal/modules/aitask)零改动: 它只认 Provider 接口和 ai_task 的状态码,
 // 不知道也不需要知道对面是谁。这是把"供应商未定"这件事变成可交付代码的关键。

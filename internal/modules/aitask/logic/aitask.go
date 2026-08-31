@@ -50,9 +50,9 @@ const aiSiteId = 1 // 单站点样板, 与其它模块的 xxSiteId 保持一致
 
 // app_config 里的运营参数 key(集中登记, 免得散落在各处拼错)。
 const (
-	cfgOpen           = "ai_open"            // 总开关
-	cfgDefaultCost    = "ai_default_cost"    // 无模板时的默认单价
-	cfgDailyLimit     = "ai_daily_limit"     // 每人每日任务数上限, <=0 不限
+	cfgOpen           = "ai_open"             // 总开关
+	cfgDefaultCost    = "ai_default_cost"     // 无模板时的默认单价
+	cfgDailyLimit     = "ai_daily_limit"      // 每人每日任务数上限, <=0 不限
 	cfgCallbackSecret = "ai_callback_secret"  // 回调验签密钥
 	cfgProvider       = "ai_provider"         // 当前供应商名, 默认 mock
 	cfgTaskTimeout    = "ai_task_timeout_sec" // 排队/处理超时秒数, 超时失败退款
@@ -705,7 +705,7 @@ func (s *sAiTask) HandleWorkerResult(ctx context.Context, jobID, status, outputU
 		}, "")
 	}
 	if errMsg == "" {
-		errMsg = "换脸失败"
+		errMsg = "生成失败"
 	}
 	return applyTerminal(ctx, t.Id, entity.AiStatusFailed, nil, errMsg)
 }

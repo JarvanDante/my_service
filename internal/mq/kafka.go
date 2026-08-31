@@ -1,4 +1,4 @@
-// Package mq 站点侧 Kafka：投递换脸任务、消费换脸结果。
+// Package mq 站点侧 Kafka：投递换脸/去衣任务、消费结果。
 package mq
 
 import (

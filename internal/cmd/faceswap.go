@@ -7,11 +7,11 @@ import (
 
 	"github.com/JarvanDante/my_service/internal/modules/aitask/logic"
 	"github.com/JarvanDante/my_service/internal/mq"
-	"github.com/JarvanDante/my_service/internal/shared/aiprovider"
 	"github.com/JarvanDante/my_service/internal/shared/aiprotocol"
+	"github.com/JarvanDante/my_service/internal/shared/aiprovider"
 )
 
-// startFaceSwapWorker 装配本地换脸: Kafka 投递 + 结果消费。
+// startFaceSwapWorker 装配本地 AI 工人(换脸/去衣): Kafka 投递 + 结果消费。
 func startFaceSwapWorker(ctx context.Context) {
 	bus := mq.Init(ctx)
 	aiprovider.SetFaceSwapPublisher(bus.PublishJob)
