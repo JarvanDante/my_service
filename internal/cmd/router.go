@@ -5,6 +5,7 @@ import (
 
 	"github.com/JarvanDante/my_service/internal/dao"
 	adminmod "github.com/JarvanDante/my_service/internal/modules/admin"
+	adsmod "github.com/JarvanDante/my_service/internal/modules/ads"
 	aimod "github.com/JarvanDante/my_service/internal/modules/aitask"
 	appmod "github.com/JarvanDante/my_service/internal/modules/application"
 	bannermod "github.com/JarvanDante/my_service/internal/modules/banner"
@@ -76,6 +77,7 @@ func mountFront(s *ghttp.Server) {
 		mediamod.RegisterFront(group, dao.NewMediaRepo())
 		kingkongmod.RegisterFront(group)
 		bannermod.RegisterFront(group)
+		adsmod.RegisterFront(group)
 		sysmod.RegisterFront(group, dao.NewSystemRepo())
 	})
 

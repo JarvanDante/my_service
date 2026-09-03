@@ -90,6 +90,7 @@ paas:
   media_base: "http://127.0.0.1:8004"
   media_admin_token: "488ac147a8b24d2b0541b24f4fdfb5f8b10c20129f6b46fcce6d2091094e872a"
   storage_base: "http://127.0.0.1:8015"
+  ad_base: "http://127.0.0.1:8016"
 
 # 播放网关(给浏览器的签名地址, 与 my_media/my_play 一致)
 play_gateway:
