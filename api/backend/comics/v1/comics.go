@@ -124,6 +124,14 @@ type ChaptersRes struct {
 	Total int           `json:"total"`
 }
 
+type ChapterGetReq struct {
+	g.Meta `path:"/comics-chapters/{id}" method:"get" tags:"Backend/Comics" summary:"章节详情"`
+	Id     int64 `json:"id" in:"path" v:"required|min:1#ID必填"`
+}
+type ChapterGetRes struct {
+	ChapterItem
+}
+
 type ChapterCreateReq struct {
 	g.Meta `path:"/comics/{id}/chapters" method:"post" tags:"Backend/Comics" summary:"新增章节"`
 	Id     int64  `json:"id" in:"path" v:"required|min:1#漫画ID必填"`

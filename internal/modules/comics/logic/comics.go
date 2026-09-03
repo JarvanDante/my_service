@@ -507,6 +507,9 @@ func (s *sComics) ChapterList(ctx context.Context, comicsId int64, page, size in
 		page = 1
 	}
 	if size <= 0 {
+		size = 20
+	}
+	if size > 50 {
 		size = 50
 	}
 	m := g.Model("comics_chapter").Ctx(ctx).
@@ -516,20 +519,40 @@ func (s *sComics) ChapterList(ctx context.Context, comicsId int64, page, size in
 		return nil, 0, err
 	}
 	var list []*entity.ComicsChapter
-	if err := m.Clone().OrderAsc("seq").Page(page, size).Scan(&list); err != nil {
+	// 列表只要序号/标题/图片数，不读 pics jsonb，也不逐章打媒资详情。
+	if err := m.Clone().
+		Fields("id,site_id,comics_id,seq,title,pic_count,status,created_at").
+		OrderAsc("seq").Page(page, size).Scan(&list); err != nil {
 		return nil, 0, err
 	}
 	out := make([]*service.ChapterDTO, 0, len(list))
-	mediaCode := ""
-	if r, e := s.find(ctx, comicsId, false); e == nil && r != nil {
-		mediaCode = r.MediaCode
-	}
 	for _, c := range list {
 		d := toChapterDTO(c)
-		d.Pics = s.refreshPics(ctx, mediaCode, c.Seq, d.Pics)
+		d.Pics = nil
 		out = append(out, d)
 	}
 	return out, total, nil
+}
+
+func (s *sComics) ChapterGet(ctx context.Context, id int64) (*service.ChapterDTO, error) {
+	if id <= 0 {
+		return nil, gerror.New("ID非法")
+	}
+	var c *entity.ComicsChapter
+	if err := g.Model("comics_chapter").Ctx(ctx).
+		Where("site_id", cmSiteId).Where("id", id).Scan(&c); err != nil {
+		return nil, err
+	}
+	if c == nil {
+		return nil, gerror.New("章节不存在")
+	}
+	d := toChapterDTO(c)
+	mediaCode := ""
+	if r, e := s.find(ctx, c.ComicsId, false); e == nil && r != nil {
+		mediaCode = r.MediaCode
+	}
+	d.Pics = s.refreshPics(ctx, mediaCode, c.Seq, d.Pics)
+	return d, nil
 }
 
 // syncChapterCount 章节增删后同步作品的章节数(以实际行数为准, 不做增量累加)。

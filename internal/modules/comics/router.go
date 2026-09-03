@@ -28,7 +28,7 @@ func RegisterBackend(group *ghttp.RouterGroup) {
 	ctrl := backend.New(logic.New(), logic.NewCategory(), logic.NewModule())
 	group.Bind(
 		ctrl.List, ctrl.Create, ctrl.Update, ctrl.Delete, ctrl.Audit,
-		ctrl.Chapters, ctrl.ChapterCreate, ctrl.ChapterUpdate, ctrl.ChapterDelete,
+		ctrl.Chapters, ctrl.ChapterGet, ctrl.ChapterCreate, ctrl.ChapterUpdate, ctrl.ChapterDelete,
 		ctrl.CategoryList, ctrl.CategoryCreate, ctrl.CategoryUpdate, ctrl.CategoryDelete,
 		ctrl.ModuleList, ctrl.ModuleCreate, ctrl.ModuleUpdate, ctrl.ModuleDelete,
 		ctrl.MediaComics, ctrl.MediaPick,

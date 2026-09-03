@@ -131,6 +131,7 @@ type IComics interface {
 	Audit(ctx context.Context, id int64, status int) error
 
 	ChapterList(ctx context.Context, comicsId int64, page, size int) ([]*ChapterDTO, int, error)
+	ChapterGet(ctx context.Context, id int64) (*ChapterDTO, error)
 	ChapterCreate(ctx context.Context, in ChapterInput) (int64, error)
 	ChapterUpdate(ctx context.Context, in ChapterInput) error
 	ChapterDelete(ctx context.Context, id int64) error

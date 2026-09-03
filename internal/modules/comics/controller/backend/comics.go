@@ -120,6 +120,18 @@ func (c *Controller) Chapters(ctx context.Context, req *v1.ChaptersReq) (res *v1
 	return res, nil
 }
 
+func (c *Controller) ChapterGet(ctx context.Context, req *v1.ChapterGetReq) (res *v1.ChapterGetRes, err error) {
+	d, err := c.svc.ChapterGet(ctx, req.Id)
+	if err != nil {
+		return nil, err
+	}
+	return &v1.ChapterGetRes{ChapterItem: v1.ChapterItem{
+		Id: d.Id, ComicsId: d.ComicsId, Seq: d.Seq, Title: d.Title,
+		Pics: toPicV1(d.Pics), PicCount: d.PicCount, Status: d.Status,
+		CreatedAt: d.CreatedAt,
+	}}, nil
+}
+
 func (c *Controller) ChapterCreate(ctx context.Context, req *v1.ChapterCreateReq) (res *v1.ChapterCreateRes, err error) {
 	id, err := c.svc.ChapterCreate(ctx, service.ChapterInput{
 		ComicsId: req.Id, Seq: req.Seq, Title: req.Title,
