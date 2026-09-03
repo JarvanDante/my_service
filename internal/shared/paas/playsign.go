@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"net/url"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/gogf/gf/v2/frame/g"
@@ -20,47 +19,44 @@ type playConf struct {
 	ttl    int64
 }
 
-var (
-	pc    playConf
-	ponce sync.Once
-)
-
-func loadPlay() {
-	ctx := context.Background()
-	pc.base = strings.TrimRight(g.Cfg().MustGet(ctx, "play_gateway.base_url", "").String(), "/")
-	pc.secret = g.Cfg().MustGet(ctx, "play_gateway.secret", "").String()
-	pc.ttl = g.Cfg().MustGet(ctx, "play_gateway.token_ttl_sec", 14400).Int64()
-	if pc.ttl <= 0 {
-		pc.ttl = 14400
+func playCfg(ctx context.Context) playConf {
+	ttl := g.Cfg().MustGet(ctx, "play_gateway.token_ttl_sec", 14400).Int64()
+	if ttl <= 0 {
+		ttl = 14400
+	}
+	return playConf{
+		base:   strings.TrimRight(g.Cfg().MustGet(ctx, "play_gateway.base_url", "").String(), "/"),
+		secret: g.Cfg().MustGet(ctx, "play_gateway.secret", "").String(),
+		ttl:    ttl,
 	}
 }
 
 func siteCode(ctx context.Context) string {
-	s := g.Cfg().MustGet(ctx, "site.code", "my").String()
+	s := strings.TrimSpace(g.Cfg().MustGet(ctx, "site.code", "my").String())
 	if s == "" {
-		return "my"
+		s = "my"
 	}
-	return s
+	return strings.ToUpper(s)
 }
 
-func playSign(code, site string, exp int64, d int, ip string, iat int64) string {
-	mac := hmac.New(sha256.New, []byte(pc.secret))
+func playSign(secret, code, site string, exp int64, d int, ip string, iat int64) string {
+	mac := hmac.New(sha256.New, []byte(secret))
 	_, _ = fmt.Fprintf(mac, "%s|%s|%d|%d|%s|%d", code, site, exp, d, ip, iat)
 	return hex.EncodeToString(mac.Sum(nil))
 }
 
-func playURL(code, site, file string, previewSec int) string {
-	ponce.Do(loadPlay)
-	if pc.base == "" || pc.secret == "" || code == "" || file == "" {
+func playURL(ctx context.Context, code, site, file string, previewSec int) string {
+	cfg := playCfg(ctx)
+	if cfg.base == "" || cfg.secret == "" || code == "" || file == "" {
 		return ""
 	}
 	if previewSec < 0 {
 		previewSec = 0
 	}
 	now := time.Now().Unix()
-	exp := now + pc.ttl
+	exp := now + cfg.ttl
 	u := fmt.Sprintf("%s/hls/%s/%s?e=%d&s=%s&t=%d&sig=%s",
-		pc.base, url.PathEscape(code), file, exp, url.QueryEscape(site), now, playSign(code, site, exp, previewSec, "", now))
+		cfg.base, url.PathEscape(code), file, exp, url.QueryEscape(site), now, playSign(cfg.secret, code, site, exp, previewSec, "", now))
 	if previewSec > 0 {
 		u += fmt.Sprintf("&d=%d", previewSec)
 	}
@@ -70,7 +66,7 @@ func playURL(code, site, file string, previewSec int) string {
 // CoverURL 媒资封面走 my_play 签名地址, 下发 cover.bnc(AES 密文)。
 // 后台预览把路径改成 cover.jpg 即可, 网关会解密直出; 签名不含文件名。
 func CoverURL(ctx context.Context, code string) string {
-	return playURL(code, siteCode(ctx), "cover.bnc", 0)
+	return playURL(ctx, code, siteCode(ctx), "cover.bnc", 0)
 }
 
 // PageURL 漫画页图走 my_play。objectKey 形如 comics/{code}/ch001/page_001.bnc。
@@ -81,7 +77,7 @@ func PageURL(ctx context.Context, code, objectKey string) string {
 		return ""
 	}
 	rel = forceBncExt(rel)
-	return playURL(code, siteCode(ctx), rel, 0)
+	return playURL(ctx, code, siteCode(ctx), rel, 0)
 }
 
 func comicRelPath(code, key string) string {
@@ -136,7 +132,7 @@ func PlaylistURL(ctx context.Context, code, raw string, previewSec int) string {
 			}
 		}
 	}
-	if u := playURL(code, siteCode(ctx), file, previewSec); u != "" {
+	if u := playURL(ctx, code, siteCode(ctx), file, previewSec); u != "" {
 		return u
 	}
 	return raw
