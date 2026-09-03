@@ -11,6 +11,7 @@ type Item struct {
 	Description string   `json:"description"`
 	CoverUrl    string   `json:"cover_url"`
 	SourceUrl   string   `json:"source_url"`
+	Kind        int      `json:"kind"` // 0视频 2动漫 3抖音
 	Category    string   `json:"category"`
 	Categories  []string `json:"categories"`
 	Duration    int      `json:"duration"`

@@ -13,6 +13,7 @@ type VideoDTO struct {
 	SourceKey     string
 	SourceMediaId int64
 	MediaCode     string
+	Kind          int // 0视频 2动漫 3抖音
 	Category      string
 	Categories    []string
 	Tags          []string

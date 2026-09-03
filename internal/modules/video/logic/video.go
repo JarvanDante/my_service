@@ -526,7 +526,7 @@ func toDTO(ctx context.Context, v *entity.Video) *service.VideoDTO {
 		Id: v.Id, Title: v.Title, Description: v.Description,
 		CoverUrl: v.CoverUrl, CoverKey: v.CoverKey, CoverMediaId: v.CoverMediaId,
 		SourceUrl: v.SourceUrl, SourceKey: v.SourceKey, SourceMediaId: v.SourceMediaId,
-		MediaCode: v.MediaCode, Category: v.Category, Categories: parseCategories(v.Category), Tags: decodeTags(v.Tags),
+		MediaCode: v.MediaCode, Kind: v.Kind, Category: v.Category, Categories: parseCategories(v.Category), Tags: decodeTags(v.Tags),
 		Duration: v.Duration, Sort: v.Sort, Status: v.Status,
 		SubmitSource: v.SubmitSource, RejectReason: v.RejectReason,
 		UpUserId: v.UpUserId, CreatedBy: v.CreatedBy,
