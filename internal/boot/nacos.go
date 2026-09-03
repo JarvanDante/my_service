@@ -1,5 +1,6 @@
 // Package boot 启动引导。按需从 Nacos 加载配置。
-// 未设置环境变量 NACOS_ADDR 时, 走本地 manifest/config/config.yaml, 不影响本地开发。
+// 未设置环境变量 NACOS_ADDR 时, 走本地 manifest/config/config.yaml。
+// 设了但连接/读取失败时回退本地文件, 避免空配置把站点打挂。
 //
 // 环境变量:
 //
@@ -54,7 +55,12 @@ func init() {
 		Watch:       true, // 配置变更热更新
 	})
 	if err != nil {
-		g.Log().Fatalf(ctx, "nacos 配置加载失败: %+v", err)
+		g.Log().Warningf(ctx, "nacos 配置加载失败, 回退本地 config.yaml: %+v", err)
+		return
+	}
+	if _, err = adapter.Get(ctx, "server"); err != nil {
+		g.Log().Warningf(ctx, "nacos 配置读取校验失败(dataId=%s), 回退本地 config.yaml: %+v", dataId, err)
+		return
 	}
 	g.Cfg().SetAdapter(adapter)
 	g.Log().Infof(ctx, "配置来源=Nacos addr=%s ns=%s group=%s dataId=%s", addr, namespace, group, dataId)
