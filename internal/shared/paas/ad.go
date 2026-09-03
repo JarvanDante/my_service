@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/url"
 	"strings"
+	"sync"
 
 	"github.com/gogf/gf/v2/errors/gerror"
 	"github.com/gogf/gf/v2/frame/g"
@@ -75,9 +76,48 @@ func FetchAds(ctx context.Context, slotCode string, limit int) ([]AdItem, error)
 		List []AdItem `json:"list"`
 	}
 	if err := adJSON(ctx, "GET", "/open/ads?"+q.Encode(), nil, &data); err != nil {
+		if strings.Contains(err.Error(), "invalid app credentials") {
+			ensureAdClient(ctx)
+			data.List = nil
+			if err2 := adJSON(ctx, "GET", "/open/ads?"+q.Encode(), nil, &data); err2 == nil {
+				return data.List, nil
+			}
+		}
 		return nil, err
 	}
 	return data.List, nil
+}
+
+var adClientOnce sync.Once
+
+func ensureAdClient(ctx context.Context) {
+	adClientOnce.Do(func() {
+		token := g.Cfg().MustGet(ctx, "paas.ad_admin_token").String()
+		if token == "" {
+			token = g.Cfg().MustGet(ctx, "paas.media_admin_token").String()
+		}
+		base := adBase(ctx)
+		key := g.Cfg().MustGet(ctx, "paas.app_key").String()
+		secret := g.Cfg().MustGet(ctx, "paas.app_secret").String()
+		site := strings.ToUpper(strings.TrimSpace(g.Cfg().MustGet(ctx, "site.code").String()))
+		if token == "" || base == "" || key == "" || secret == "" || site == "" {
+			g.Log().Warning(ctx, "无法登记广告中台调用方: 缺少 ad_base / admin_token / app 凭证")
+			return
+		}
+		c := g.Client().ContentJson().SetHeader("X-Admin-Token", token)
+		r, err := c.Put(ctx, base+"/admin/clients", g.Map{
+			"app_key": key, "app_secret": secret, "site_code": site,
+			"status": 1, "remark": "auto from my_service",
+		})
+		if err != nil {
+			g.Log().Warningf(ctx, "登记广告中台调用方失败: %v", err)
+			return
+		}
+		defer r.Close()
+		if err := parseEnvelope(r.ReadAll(), nil); err != nil {
+			g.Log().Warningf(ctx, "登记广告中台调用方失败: %v", err)
+		}
+	})
 }
 
 func ReportAdEvent(ctx context.Context, eventType, campaignId, creativeId, slotCode string) error {
