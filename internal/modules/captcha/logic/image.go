@@ -14,9 +14,9 @@ import (
 const charset = "23456789ABCDEFGHJKMNPQRSTUVWXYZ"
 
 const (
-	imgW   = 120
-	imgH   = 40
-	scale  = 3
+	imgW   = 220
+	imgH   = 72
+	scale  = 5
 	glyphW = 5
 	glyphH = 7
 )
@@ -93,38 +93,39 @@ func rndN(n int) int {
 
 func renderDataURI(code string) (string, error) {
 	img := image.NewRGBA(image.Rect(0, 0, imgW, imgH))
-	bg := color.RGBA{R: 22, G: 18, B: 32, A: 255}
+	bg := color.RGBA{R: 244, G: 240, B: 232, A: 255}
 	for y := 0; y < imgH; y++ {
 		for x := 0; x < imgW; x++ {
 			img.Set(x, y, bg)
 		}
 	}
 
-	gap := 8
+	gap := 16
 	block := glyphW * scale
 	total := 4*block + 3*gap
 	originX := (imgW - total) / 2
 	originY := (imgH - glyphH*scale) / 2
+	palette := []color.RGBA{
+		{R: 36, G: 36, B: 48, A: 255},
+		{R: 168, G: 32, B: 72, A: 255},
+		{R: 28, G: 86, B: 160, A: 255},
+		{R: 92, G: 36, B: 140, A: 255},
+	}
 
 	for i := 0; i < len(code) && i < 4; i++ {
 		ch := code[i]
-		fg := color.RGBA{
-			R: 160 + rndByte()%80,
-			G: 140 + rndByte()%90,
-			B: 220,
-			A: 255,
-		}
-		ox := originX + i*(block+gap) + rndN(3) - 1
-		oy := originY + rndN(5) - 2
+		fg := palette[rndN(len(palette))]
+		ox := originX + i*(block+gap) + rndN(5) - 2
+		oy := originY + rndN(7) - 3
 		drawGlyph(img, ch, ox, oy, fg)
 	}
 
-	for i := 0; i < 5; i++ {
-		c := color.RGBA{R: 80 + rndByte()%80, G: 70 + rndByte()%70, B: 120 + rndByte()%80, A: 180}
+	for i := 0; i < 3; i++ {
+		c := color.RGBA{R: 180, G: 168, B: 158, A: 140}
 		drawLine(img, rndN(imgW), rndN(imgH), rndN(imgW), rndN(imgH), c)
 	}
-	for i := 0; i < 90; i++ {
-		c := color.RGBA{R: 90 + rndByte()%120, G: 80 + rndByte()%120, B: 140 + rndByte()%100, A: 160}
+	for i := 0; i < 28; i++ {
+		c := color.RGBA{R: 170 + rndByte()%40, G: 160 + rndByte()%40, B: 150 + rndByte()%40, A: 120}
 		img.Set(rndN(imgW), rndN(imgH), c)
 	}
 
