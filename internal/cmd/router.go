@@ -9,6 +9,7 @@ import (
 	aimod "github.com/JarvanDante/my_service/internal/modules/aitask"
 	appmod "github.com/JarvanDante/my_service/internal/modules/application"
 	bannermod "github.com/JarvanDante/my_service/internal/modules/banner"
+	captchamod "github.com/JarvanDante/my_service/internal/modules/captcha"
 	checkinmod "github.com/JarvanDante/my_service/internal/modules/checkin"
 	collectmod "github.com/JarvanDante/my_service/internal/modules/collect"
 	comicsmod "github.com/JarvanDante/my_service/internal/modules/comics"
@@ -78,6 +79,7 @@ func mountFront(s *ghttp.Server) {
 		kingkongmod.RegisterFront(group)
 		bannermod.RegisterFront(group)
 		adsmod.RegisterFront(group)
+		captchamod.RegisterFront(group)
 		sysmod.RegisterFront(group, dao.NewSystemRepo())
 	})
 
