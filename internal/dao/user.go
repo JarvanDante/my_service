@@ -628,7 +628,11 @@ func (r *userRepo) AdminListUsers(ctx context.Context, f domain.AdminUserFilter,
 		m = m.Where("parent_id", f.ParentId)
 	}
 	if f.Channel != "" {
-		m = m.Where("channel_name ILIKE ?", "%"+f.Channel+"%")
+		if f.Channel == "-" {
+			m = m.Where("channel_name = ''")
+		} else {
+			m = m.Where("channel_name ILIKE ?", "%"+f.Channel+"%")
+		}
 	}
 	if f.GroupId > 0 {
 		m = m.Where("group_id", f.GroupId)

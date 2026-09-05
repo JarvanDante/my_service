@@ -7,6 +7,7 @@ type LoginInput struct {
 	DeviceId      string
 	DeviceType    string
 	DeviceVersion string
+	Channel       string
 	Ip            string
 }
 
@@ -532,6 +533,7 @@ type IUser interface {
 	Fans(ctx context.Context, userId int64, page, size int) ([]*PublicUserDTO, int, error)
 	// 推广 / 兑换码
 	BindParent(ctx context.Context, userId int64, account string) error
+	BindChannel(ctx context.Context, userId int64, channel string) error
 	RedeemCode(ctx context.Context, userId int64, code string) (*RedeemDTO, error)
 	CodeLogs(ctx context.Context, userId int64, page, size int) ([]*CodeLogDTO, int, error)
 	ShareInfo(ctx context.Context, userId int64) (*ShareDTO, error)

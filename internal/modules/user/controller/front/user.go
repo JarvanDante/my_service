@@ -3,6 +3,7 @@ package front
 
 import (
 	"context"
+	"strings"
 
 	"github.com/gogf/gf/v2/errors/gcode"
 	"github.com/gogf/gf/v2/errors/gerror"
@@ -34,6 +35,7 @@ func (c *Controller) Login(ctx context.Context, req *v1.LoginReq) (res *v1.Login
 		DeviceId:      req.DeviceId,
 		DeviceType:    req.DeviceType,
 		DeviceVersion: req.DeviceVersion,
+		Channel:       req.Channel,
 		Ip:            r.GetClientIp(),
 	})
 	if err != nil {
@@ -272,13 +274,21 @@ func (c *Controller) BindParent(ctx context.Context, req *v1.BindParentReq) (res
 	return &v1.BindParentRes{}, nil
 }
 
-// BindCode 绑定邀请码(需登录, 复用绑定推荐人逻辑)。
+// BindCode 绑定邀请码或渠道码(需登录)。channel:// 绑渠道, share:// 或裸码绑推荐人。
 func (c *Controller) BindCode(ctx context.Context, req *v1.BindCodeReq) (res *v1.BindCodeRes, err error) {
 	id, err := uid(ctx)
 	if err != nil {
 		return nil, err
 	}
-	if err = c.user.BindParent(ctx, id, req.Code); err != nil {
+	code := strings.TrimSpace(req.Code)
+	if strings.Contains(code, "channel://") {
+		if err = c.user.BindChannel(ctx, id, code); err != nil {
+			return nil, err
+		}
+		return &v1.BindCodeRes{}, nil
+	}
+	account := strings.TrimSpace(strings.ReplaceAll(code, "share://", ""))
+	if err = c.user.BindParent(ctx, id, account); err != nil {
 		return nil, err
 	}
 	return &v1.BindCodeRes{}, nil

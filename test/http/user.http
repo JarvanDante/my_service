@@ -26,6 +26,37 @@ client.global.set("token", response.body.data.token);
 client.global.set("uid", response.body.data.user.id);
 %}
 
+### 1b. 新设备登录带渠道 —— 自动注册写入渠道名
+POST {{baseUrl}}/front/v1/user/login
+Content-Type: application/json
+
+{
+  "device_id": "e2e-device-channel-001",
+  "device_type": "h5",
+  "device_version": "1.0",
+  "channel": "channel://e2e-promo"
+}
+
+> {%
+client.test("带渠道登录成功", function () {
+    client.assert(response.body.code === 0, "code 应为 0, 实际: " + response.body.code);
+    client.global.set("chToken", response.body.data.token);
+});
+%}
+
+### 1c. 已注册用户再绑渠道 —— 已有渠道应拒绝
+POST {{baseUrl}}/front/v1/user/bind-code
+Authorization: {{chToken}}
+Content-Type: application/json
+
+{ "code": "channel://e2e-promo-2" }
+
+> {%
+client.test("已绑定渠道被拒", function () {
+    client.assert(response.body.code !== 0, "已绑定渠道不应再改");
+});
+%}
+
 ### 2. 个人信息(带 token) —— 成功
 GET {{baseUrl}}/front/v1/user/info
 Authorization: {{token}}

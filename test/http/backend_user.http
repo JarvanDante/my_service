@@ -46,6 +46,33 @@ client.test("列表搜索命中", function () {
 });
 %}
 
+### 3b. 带渠道登录 → 列表按渠道名搜索 → 回查渠道字段
+POST {{baseUrl}}/front/v1/user/login
+Content-Type: application/json
+
+{ "device_id": "e2e-b1-channel", "device_type": "h5", "device_version": "1.0", "channel": "channel://e2e-ch-promo" }
+
+> {%
+client.test("带渠道登录成功", function () {
+    client.assert(response.body.code === 0, "code 应为 0: " + response.body.message);
+    client.global.set("chUid", response.body.data.user.id);
+});
+%}
+
+###
+GET {{baseUrl}}/backend/users?channel=e2e-ch-promo&page=1&size=10
+Authorization: {{adminToken}}
+
+> {%
+client.test("按渠道名搜到用户", function () {
+    client.assert(response.body.code === 0, "code 应为 0: " + response.body.message);
+    var hit = (response.body.data.list || []).some(function (u) {
+        return u.id === client.global.get("chUid") && u.channel === "e2e-ch-promo";
+    });
+    client.assert(hit, "应包含渠道用户且 channel 为 e2e-ch-promo");
+});
+%}
+
 ### 4. 用户详情
 GET {{baseUrl}}/backend/users/{{uid}}
 Authorization: {{adminToken}}
