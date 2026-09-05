@@ -31,7 +31,6 @@ type LoginReq struct {
 	DeviceId      string `json:"device_id"      v:"required#设备号必填"`
 	DeviceType    string `json:"device_type"`
 	DeviceVersion string `json:"device_version"`
-	Channel       string `json:"channel"` // 渠道名(可选, 支持 channel://xxx)
 }
 type LoginRes struct {
 	Token string   `json:"token"`
@@ -214,10 +213,10 @@ type BindParentReq struct {
 }
 type BindParentRes struct{}
 
-// 绑定邀请码或渠道码(邀请码=分享码; channel:// 绑渠道)
+// 绑定邀请码(by 邀请码=分享码)
 type BindCodeReq struct {
-	g.Meta `path:"/user/bind-code" method:"post" tags:"Front/User" summary:"绑定邀请码或渠道"`
-	Code   string `json:"code" v:"required#邀请码或渠道码必填"`
+	g.Meta `path:"/user/bind-code" method:"post" tags:"Front/User" summary:"绑定邀请码"`
+	Code   string `json:"code" v:"required#邀请码必填"`
 }
 type BindCodeRes struct{}
 

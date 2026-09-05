@@ -59,7 +59,6 @@ func (s *sUser) Login(ctx context.Context, in service.LoginInput) (*service.Logi
 			"device_id":      in.DeviceId,
 			"device_type":    in.DeviceType,
 			"device_version": in.DeviceVersion,
-			"channel_name":   ParseChannel(in.Channel),
 			"register_at":    now,
 			"register_date":  gconv.Int(now.Format("Ymd")),
 			"register_ip":    in.Ip,
@@ -552,25 +551,6 @@ func toPublicList(us []*entity.Users) []*service.PublicUserDTO {
 		out = append(out, toPublic(u))
 	}
 	return out
-}
-
-// BindChannel 绑定渠道名, 已绑定则不可改。
-func (s *sUser) BindChannel(ctx context.Context, userId int64, channel string) error {
-	name := ParseChannel(channel)
-	if name == "" {
-		return gerror.New("参数错误,请检查")
-	}
-	me, err := s.repo.FindById(ctx, userId)
-	if err != nil {
-		return err
-	}
-	if me == nil || me.IsDisabled == 1 {
-		return gerror.New("当前用户不存在,或已经禁用")
-	}
-	if strings.TrimSpace(me.ChannelName) != "" {
-		return gerror.New("当前用户已经绑定了")
-	}
-	return s.repo.UpdateProfile(ctx, userId, g.Map{"channel_name": name})
 }
 
 // BindParent 绑定推荐人(by account/邀请码), 已绑定则不可改。
