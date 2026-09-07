@@ -31,12 +31,23 @@ func adminId(ctx context.Context) (int64, error) {
 // Login 公开。
 func (c *Controller) Login(ctx context.Context, req *v1.LoginReq) (res *v1.LoginRes, err error) {
 	r := ghttp.RequestFromCtx(ctx)
-	dto, err := c.admin.Login(ctx, service.LoginInput{Username: req.Username, Password: req.Password, Ip: r.GetClientIp()})
+	dto, err := c.admin.Login(ctx, service.LoginInput{
+		Username: req.Username, Password: req.Password, TotpCode: req.TotpCode, Ip: r.GetClientIp(),
+	})
 	if err != nil {
 		return nil, err
 	}
 	code, name := siteMeta(ctx)
-	return &v1.LoginRes{Token: dto.Token, Admin: toApi(dto.Admin), SiteCode: code, SiteName: name}, nil
+	res = &v1.LoginRes{
+		NeedTotp: dto.NeedTotp, TotpBound: dto.TotpBound,
+		TotpQR: dto.TotpQR, TotpSecret: dto.TotpSecret,
+		SiteCode: code, SiteName: name,
+	}
+	if dto.Token != "" {
+		res.Token = dto.Token
+		res.Admin = toApi(dto.Admin)
+	}
+	return res, nil
 }
 
 // Logout 需登录。

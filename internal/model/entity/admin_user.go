@@ -14,6 +14,8 @@ type AdminUser struct {
 	Status      int         `json:"status"      orm:"status"`
 	LastLoginAt *gtime.Time `json:"lastLoginAt" orm:"last_login_at"`
 	LastIp      string      `json:"lastIp"      orm:"last_ip"`
+	TotpSecret  string      `json:"totpSecret"  orm:"totp_secret"`
+	TotpBoundAt *gtime.Time `json:"totpBoundAt" orm:"totp_bound_at"`
 	CreatedAt   *gtime.Time `json:"createdAt"   orm:"created_at"`
 	UpdatedAt   *gtime.Time `json:"updatedAt"   orm:"updated_at"`
 }

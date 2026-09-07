@@ -29,6 +29,6 @@ func RegisterPermManage(group *ghttp.RouterGroup, repo domain.Repository) {
 		// 角色管理
 		ctrl.CreateRole, ctrl.UpdateRole, ctrl.DeleteRole,
 		// 管理员账号管理
-		ctrl.ListAdmins, ctrl.CreateAdmin, ctrl.UpdateAdmin, ctrl.DeleteAdmin,
+		ctrl.ListAdmins, ctrl.CreateAdmin, ctrl.UpdateAdmin, ctrl.DeleteAdmin, ctrl.ResetAdminTotp,
 	)
 }

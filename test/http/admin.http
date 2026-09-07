@@ -1,18 +1,37 @@
 ###############################################################################
 # 后台 B0 · 管理员认证(登录/信息/退出)真实端到端测试
 # 超管种子账号: admin / admin123
+# 登录两步: 账号密码 → 未绑定返回二维码/密钥, 已绑定只回验证码步骤 → 再带 totp_code
 ###############################################################################
 
 @baseUrl = http://127.0.0.1:8000
 
-### 1. 管理员登录 —— 成功并保存 token
+### 1. 管理员登录 —— 账号密码通过后进入谷歌验证器步骤
 POST {{baseUrl}}/backend/auth/login
 Content-Type: application/json
 
 { "username": "admin", "password": "admin123" }
 
 > {%
-client.test("管理员登录成功", function () {
+client.test("需要谷歌验证器", function () {
+    client.assert(response.body.code === 0, "code 应为 0: " + response.body.message);
+    client.assert(response.body.data.need_totp === true, "应返回 need_totp");
+    client.assert(!response.body.data.token, "尚未签发 token");
+    if (!response.body.data.totp_bound) {
+        client.assert(!!response.body.data.totp_qr, "未绑定应返回二维码");
+        client.assert(!!response.body.data.totp_secret, "未绑定应返回密钥");
+    }
+});
+%}
+
+### 1b. 管理员登录 —— 带验证码后签发 token(totp_code 换成当前 6 位码)
+POST {{baseUrl}}/backend/auth/login
+Content-Type: application/json
+
+{ "username": "admin", "password": "admin123", "totp_code": "{{totpCode}}" }
+
+> {%
+client.test("验证码登录成功", function () {
     client.assert(response.body.code === 0, "code 应为 0: " + response.body.message);
     client.assert(response.body.data.token !== "", "应返回 token");
     client.assert(response.body.data.admin.username === "admin", "用户名应为 admin");

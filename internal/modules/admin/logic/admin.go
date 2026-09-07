@@ -3,9 +3,11 @@ package logic
 
 import (
 	"context"
+	"strings"
 
 	"github.com/gogf/gf/v2/crypto/gmd5"
 	"github.com/gogf/gf/v2/errors/gerror"
+	"github.com/gogf/gf/v2/os/gtime"
 	"github.com/gogf/gf/v2/util/grand"
 
 	"github.com/JarvanDante/my_service/internal/model/entity"
@@ -16,11 +18,21 @@ import (
 
 const superAdminCode = "superadmin"
 
+// issueAdminToken 签发会话; 单测可替换, 避免依赖 Redis。
+var issueAdminToken = kit.IssueAdminToken
+
 type sAdmin struct {
-	repo domain.Repository
+	repo    domain.Repository
+	pending totpPending
 }
 
-func New(repo domain.Repository) service.IAdmin { return &sAdmin{repo: repo} }
+func New(repo domain.Repository) service.IAdmin {
+	return &sAdmin{repo: repo, pending: redisTotpPending{}}
+}
+
+func newAdmin(repo domain.Repository, pending totpPending) *sAdmin {
+	return &sAdmin{repo: repo, pending: pending}
+}
 
 // ---------- 认证 ----------
 
@@ -41,12 +53,95 @@ func (s *sAdmin) Login(ctx context.Context, in service.LoginInput) (*service.Log
 	if gmd5.MustEncryptString(in.Password+a.Salt) != a.Password {
 		return nil, gerror.New("账号或密码错误")
 	}
+
+	bound := totpBound(a)
+	code := strings.TrimSpace(in.TotpCode)
+	if code == "" {
+		return s.challengeTotp(ctx, a, bound)
+	}
+	if err = s.verifyTotp(ctx, a, bound, code); err != nil {
+		return nil, err
+	}
+
 	_ = s.repo.UpdateLoginInfo(ctx, a.Id, in.Ip)
-	token, err := kit.IssueAdminToken(ctx, a.Id)
+	token, err := issueAdminToken(ctx, a.Id)
 	if err != nil {
 		return nil, err
 	}
 	return &service.LoginDTO{Token: token, Admin: toInfo(a)}, nil
+}
+
+func (s *sAdmin) challengeTotp(ctx context.Context, a *entity.AdminUser, bound bool) (*service.LoginDTO, error) {
+	if bound {
+		return &service.LoginDTO{NeedTotp: true, TotpBound: true}, nil
+	}
+	secret, err := s.pending.Get(ctx, a.Id)
+	if err != nil {
+		return nil, err
+	}
+	if secret == "" {
+		secret, _, _, err = kit.GenerateTOTP(a.Username)
+		if err != nil {
+			return nil, err
+		}
+		if err = s.pending.Set(ctx, a.Id, secret); err != nil {
+			return nil, err
+		}
+	}
+	_, qr, err := kit.TOTPQRFromSecret(a.Username, secret)
+	if err != nil {
+		return nil, err
+	}
+	return &service.LoginDTO{
+		NeedTotp:   true,
+		TotpBound:  false,
+		TotpQR:     qr,
+		TotpSecret: secret,
+	}, nil
+}
+
+func (s *sAdmin) verifyTotp(ctx context.Context, a *entity.AdminUser, bound bool, code string) error {
+	if bound {
+		if !kit.ValidateTOTP(code, a.TotpSecret) {
+			return gerror.New("验证码错误")
+		}
+		return nil
+	}
+	secret, err := s.pending.Get(ctx, a.Id)
+	if err != nil {
+		return err
+	}
+	if secret == "" {
+		return gerror.New("请先扫描二维码绑定谷歌验证器")
+	}
+	if !kit.ValidateTOTP(code, secret) {
+		return gerror.New("验证码错误")
+	}
+	if err = s.repo.BindTotp(ctx, a.Id, secret); err != nil {
+		return err
+	}
+	_ = s.pending.Del(ctx, a.Id)
+	a.TotpSecret = secret
+	a.TotpBoundAt = gtime.Now()
+	return nil
+}
+
+func (s *sAdmin) ResetTotp(ctx context.Context, id int64) error {
+	if id <= 0 {
+		return gerror.New("管理员ID无效")
+	}
+	a, err := s.repo.FindById(ctx, id)
+	if err != nil {
+		return err
+	}
+	if a == nil {
+		return gerror.New("管理员不存在")
+	}
+	if err = s.repo.ResetTotp(ctx, id); err != nil {
+		return err
+	}
+	_ = s.pending.Del(ctx, id)
+	return nil
 }
 
 func (s *sAdmin) Logout(ctx context.Context, adminId int64) error {
@@ -168,9 +263,16 @@ func (s *sAdmin) ListAdmins(ctx context.Context, page, size int) (*service.Admin
 		if a.LastLoginAt != nil {
 			last = a.LastLoginAt.String()
 		}
+		totpAt := ""
+		totpOn := 0
+		if totpBound(a) {
+			totpOn = 1
+			totpAt = a.TotpBoundAt.String()
+		}
 		items = append(items, &service.AdminItemDTO{
 			Id: a.Id, Username: a.Username, Nickname: a.Nickname,
 			RoleId: a.RoleId, RoleName: roleName[a.RoleId], Status: a.Status, LastLoginAt: last,
+			TotpBound: totpOn, TotpBoundAt: totpAt,
 		})
 	}
 	return &service.AdminListDTO{List: items, Total: total, Page: page, Size: size}, nil
@@ -248,6 +350,10 @@ func (s *sAdmin) DeleteAdmin(ctx context.Context, id, operatorId int64) error {
 		return gerror.New("管理员不存在")
 	}
 	return s.repo.DeleteAdmin(ctx, id)
+}
+
+func totpBound(a *entity.AdminUser) bool {
+	return a != nil && a.TotpSecret != "" && a.TotpBoundAt != nil
 }
 
 func toInfo(a *entity.AdminUser) *service.AdminInfoDTO {

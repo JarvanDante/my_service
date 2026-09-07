@@ -11,6 +11,8 @@ type AdminItem struct {
 	RoleName    string `json:"role_name"`
 	Status      int    `json:"status"`
 	LastLoginAt string `json:"last_login_at"`
+	TotpBound   int    `json:"totp_bound"`
+	TotpBoundAt string `json:"totp_bound_at"`
 }
 
 // 管理员列表
@@ -55,3 +57,9 @@ type AdminDeleteReq struct {
 	Id     int64 `json:"id" v:"required|min:1#管理员ID必填|管理员ID必须大于0"`
 }
 type AdminDeleteRes struct{}
+
+type AdminResetTotpReq struct {
+	g.Meta `path:"/admins/{id}/totp" method:"delete" tags:"Backend/Admin" summary:"解绑管理员谷歌验证器"`
+	Id     int64 `json:"id" v:"required|min:1#管理员ID必填|管理员ID必须大于0"`
+}
+type AdminResetTotpRes struct{}

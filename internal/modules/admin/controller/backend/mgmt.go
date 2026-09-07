@@ -44,6 +44,7 @@ func (c *Controller) ListAdmins(ctx context.Context, req *v1.AdminListReq) (res 
 		list = append(list, v1.AdminItem{
 			Id: a.Id, Username: a.Username, Nickname: a.Nickname,
 			RoleId: a.RoleId, RoleName: a.RoleName, Status: a.Status, LastLoginAt: a.LastLoginAt,
+			TotpBound: a.TotpBound, TotpBoundAt: a.TotpBoundAt,
 		})
 	}
 	return &v1.AdminListRes{List: list, Total: dto.Total, Page: dto.Page, Size: dto.Size}, nil
@@ -77,4 +78,11 @@ func (c *Controller) DeleteAdmin(ctx context.Context, req *v1.AdminDeleteReq) (r
 		return nil, err
 	}
 	return &v1.AdminDeleteRes{}, nil
+}
+
+func (c *Controller) ResetAdminTotp(ctx context.Context, req *v1.AdminResetTotpReq) (res *v1.AdminResetTotpRes, err error) {
+	if err = c.admin.ResetTotp(ctx, req.Id); err != nil {
+		return nil, err
+	}
+	return &v1.AdminResetTotpRes{}, nil
 }

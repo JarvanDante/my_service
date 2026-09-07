@@ -8,6 +8,7 @@ import "context"
 type LoginInput struct {
 	Username string
 	Password string
+	TotpCode string
 	Ip       string
 }
 
@@ -19,8 +20,12 @@ type AdminInfoDTO struct {
 }
 
 type LoginDTO struct {
-	Token string
-	Admin *AdminInfoDTO
+	Token      string
+	Admin      *AdminInfoDTO
+	NeedTotp   bool
+	TotpBound  bool
+	TotpQR     string
+	TotpSecret string
 }
 
 // ---------- 角色 / 权限 ----------
@@ -109,6 +114,8 @@ type AdminItemDTO struct {
 	RoleName    string
 	Status      int
 	LastLoginAt string
+	TotpBound   int
+	TotpBoundAt string
 }
 
 type AdminListDTO struct {
@@ -138,6 +145,7 @@ type IAdmin interface {
 	Login(ctx context.Context, in LoginInput) (*LoginDTO, error)
 	Logout(ctx context.Context, adminId int64) error
 	Info(ctx context.Context, adminId int64) (*AdminInfoDTO, error)
+	ResetTotp(ctx context.Context, id int64) error
 
 	// 角色
 	ListRoles(ctx context.Context) ([]*RoleDTO, error)
