@@ -10,6 +10,7 @@ import (
 	appmod "github.com/JarvanDante/my_service/internal/modules/application"
 	bannermod "github.com/JarvanDante/my_service/internal/modules/banner"
 	captchamod "github.com/JarvanDante/my_service/internal/modules/captcha"
+	channelmod "github.com/JarvanDante/my_service/internal/modules/channel"
 	checkinmod "github.com/JarvanDante/my_service/internal/modules/checkin"
 	collectmod "github.com/JarvanDante/my_service/internal/modules/collect"
 	comicsmod "github.com/JarvanDante/my_service/internal/modules/comics"
@@ -141,6 +142,7 @@ func mountBackend(s *ghttp.Server) {
 			checkinmod.RegisterBackend(perm)
 			kingkongmod.RegisterBackend(perm)
 			bannermod.RegisterBackend(perm)
+			channelmod.RegisterBackend(perm)
 		})
 	})
 }

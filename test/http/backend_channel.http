@@ -1,0 +1,81 @@
+###############################################################################
+# 后台渠道管理：登录 → 新增 → 列表搜索 → 编辑停用 → 再启用 → 删除
+###############################################################################
+
+@baseUrl = http://127.0.0.1:8000
+
+### 1. 超管登录
+POST {{baseUrl}}/backend/auth/login
+Content-Type: application/json
+
+{ "username": "admin", "password": "admin123" }
+
+> {%
+client.test("超管登录成功", function () {
+    client.assert(response.body.code === 0, "code 应为 0: " + response.body.message);
+});
+client.global.set("adminToken", response.body.data.token);
+%}
+
+### 2. 新增渠道
+POST {{baseUrl}}/backend/channels
+Authorization: {{adminToken}}
+Content-Type: application/json
+
+{ "code": "DY01", "name": "抖音测试", "remark": "自动化", "status": 1 }
+
+> {%
+client.test("新增渠道成功", function () {
+    client.assert(response.body.code === 0, "code 应为 0: " + response.body.message);
+    client.assert(response.body.data.id > 0, "应返回 id");
+});
+client.global.set("channelId", response.body.data.id);
+%}
+
+### 3. 按码搜索
+GET {{baseUrl}}/backend/channels?keyword=DY01&status=1
+Authorization: {{adminToken}}
+
+> {%
+client.test("能搜到刚加的渠道", function () {
+    client.assert(response.body.code === 0, "code 应为 0");
+    var list = response.body.data.list || [];
+    client.assert(list.some(function (x) { return x.code === "DY01"; }), "列表应含 DY01");
+});
+%}
+
+### 4. 停用
+PUT {{baseUrl}}/backend/channels/{{channelId}}
+Authorization: {{adminToken}}
+Content-Type: application/json
+
+{ "name": "抖音测试", "remark": "停用", "status": 0 }
+
+> {%
+client.test("停用成功", function () {
+    client.assert(response.body.code === 0, "code 应为 0: " + response.body.message);
+});
+%}
+
+### 5. 再启用
+PUT {{baseUrl}}/backend/channels/{{channelId}}
+Authorization: {{adminToken}}
+Content-Type: application/json
+
+{ "name": "抖音测试", "remark": "启用", "status": 1 }
+
+> {%
+client.test("启用成功", function () {
+    client.assert(response.body.code === 0, "code 应为 0: " + response.body.message);
+});
+%}
+
+### 6. 删除测试数据
+DELETE {{baseUrl}}/backend/channels/{{channelId}}
+Authorization: {{adminToken}}
+
+> {%
+client.test("删除成功", function () {
+    client.assert(response.body.code === 0, "code 应为 0: " + response.body.message);
+});
+%}

@@ -1,0 +1,87 @@
+###############################################################################
+# 设备登录写渠道：启用渠道 → 新设备带 source 注册 → 再登录不改 → 停用后新设备不写
+###############################################################################
+
+@baseUrl = http://127.0.0.1:8000
+
+### 1. 超管登录
+POST {{baseUrl}}/backend/auth/login
+Content-Type: application/json
+
+{ "username": "admin", "password": "admin123" }
+
+> {%
+client.test("超管登录成功", function () {
+    client.assert(response.body.code === 0, "code 应为 0: " + response.body.message);
+});
+client.global.set("adminToken", response.body.data.token);
+%}
+
+### 2. 准备启用渠道
+POST {{baseUrl}}/backend/channels
+Authorization: {{adminToken}}
+Content-Type: application/json
+
+{ "code": "SRC01", "name": "登录归因测试", "status": 1 }
+
+> {%
+client.global.set("sourceChannelId", response.body.data.id);
+%}
+
+### 3. 新设备登录带 source
+POST {{baseUrl}}/front/v1/user/login
+Content-Type: application/json
+
+{
+  "device_id": "e2e-source-new-001",
+  "device_type": "android",
+  "device_version": "1.0",
+  "source": "channel://SRC01"
+}
+
+> {%
+client.test("新用户写入渠道", function () {
+    client.assert(response.body.code === 0, "code 应为 0");
+    var ext = response.body.data.user.ext || {};
+    client.assert(ext.channel_name === "SRC01", "应写入 SRC01, 实际: " + ext.channel_name);
+});
+client.global.set("sourceToken", response.body.data.token);
+%}
+
+### 4. 同一设备再带别的 source，渠道不改
+POST {{baseUrl}}/front/v1/user/login
+Content-Type: application/json
+
+{
+  "device_id": "e2e-source-new-001",
+  "device_type": "android",
+  "device_version": "1.0",
+  "source": "OTHER99"
+}
+
+> {%
+client.test("已有渠道不改", function () {
+    client.assert(response.body.code === 0, "code 应为 0");
+    var ext = response.body.data.user.ext || {};
+    client.assert(ext.channel_name === "SRC01", "不应被 OTHER99 覆盖");
+});
+%}
+
+### 5. 无效 source 不挡登录
+POST {{baseUrl}}/front/v1/user/login
+Content-Type: application/json
+
+{
+  "device_id": "e2e-source-invalid-001",
+  "device_type": "h5",
+  "device_version": "1.0",
+  "source": "official"
+}
+
+> {%
+client.test("无效 source 仍能登录", function () {
+    client.assert(response.body.code === 0, "code 应为 0");
+    var ext = response.body.data.user.ext || {};
+    client.assert(!ext.channel_name, "无效码不应写入渠道");
+});
+%}

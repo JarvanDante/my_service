@@ -34,6 +34,7 @@ func (c *Controller) Login(ctx context.Context, req *v1.LoginReq) (res *v1.Login
 		DeviceId:      req.DeviceId,
 		DeviceType:    req.DeviceType,
 		DeviceVersion: req.DeviceVersion,
+		Source:        req.Source,
 		Ip:            r.GetClientIp(),
 	})
 	if err != nil {
@@ -72,6 +73,7 @@ func (c *Controller) AccountLogin(ctx context.Context, req *v1.AccountLoginReq) 
 		DeviceId:      req.DeviceId,
 		DeviceType:    req.DeviceType,
 		DeviceVersion: req.DeviceVersion,
+		Source:        req.Source,
 		Ip:            r.GetClientIp(),
 	})
 	if err != nil {

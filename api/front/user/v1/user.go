@@ -31,6 +31,7 @@ type LoginReq struct {
 	DeviceId      string `json:"device_id"      v:"required#设备号必填"`
 	DeviceType    string `json:"device_type"`
 	DeviceVersion string `json:"device_version"`
+	Source        string `json:"source"` // 推广渠道码，或剪贴板 channel://码；与邀请无关
 }
 type LoginRes struct {
 	Token string   `json:"token"`
@@ -59,6 +60,7 @@ type AccountLoginReq struct {
 	DeviceId      string `json:"device_id"      v:"required#设备号必填"`
 	DeviceType    string `json:"device_type"`
 	DeviceVersion string `json:"device_version"`
+	Source        string `json:"source"` // 推广渠道码，或剪贴板 channel://码；与邀请无关
 }
 type AccountLoginRes struct {
 	Token string   `json:"token"`

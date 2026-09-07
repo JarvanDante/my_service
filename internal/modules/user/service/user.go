@@ -7,6 +7,7 @@ type LoginInput struct {
 	DeviceId      string
 	DeviceType    string
 	DeviceVersion string
+	Source        string
 	Ip            string
 }
 
@@ -26,6 +27,7 @@ type AccountLoginInput struct {
 	DeviceId      string
 	DeviceType    string
 	DeviceVersion string
+	Source        string
 	Ip            string
 }
 

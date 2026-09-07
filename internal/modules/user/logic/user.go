@@ -14,6 +14,7 @@ import (
 
 	"github.com/JarvanDante/my_service/internal/dao"
 	"github.com/JarvanDante/my_service/internal/model/entity"
+	channellogic "github.com/JarvanDante/my_service/internal/modules/channel/logic"
 	"github.com/JarvanDante/my_service/internal/modules/user/domain"
 	"github.com/JarvanDante/my_service/internal/modules/user/service"
 	"github.com/JarvanDante/my_service/internal/shared/appcfg"
@@ -29,6 +30,24 @@ type sUser struct {
 // New 注入仓储, 返回 service.IUser 实现。
 func New(repo domain.Repository) service.IUser {
 	return &sUser{repo: repo}
+}
+
+// applySource 登录时写入推广渠道：码须在渠道表且启用，且用户当前渠道为空。与邀请无关。
+func (s *sUser) applySource(ctx context.Context, u *entity.Users, source string) *entity.Users {
+	if u == nil || strings.TrimSpace(source) == "" {
+		return u
+	}
+	if err := channellogic.BindIfEmpty(ctx, u.Id, u.ChannelName, source); err != nil {
+		return u
+	}
+	if strings.TrimSpace(u.ChannelName) != "" {
+		return u
+	}
+	refreshed, err := s.repo.FindById(ctx, u.Id)
+	if err != nil || refreshed == nil {
+		return u
+	}
+	return refreshed
 }
 
 // Login 设备登录: 有则登录, 无则自动注册。
@@ -83,6 +102,7 @@ func (s *sUser) Login(ctx context.Context, in service.LoginInput) (*service.Logi
 		}
 		_ = s.repo.UpdateLoginInfo(ctx, u.Id, in.Ip)
 	}
+	u = s.applySource(ctx, u, in.Source)
 	u = s.ensureEncodedUsername(ctx, u)
 	token, err := kit.IssueToken(ctx, u.Id)
 	if err != nil {
@@ -213,6 +233,7 @@ func (s *sUser) AccountLogin(ctx context.Context, in service.AccountLoginInput) 
 	if u, err = s.repo.FindById(ctx, u.Id); err != nil {
 		return nil, err
 	}
+	u = s.applySource(ctx, u, in.Source)
 	u = s.ensureEncodedUsername(ctx, u)
 	token, err := kit.IssueToken(ctx, u.Id)
 	if err != nil {
