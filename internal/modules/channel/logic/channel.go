@@ -28,11 +28,19 @@ func statusText(status int) string {
 	return "停用"
 }
 
-func buildH5Link(ctx context.Context, code string) string {
-	base := strings.TrimSpace(appcfg.String(ctx, "share_url", ""))
-	if strings.Contains(strings.ToLower(base), "example.com") {
-		base = ""
+func landingBase(ctx context.Context) string {
+	for _, key := range []string{"landing_url", "share_url"} {
+		base := strings.TrimSpace(appcfg.String(ctx, key, ""))
+		if base == "" || strings.Contains(strings.ToLower(base), "example.com") {
+			continue
+		}
+		return strings.TrimRight(base, "/")
 	}
+	return ""
+}
+
+func buildH5Link(ctx context.Context, code string) string {
+	base := landingBase(ctx)
 	base = strings.TrimRight(base, "/")
 	if base == "" {
 		return "?source=" + url.QueryEscape(code)
