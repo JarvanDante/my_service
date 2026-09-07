@@ -80,7 +80,7 @@ func (s *sAdmin) challengeTotp(ctx context.Context, a *entity.AdminUser, bound b
 		return nil, err
 	}
 	if secret == "" {
-		secret, _, _, err = kit.GenerateTOTP(a.Username)
+		secret, _, _, err = kit.GenerateTOTP(kit.SiteTotpIssuer(), a.Username)
 		if err != nil {
 			return nil, err
 		}
@@ -88,7 +88,7 @@ func (s *sAdmin) challengeTotp(ctx context.Context, a *entity.AdminUser, bound b
 			return nil, err
 		}
 	}
-	_, qr, err := kit.TOTPQRFromSecret(a.Username, secret)
+	_, qr, err := kit.TOTPQRFromSecret(kit.SiteTotpIssuer(), a.Username, secret)
 	if err != nil {
 		return nil, err
 	}

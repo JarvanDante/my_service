@@ -6,17 +6,37 @@ import (
 	"fmt"
 	"image/png"
 	"net/url"
+	"strings"
 
+	"github.com/gogf/gf/v2/os/genv"
 	"github.com/pquerna/otp"
 	"github.com/pquerna/otp/totp"
 )
 
-const totpIssuer = "子后台"
+const totpIssuerSuffix = "子后台"
+
+// SiteTotpIssuer 谷歌验证器显示名发行方: {SITE_CODE大写}-子后台, 如 MY-子后台。
+func SiteTotpIssuer() string {
+	code := strings.ToUpper(strings.TrimSpace(genv.Get("SITE_CODE", "my").String()))
+	if code == "" {
+		code = "MY"
+	}
+	return code + "-" + totpIssuerSuffix
+}
+
+func totpIssuerOrDefault(issuer string) string {
+	issuer = strings.TrimSpace(issuer)
+	if issuer == "" {
+		return SiteTotpIssuer()
+	}
+	return issuer
+}
 
 // GenerateTOTP 生成新的谷歌验证器密钥与扫码图。
-func GenerateTOTP(account string) (secret, otpauthURI, qrDataURI string, err error) {
+func GenerateTOTP(issuer, account string) (secret, otpauthURI, qrDataURI string, err error) {
+	issuer = totpIssuerOrDefault(issuer)
 	key, err := totp.Generate(totp.GenerateOpts{
-		Issuer:      totpIssuer,
+		Issuer:      issuer,
 		AccountName: account,
 		Period:      30,
 		SecretSize:  20,
@@ -34,13 +54,14 @@ func GenerateTOTP(account string) (secret, otpauthURI, qrDataURI string, err err
 }
 
 // TOTPQRFromSecret 用已有密钥重新生成 otpauth 与扫码图(待绑定重试时复用同一密钥)。
-func TOTPQRFromSecret(account, secret string) (otpauthURI, qrDataURI string, err error) {
+func TOTPQRFromSecret(issuer, account, secret string) (otpauthURI, qrDataURI string, err error) {
 	if account == "" || secret == "" {
 		return "", "", fmt.Errorf("totp account/secret empty")
 	}
+	issuer = totpIssuerOrDefault(issuer)
 	uri := fmt.Sprintf(
 		"otpauth://totp/%s:%s?secret=%s&issuer=%s&algorithm=SHA1&digits=6&period=30",
-		url.PathEscape(totpIssuer), url.PathEscape(account), secret, url.QueryEscape(totpIssuer),
+		url.PathEscape(issuer), url.PathEscape(account), secret, url.QueryEscape(issuer),
 	)
 	key, err := otp.NewKeyFromURL(uri)
 	if err != nil {

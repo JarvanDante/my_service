@@ -13,11 +13,14 @@ func TestGenerateAndValidateTOTP(t *testing.T) {
 	totpNow = func() time.Time { return now }
 	t.Cleanup(func() { totpNow = time.Now })
 
-	secret, uri, qr, err := GenerateTOTP("admin")
+	secret, uri, qr, err := GenerateTOTP("MY-子后台", "admin")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if secret == "" || !strings.HasPrefix(uri, "otpauth://totp/") || !strings.HasPrefix(qr, "data:image/png;base64,") {
+	if secret == "" || !strings.Contains(uri, "MY-%E5%AD%90%E5%90%8E%E5%8F%B0") && !strings.Contains(uri, "MY-子后台") {
+		t.Fatalf("issuer missing in uri=%q", uri)
+	}
+	if !strings.Contains(uri, "admin") || !strings.HasPrefix(qr, "data:image/png;base64,") {
 		t.Fatalf("unexpected totp payload secret=%q uri=%q qrPrefix=%q", secret, uri, qr[:min(32, len(qr))])
 	}
 
@@ -37,18 +40,32 @@ func TestGenerateAndValidateTOTP(t *testing.T) {
 }
 
 func TestTOTPQRFromSecretReusesSameSecret(t *testing.T) {
-	secret, _, _, err := GenerateTOTP("yyleader")
+	secret, _, _, err := GenerateTOTP("JH-子后台", "yyleader")
 	if err != nil {
 		t.Fatal(err)
 	}
-	uri, qr, err := TOTPQRFromSecret("yyleader", secret)
+	uri, qr, err := TOTPQRFromSecret("JH-子后台", "yyleader", secret)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if !strings.Contains(uri, secret) || !strings.HasPrefix(qr, "data:image/png;base64,") {
 		t.Fatalf("qr from secret mismatch uri=%q", uri)
 	}
-	if _, _, err = TOTPQRFromSecret("", secret); err == nil {
+	if !strings.Contains(uri, "JH") {
+		t.Fatalf("issuer should keep site prefix uri=%q", uri)
+	}
+	if _, _, err = TOTPQRFromSecret("JH-子后台", "", secret); err == nil {
 		t.Fatal("empty account should fail")
+	}
+}
+
+func TestSiteTotpIssuer(t *testing.T) {
+	t.Setenv("SITE_CODE", "my")
+	if got := SiteTotpIssuer(); got != "MY-子后台" {
+		t.Fatalf("SiteTotpIssuer=%q", got)
+	}
+	t.Setenv("SITE_CODE", "jh")
+	if got := SiteTotpIssuer(); got != "JH-子后台" {
+		t.Fatalf("SiteTotpIssuer=%q", got)
 	}
 }
