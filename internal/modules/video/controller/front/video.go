@@ -196,17 +196,21 @@ func (c *Controller) DouyinMy(ctx context.Context, req *v1.DouyinMyReq) (res *v1
 	return &v1.DouyinMyRes{List: items, Total: dto.Total, Page: dto.Page, Size: dto.Size}, nil
 }
 
+func toFrontModule(d *service.ModuleFrontDTO) v1.FrontModuleItem {
+	row := v1.FrontModuleItem{
+		Id: d.Id, Name: d.Name, Style: d.Style, Icon: d.Icon, Size: d.Size, Tags: d.Tags, Categories: d.Categories,
+		Items: make([]v1.Item, 0, len(d.Items)),
+	}
+	for _, item := range d.Items {
+		row.Items = append(row.Items, toItem(item))
+	}
+	return row
+}
+
 func toFrontModules(list []*service.ModuleFrontDTO) []v1.FrontModuleItem {
 	out := make([]v1.FrontModuleItem, 0, len(list))
 	for _, d := range list {
-		row := v1.FrontModuleItem{
-			Id: d.Id, Name: d.Name, Style: d.Style, Icon: d.Icon, Size: d.Size, Tags: d.Tags, Categories: d.Categories,
-			Items: make([]v1.Item, 0, len(d.Items)),
-		}
-		for _, item := range d.Items {
-			row.Items = append(row.Items, toItem(item))
-		}
-		out = append(out, row)
+		out = append(out, toFrontModule(d))
 	}
 	return out
 }
@@ -225,4 +229,20 @@ func (c *Controller) CartoonModuleList(ctx context.Context, req *v1.CartoonModul
 		return nil, err
 	}
 	return &v1.CartoonModuleListRes{List: toFrontModules(list)}, nil
+}
+
+func (c *Controller) VideoModuleRefresh(ctx context.Context, req *v1.VideoModuleRefreshReq) (res *v1.VideoModuleRefreshRes, err error) {
+	d, err := c.videoMod.FrontRefresh(ctx, req.Id, kit.ParseI64CSV(req.Exclude))
+	if err != nil {
+		return nil, err
+	}
+	return &v1.VideoModuleRefreshRes{FrontModuleItem: toFrontModule(d)}, nil
+}
+
+func (c *Controller) CartoonModuleRefresh(ctx context.Context, req *v1.CartoonModuleRefreshReq) (res *v1.CartoonModuleRefreshRes, err error) {
+	d, err := c.cartoonMod.FrontRefresh(ctx, req.Id, kit.ParseI64CSV(req.Exclude))
+	if err != nil {
+		return nil, err
+	}
+	return &v1.CartoonModuleRefreshRes{FrontModuleItem: toFrontModule(d)}, nil
 }

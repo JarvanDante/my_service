@@ -58,4 +58,5 @@ type IModule interface {
 	Update(ctx context.Context, in ModuleInput) error
 	Delete(ctx context.Context, id int64) error
 	FrontRepo(ctx context.Context, position string) ([]*ModuleFrontDTO, error)
+	FrontRefresh(ctx context.Context, id int64, exclude []int64) (*ModuleFrontDTO, error)
 }

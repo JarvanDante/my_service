@@ -61,11 +61,19 @@ func (r *videoRepo) List(ctx context.Context, f videodomain.ListFilter, page, si
 	} else if f.Status != 9 {
 		m = m.Where("status", f.Status)
 	}
+	if len(f.ExcludeIds) > 0 {
+		m = m.WhereNotIn("id", f.ExcludeIds)
+	}
 	total, err := m.Clone().Count()
 	if err != nil {
 		return nil, 0, err
 	}
 	q := m.Clone()
+	var list []*entity.Video
+	if f.Shuffle {
+		err = q.OrderRandom().Limit(size).Scan(&list)
+		return list, total, err
+	}
 	// 排序在 SQL 里做, 保证与分页一致。default 分支即原有的"综合"顺序, 后台不传 Sort 时行为不变。
 	switch f.Sort {
 	case 1: // 最新: 自增主键即时间序, 比按 created_at 排省一个索引
@@ -75,7 +83,6 @@ func (r *videoRepo) List(ctx context.Context, f videodomain.ListFilter, page, si
 	default:
 		q = q.OrderDesc("sort").OrderDesc("id")
 	}
-	var list []*entity.Video
 	err = q.Page(page, size).Scan(&list)
 	return list, total, err
 }

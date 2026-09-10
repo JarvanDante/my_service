@@ -1,6 +1,9 @@
 package kit
 
-import "strings"
+import (
+	"strconv"
+	"strings"
+)
 
 // NamesCSV 拆中英文逗号并去掉空白。
 func NamesCSV(raw string) []string {
@@ -20,6 +23,32 @@ func NamesCSV(raw string) []string {
 		}
 		seen[p] = struct{}{}
 		out = append(out, p)
+	}
+	return out
+}
+
+// ParseI64CSV 拆中英文逗号的正整数 ID。
+func ParseI64CSV(raw string) []int64 {
+	raw = strings.ReplaceAll(strings.TrimSpace(raw), "，", ",")
+	if raw == "" {
+		return nil
+	}
+	seen := map[int64]struct{}{}
+	out := make([]int64, 0, 8)
+	for _, p := range strings.Split(raw, ",") {
+		p = strings.TrimSpace(p)
+		if p == "" {
+			continue
+		}
+		id, err := strconv.ParseInt(p, 10, 64)
+		if err != nil || id <= 0 {
+			continue
+		}
+		if _, ok := seen[id]; ok {
+			continue
+		}
+		seen[id] = struct{}{}
+		out = append(out, id)
 	}
 	return out
 }

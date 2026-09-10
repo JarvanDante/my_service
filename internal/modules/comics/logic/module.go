@@ -265,3 +265,52 @@ func (s *sModule) FrontRepo(ctx context.Context, position string) ([]*service.Mo
 	}
 	return out, nil
 }
+
+func (s *sModule) pickShuffle(ctx context.Context, catNames, tagNames []string, size int, exclude []int64) ([]*service.ComicsDTO, error) {
+	items, _, err := s.comics.FrontList(ctx, 0, service.ListFilter{
+		Categories: catNames, Tags: tagNames, Shuffle: true, ExcludeIds: exclude, Page: 1, Size: size,
+	})
+	if err != nil {
+		return nil, err
+	}
+	if len(items) >= size {
+		return items[:size], nil
+	}
+	picked := make([]int64, 0, len(items))
+	for _, it := range items {
+		picked = append(picked, it.Id)
+	}
+	more, _, err := s.comics.FrontList(ctx, 0, service.ListFilter{
+		Categories: catNames, Tags: tagNames, Shuffle: true, ExcludeIds: picked, Page: 1, Size: size - len(items),
+	})
+	if err != nil {
+		return items, nil
+	}
+	return append(items, more...), nil
+}
+
+func (s *sModule) FrontRefresh(ctx context.Context, id int64, exclude []int64) (*service.ModuleFrontDTO, error) {
+	if id <= 0 {
+		return nil, gerror.New("模块ID非法")
+	}
+	var r *entity.ComicsModule
+	err := g.Model("comics_module").Ctx(ctx).
+		Where("site_id", cmSiteId).Where("id", id).Where("status", 1).Scan(&r)
+	if err != nil {
+		return nil, err
+	}
+	if r == nil {
+		return nil, gerror.New("模块不存在")
+	}
+	tagNames := s.tagNames(ctx, decodeI64s(r.TagIds))
+	catNames := s.categoryNames(ctx, decodeI64s(r.CategoryIds))
+	size := normalizeSize(r.Size, r.Style)
+	items, err := s.pickShuffle(ctx, catNames, tagNames, size, exclude)
+	if err != nil {
+		return nil, err
+	}
+	return &service.ModuleFrontDTO{
+		Id: r.Id, Name: r.Name, Style: normalizeStyle(r.Style), Icon: normalizeIcon(r.Icon),
+		Size: size, Tags: tagNames, Categories: catNames, Items: items,
+	}, nil
+}

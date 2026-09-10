@@ -28,3 +28,21 @@ type CartoonModuleListReq struct {
 type CartoonModuleListRes struct {
 	List []FrontModuleItem `json:"list"`
 }
+
+type VideoModuleRefreshReq struct {
+	g.Meta  `path:"/video/modules/refresh" method:"get" tags:"Front/Video" summary:"视频模块换一换"`
+	Id      int64  `json:"id" v:"required|min:1"`
+	Exclude string `json:"exclude"`
+}
+type VideoModuleRefreshRes struct {
+	FrontModuleItem
+}
+
+type CartoonModuleRefreshReq struct {
+	g.Meta  `path:"/cartoon/modules/refresh" method:"get" tags:"Front/Cartoon" summary:"动漫模块换一换"`
+	Id      int64  `json:"id" v:"required|min:1"`
+	Exclude string `json:"exclude"`
+}
+type CartoonModuleRefreshRes struct {
+	FrontModuleItem
+}

@@ -128,6 +128,17 @@ func (c *Controller) MayLike(ctx context.Context, req *v1.MayLikeReq) (res *v1.M
 	return res, nil
 }
 
+func toFrontModule(d *service.ModuleFrontDTO) v1.FrontModuleItem {
+	row := v1.FrontModuleItem{
+		Id: d.Id, Name: d.Name, Style: d.Style, Icon: d.Icon, Size: d.Size, Tags: d.Tags, Categories: d.Categories,
+		Items: make([]v1.Item, 0, len(d.Items)),
+	}
+	for _, item := range d.Items {
+		row.Items = append(row.Items, toItem(item))
+	}
+	return row
+}
+
 func (c *Controller) ModuleList(ctx context.Context, req *v1.ModuleListReq) (res *v1.ModuleListRes, err error) {
 	list, err := c.mod.FrontRepo(ctx, req.Position)
 	if err != nil {
@@ -135,16 +146,17 @@ func (c *Controller) ModuleList(ctx context.Context, req *v1.ModuleListReq) (res
 	}
 	res = &v1.ModuleListRes{List: make([]v1.FrontModuleItem, 0, len(list))}
 	for _, d := range list {
-		row := v1.FrontModuleItem{
-			Id: d.Id, Name: d.Name, Style: d.Style, Icon: d.Icon, Size: d.Size, Tags: d.Tags, Categories: d.Categories,
-			Items: make([]v1.Item, 0, len(d.Items)),
-		}
-		for _, item := range d.Items {
-			row.Items = append(row.Items, toItem(item))
-		}
-		res.List = append(res.List, row)
+		res.List = append(res.List, toFrontModule(d))
 	}
 	return res, nil
+}
+
+func (c *Controller) ModuleRefresh(ctx context.Context, req *v1.ModuleRefreshReq) (res *v1.ModuleRefreshRes, err error) {
+	d, err := c.mod.FrontRefresh(ctx, req.Id, kit.ParseI64CSV(req.Exclude))
+	if err != nil {
+		return nil, err
+	}
+	return &v1.ModuleRefreshRes{FrontModuleItem: toFrontModule(d)}, nil
 }
 
 func (c *Controller) CategoryList(ctx context.Context, _ *v1.CategoryListReq) (res *v1.CategoryListRes, err error) {

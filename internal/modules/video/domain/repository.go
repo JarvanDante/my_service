@@ -19,7 +19,9 @@ type ListFilter struct {
 	// 内存排序只能排当前这一页, 结果是错的。
 	Sort      int
 	Tags      []string // 标签名, 命中 tags jsonb 数组中任一项
-	UpUserIds []int64  // 只出这些 UP 主的作品(关注流)
+	UpUserIds  []int64 // 只出这些 UP 主的作品(关注流)
+	ExcludeIds []int64
+	Shuffle    bool // 随机取一页, 给模块「换一换」
 }
 
 type Repository interface {

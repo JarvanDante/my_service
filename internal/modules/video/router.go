@@ -27,6 +27,7 @@ func RegisterFront(group *ghttp.RouterGroup, repo domain.Repository) {
 			ctrl.List, ctrl.Detail, ctrl.CategoryList, ctrl.CartoonList, ctrl.CartoonCategoryList,
 			ctrl.DouyinList, ctrl.DouyinCategoryList,
 			ctrl.VideoModuleList, ctrl.CartoonModuleList,
+			ctrl.VideoModuleRefresh, ctrl.CartoonModuleRefresh,
 		)
 	})
 	group.Group("/", func(auth *ghttp.RouterGroup) {

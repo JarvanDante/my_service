@@ -124,6 +124,8 @@ func (s *sVideo) FrontList(ctx context.Context, in service.FrontListInput) (*ser
 		Status:       entity.VideoStatusPublished,
 		SubmitSource: 9,
 		Sort:         in.Sort,
+		ExcludeIds:   in.ExcludeIds,
+		Shuffle:      in.Shuffle,
 	}
 	if in.UpUserId > 0 {
 		filter.UpUserIds = []int64{in.UpUserId}

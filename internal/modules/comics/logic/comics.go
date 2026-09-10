@@ -154,6 +154,9 @@ func (s *sComics) query(ctx context.Context, f service.ListFilter) ([]*service.C
 	case 3:
 		base = base.Where("is_vip", 0).Where("price <= ?", 0)
 	}
+	if len(f.ExcludeIds) > 0 {
+		base = base.WhereNotIn("id", f.ExcludeIds)
+	}
 	if f.Sort == 1 {
 		base = base.Where("view_count > 0")
 	}
@@ -162,19 +165,25 @@ func (s *sComics) query(ctx context.Context, f service.ListFilter) ([]*service.C
 		return nil, 0, err
 	}
 	m := base.Clone()
-	switch f.Sort {
-	case 1:
-		m = m.OrderDesc("view_count")
-	case 2:
-		m = m.OrderDesc("updated_at").OrderDesc("id")
-	case 3:
-		m = m.OrderDesc("like_count")
-	default:
-		m = m.OrderDesc("rank")
-	}
 	var list []*entity.Comics
-	if err := m.OrderDesc("id").Page(f.Page, f.Size).Scan(&list); err != nil {
-		return nil, 0, err
+	if f.Shuffle {
+		if err := m.OrderRandom().Limit(f.Size).Scan(&list); err != nil {
+			return nil, 0, err
+		}
+	} else {
+		switch f.Sort {
+		case 1:
+			m = m.OrderDesc("view_count")
+		case 2:
+			m = m.OrderDesc("updated_at").OrderDesc("id")
+		case 3:
+			m = m.OrderDesc("like_count")
+		default:
+			m = m.OrderDesc("rank")
+		}
+		if err := m.OrderDesc("id").Page(f.Page, f.Size).Scan(&list); err != nil {
+			return nil, 0, err
+		}
 	}
 	out := make([]*service.ComicsDTO, 0, len(list))
 	for _, r := range list {

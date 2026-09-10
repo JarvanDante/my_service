@@ -107,6 +107,8 @@ type ListFilter struct {
 	Sort          int  // 0综合(推荐权重) 1最多观看 2最新 3最多点赞
 	PayType       int  // 0全部 1VIP 2付费解锁 3免费
 	OnlyRecommend bool // 仅 is_recommend=1, 给 H5 推荐栏
+	ExcludeIds    []int64
+	Shuffle       bool // 随机取一页, 给模块「换一换」
 	Page          int
 	Size          int
 }

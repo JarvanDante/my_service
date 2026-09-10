@@ -218,3 +218,61 @@ Authorization: {{adminToken}}
 > {%
 client.test("清理C", function () { client.assert(response.body.code === 0, response.body.message); });
 %}
+
+### 18. 新建视频首页模块
+POST {{baseUrl}}/backend/video-modules
+Authorization: {{adminToken}}
+Content-Type: application/json
+
+{ "name": "e2e换一换模块", "position": "video_home", "style": 7, "icon": 1, "size": 6, "rank": 1, "status": 1 }
+
+> {%
+client.test("建模块", function () { client.assert(response.body.code === 0, response.body.message); });
+client.global.set("vmodId", response.body.data.id);
+%}
+
+### 19. 前台模块列表能看到刚建的模块
+GET {{baseUrl}}/front/v1/video/modules?position=video_home
+Accept: application/json
+
+> {%
+client.test("模块在列表里", function () {
+    client.assert(response.body.code === 0, response.body.message);
+    var list = response.body.data.list || [];
+    var found = list.some(function (m) { return String(m.id) === String(client.global.get("vmodId")); });
+    client.assert(found, "刚建的模块应出现在首页模块列表");
+});
+%}
+
+### 20. 换一换返回同一模块的一批作品
+GET {{baseUrl}}/front/v1/video/modules/refresh?id={{vmodId}}&exclude=
+Accept: application/json
+
+> {%
+client.test("换一换成功", function () {
+    client.assert(response.body.code === 0, response.body.message);
+    client.assert(String(response.body.data.id) === String(client.global.get("vmodId")), "应回同一模块");
+    client.assert(Array.isArray(response.body.data.items), "应带回作品列表");
+    var ids = (response.body.data.items || []).map(function (it) { return it.id; }).join(",");
+    client.global.set("vmodExclude", ids);
+});
+%}
+
+### 21. 换一换排除上一批后再取
+GET {{baseUrl}}/front/v1/video/modules/refresh?id={{vmodId}}&exclude={{vmodExclude}}
+Accept: application/json
+
+> {%
+client.test("排除后再换", function () {
+    client.assert(response.body.code === 0, response.body.message);
+    client.assert(Array.isArray(response.body.data.items), "排除后仍应带回作品列表");
+});
+%}
+
+### 22. 清理模块
+DELETE {{baseUrl}}/backend/video-modules/{{vmodId}}
+Authorization: {{adminToken}}
+
+> {%
+client.test("删模块", function () { client.assert(response.body.code === 0, response.body.message); });
+%}

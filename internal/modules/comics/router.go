@@ -15,7 +15,7 @@ func RegisterFront(group *ghttp.RouterGroup) {
 	ctrl := front.New(logic.New(), logic.NewCategory(), logic.NewModule())
 	group.Group("/", func(pub *ghttp.RouterGroup) {
 		pub.Middleware(middleware.AuthOptional)
-		pub.Bind(ctrl.List, ctrl.Detail, ctrl.Chapters, ctrl.Read, ctrl.MayLike, ctrl.CategoryList, ctrl.ModuleList)
+		pub.Bind(ctrl.List, ctrl.Detail, ctrl.Chapters, ctrl.Read, ctrl.MayLike, ctrl.CategoryList, ctrl.ModuleList, ctrl.ModuleRefresh)
 	})
 	group.Group("/", func(auth *ghttp.RouterGroup) {
 		auth.Middleware(middleware.Auth, middleware.UserRateLimit)
