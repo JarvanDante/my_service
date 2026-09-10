@@ -92,42 +92,85 @@ func (s *sTag) List(ctx context.Context, f service.ListFilter) ([]*service.ItemD
 	return out, total, nil
 }
 
-// fillUseCounts 只给当前页标签补引用数，一条 SQL，走 comics.tags 的 GIN。
+// fillUseCounts 只给当前页标签补引用数。漫画走 comics.tags，视频/抖音/动漫走 video.tags + kind。
 func (s *sTag) fillUseCounts(ctx context.Context, list []*service.ItemDTO) {
-	names := make([]string, 0, len(list))
-	seen := map[string]struct{}{}
-	for _, it := range list {
-		if it.ContentType != 4 || it.Name == "" {
-			continue
-		}
-		if _, ok := seen[it.Name]; ok {
-			continue
-		}
-		seen[it.Name] = struct{}{}
-		names = append(names, it.Name)
+	type key struct {
+		ct   int
+		name string
 	}
-	if len(names) == 0 {
+	namesByCT := map[int][]string{}
+	seen := map[key]struct{}{}
+	for _, it := range list {
+		if it.Name == "" || !supportsUseCount(it.ContentType) {
+			continue
+		}
+		k := key{it.ContentType, it.Name}
+		if _, ok := seen[k]; ok {
+			continue
+		}
+		seen[k] = struct{}{}
+		namesByCT[it.ContentType] = append(namesByCT[it.ContentType], it.Name)
+	}
+	if len(namesByCT) == 0 {
 		return
 	}
-	cnt := make(map[string]int, len(names))
-	for _, name := range names {
-		b, err := json.Marshal([]string{name})
-		if err != nil {
-			continue
+	cnt := make(map[key]int)
+	for ct, names := range namesByCT {
+		for _, name := range names {
+			n, err := countTaggedWorks(ctx, ct, name)
+			if err != nil {
+				continue
+			}
+			cnt[key{ct, name}] = n
 		}
-		n, err := g.Model("comics").Ctx(ctx).
-			Where("site_id", tagSiteId).
-			Where("tags @> ?::jsonb", string(b)).
-			Count()
-		if err != nil {
-			continue
-		}
-		cnt[name] = n
 	}
 	for _, it := range list {
-		if it.ContentType == 4 {
-			it.UseCount = cnt[it.Name]
+		if supportsUseCount(it.ContentType) {
+			it.UseCount = cnt[key{it.ContentType, it.Name}]
 		}
+	}
+}
+
+func supportsUseCount(contentType int) bool {
+	switch contentType {
+	case 1, 2, 3, 4:
+		return true
+	default:
+		return false
+	}
+}
+
+func countTaggedWorks(ctx context.Context, contentType int, name string) (int, error) {
+	b, err := json.Marshal([]string{name})
+	if err != nil {
+		return 0, err
+	}
+	m := g.Model(useCountTable(contentType)).Ctx(ctx).
+		Where("site_id", tagSiteId).
+		Where("tags @> ?::jsonb", string(b))
+	if kind, ok := useCountKind(contentType); ok {
+		m = m.Where("kind", kind)
+	}
+	return m.Count()
+}
+
+func useCountTable(contentType int) string {
+	if contentType == 4 {
+		return "comics"
+	}
+	return "video"
+}
+
+func useCountKind(contentType int) (int, bool) {
+	switch contentType {
+	case 1:
+		return entity.VideoKindVideo, true
+	case 2:
+		return entity.VideoKindDouyin, true
+	case 3:
+		return entity.VideoKindCartoon, true
+	default:
+		return 0, false
 	}
 }
 
