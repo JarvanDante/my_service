@@ -1,4 +1,4 @@
-// Code maintained manually (漫画首页运营模块).
+// Code maintained manually (漫画分类运营模块).
 package entity
 
 import "github.com/gogf/gf/v2/os/gtime"
@@ -19,7 +19,7 @@ const (
 	ComicsModuleIconFire = 3
 )
 
-const ComicsModulePosHome = "comic_home"
+const ComicsModulePosHome = "comic_home" // 已废弃, 写入时改挂权重最高的分类
 
 type ComicsModule struct {
 	Id          int64       `json:"id"        orm:"id"`

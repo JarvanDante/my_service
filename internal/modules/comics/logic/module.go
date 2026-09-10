@@ -3,6 +3,7 @@ package logic
 import (
 	"context"
 	"encoding/json"
+	"strconv"
 	"strings"
 
 	"github.com/gogf/gf/v2/errors/gerror"
@@ -52,10 +53,23 @@ func normalizeIcon(icon int) int {
 	return icon
 }
 
-func normalizePosition(pos string) string {
+func (s *sModule) defaultCatPosition(ctx context.Context) string {
+	var row struct {
+		Id int64 `orm:"id"`
+	}
+	_ = g.Model("comics_category").Ctx(ctx).
+		Where("site_id", cmSiteId).Where("status", 1).
+		OrderDesc("rank").OrderDesc("id").Limit(1).Scan(&row)
+	if row.Id <= 0 {
+		return ""
+	}
+	return "cat_" + strconv.FormatInt(row.Id, 10)
+}
+
+func (s *sModule) resolvePosition(ctx context.Context, pos string) string {
 	pos = strings.TrimSpace(pos)
-	if pos == "" {
-		return entity.ComicsModulePosHome
+	if pos == "" || pos == entity.ComicsModulePosHome {
+		return s.defaultCatPosition(ctx)
 	}
 	return pos
 }
@@ -223,10 +237,14 @@ func (s *sModule) Create(ctx context.Context, in service.ModuleInput) (int64, er
 	}
 	style := normalizeStyle(in.Style)
 	s.bindFilter(&in)
+	pos := s.resolvePosition(ctx, in.Position)
+	if pos == "" {
+		return 0, gerror.New("请先在漫画分类里配置分类")
+	}
 	return g.Model("comics_module").Ctx(ctx).Data(g.Map{
 		"site_id":      cmSiteId,
 		"name":         name,
-		"position":     normalizePosition(in.Position),
+		"position":     pos,
 		"style":        style,
 		"icon":         normalizeIcon(in.Icon),
 		"category_ids": encodeI64s(in.CategoryIds),
@@ -244,8 +262,12 @@ func (s *sModule) Update(ctx context.Context, in service.ModuleInput) error {
 	}
 	style := normalizeStyle(in.Style)
 	s.bindFilter(&in)
+	pos := s.resolvePosition(ctx, in.Position)
+	if pos == "" {
+		return gerror.New("请先在漫画分类里配置分类")
+	}
 	data := g.Map{
-		"position":     normalizePosition(in.Position),
+		"position":     pos,
 		"style":        style,
 		"icon":         normalizeIcon(in.Icon),
 		"category_ids": encodeI64s(in.CategoryIds),
@@ -276,7 +298,7 @@ func (s *sModule) Delete(ctx context.Context, id int64) error {
 }
 
 func (s *sModule) FrontRepo(ctx context.Context, position string) ([]*service.ModuleFrontDTO, error) {
-	pos := normalizePosition(position)
+	pos := s.resolvePosition(ctx, position)
 	var list []*entity.ComicsModule
 	err := g.Model("comics_module").Ctx(ctx).
 		Where("site_id", cmSiteId).Where("status", 1).Where("position", pos).

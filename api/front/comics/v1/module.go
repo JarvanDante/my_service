@@ -13,9 +13,9 @@ type FrontModuleItem struct {
 	Items      []Item   `json:"items"`
 }
 
-// ModuleListReq 启用中的漫画首页模块, 按权重倒序(公开)。
+// ModuleListReq 启用中的漫画分类模块, 按权重倒序(公开)。position 空则用权重最高的分类。
 type ModuleListReq struct {
-	g.Meta   `path:"/comics/modules" method:"get" tags:"Front/Comics" summary:"漫画首页模块"`
+	g.Meta   `path:"/comics/modules" method:"get" tags:"Front/Comics" summary:"漫画分类模块"`
 	Position string `json:"position"`
 }
 type ModuleListRes struct {
