@@ -154,6 +154,12 @@ func (s *sComics) query(ctx context.Context, f service.ListFilter) ([]*service.C
 	case 3:
 		base = base.Where("is_vip", 0).Where("price <= ?", 0)
 	}
+	if len(f.Ids) > 0 {
+		base = base.WhereIn("id", f.Ids)
+	}
+	if f.UpdateStatus == 1 || f.UpdateStatus == 2 {
+		base = base.Where("update_status", f.UpdateStatus)
+	}
 	if len(f.ExcludeIds) > 0 {
 		base = base.WhereNotIn("id", f.ExcludeIds)
 	}

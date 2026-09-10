@@ -378,7 +378,7 @@ POST {{baseUrl}}/backend/comics-modules
 Authorization: {{adminToken}}
 Content-Type: application/json
 
-{ "name": "e2e换一换模块", "position": "comic_home", "style": 7, "icon": 1, "size": 6, "rank": 1, "status": 1 }
+{ "name": "e2e换一换模块", "position": "comic_home", "style": 7, "icon": 1, "size": 6, "rank": 1, "status": 1, "filter": "{\"order\":\"new\"}" }
 
 > {%
 client.test("建模块", function () { client.assert(response.body.code === 0, response.body.message); });

@@ -108,7 +108,9 @@ type ListFilter struct {
 	PayType       int  // 0全部 1VIP 2付费解锁 3免费
 	OnlyRecommend bool // 仅 is_recommend=1, 给 H5 推荐栏
 	ExcludeIds    []int64
-	Shuffle       bool // 随机取一页, 给模块「换一换」
+	Ids           []int64 // 指定作品 ID
+	UpdateStatus  int     // 0不限 1连载 2完结
+	Shuffle       bool    // 随机取一页, 给模块「换一换」
 	Page          int
 	Size          int
 }

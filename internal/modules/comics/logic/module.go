@@ -123,7 +123,7 @@ func (s *sModule) tagNames(ctx context.Context, ids []int64) []string {
 	return out
 }
 
-func toModuleDTO(r *entity.ComicsModule, catNames, tagNames []string) *service.ModuleDTO {
+func toModuleDTO(r *entity.ComicsModule, catNames, tagNames []string, filter string) *service.ModuleDTO {
 	created, updated := "", ""
 	if r.CreatedAt != nil {
 		created = r.CreatedAt.String()
@@ -140,9 +140,41 @@ func toModuleDTO(r *entity.ComicsModule, catNames, tagNames []string) *service.M
 	return &service.ModuleDTO{
 		Id: r.Id, Name: r.Name, Position: r.Position, Style: r.Style, Icon: r.Icon,
 		CategoryIds: decodeI64s(r.CategoryIds), CategoryNames: catNames,
-		TagIds: decodeI64s(r.TagIds), TagNames: tagNames, Size: r.Size, Rank: r.Rank, Status: r.Status,
+		TagIds: decodeI64s(r.TagIds), TagNames: tagNames, Filter: filter,
+		Size: r.Size, Rank: r.Rank, Status: r.Status,
 		CreatedAt: created, UpdatedAt: updated,
 	}
+}
+
+func (s *sModule) bindFilter(in *service.ModuleInput) moduleQuery {
+	q := parseModuleFilter(in.Filter, in.CategoryIds, in.TagIds)
+	in.CategoryIds = q.CatIDs
+	in.TagIds = q.TagIDs
+	in.Filter = encodeFilter(q)
+	return q
+}
+
+func (s *sModule) queryOf(ctx context.Context, r *entity.ComicsModule) (moduleQuery, []string, []string) {
+	q := parseModuleFilter(r.Filter, decodeI64s(r.CategoryIds), decodeI64s(r.TagIds))
+	if id := parseCatPosition(r.Position); id > 0 && len(q.CatIDs) == 0 {
+		if name, kind := s.categoryKind(ctx, id); kind == entity.ComicsCategoryKindNormal && name != "" {
+			q.CatIDs = []int64{id}
+		}
+	}
+	return q, s.categoryNames(ctx, q.CatIDs), s.tagNames(ctx, q.TagIDs)
+}
+
+func (s *sModule) categoryKind(ctx context.Context, id int64) (string, int) {
+	if id <= 0 {
+		return "", -1
+	}
+	var row struct {
+		Name string `orm:"name"`
+		Kind int    `orm:"kind"`
+	}
+	_ = g.Model("comics_category").Ctx(ctx).
+		Where("site_id", cmSiteId).Where("id", id).Scan(&row)
+	return row.Name, row.Kind
 }
 
 func (s *sModule) List(ctx context.Context, f service.ModuleFilter) ([]*service.ModuleDTO, int, error) {
@@ -175,7 +207,8 @@ func (s *sModule) List(ctx context.Context, f service.ModuleFilter) ([]*service.
 	}
 	out := make([]*service.ModuleDTO, 0, len(list))
 	for _, r := range list {
-		out = append(out, toModuleDTO(r, s.categoryNames(ctx, decodeI64s(r.CategoryIds)), s.tagNames(ctx, decodeI64s(r.TagIds))))
+		q := parseModuleFilter(r.Filter, decodeI64s(r.CategoryIds), decodeI64s(r.TagIds))
+		out = append(out, toModuleDTO(r, s.categoryNames(ctx, q.CatIDs), s.tagNames(ctx, q.TagIDs), encodeFilter(q)))
 	}
 	return out, total, nil
 }
@@ -189,6 +222,7 @@ func (s *sModule) Create(ctx context.Context, in service.ModuleInput) (int64, er
 		in.Status = 1
 	}
 	style := normalizeStyle(in.Style)
+	s.bindFilter(&in)
 	return g.Model("comics_module").Ctx(ctx).Data(g.Map{
 		"site_id":      cmSiteId,
 		"name":         name,
@@ -197,6 +231,7 @@ func (s *sModule) Create(ctx context.Context, in service.ModuleInput) (int64, er
 		"icon":         normalizeIcon(in.Icon),
 		"category_ids": encodeI64s(in.CategoryIds),
 		"tag_ids":      encodeI64s(in.TagIds),
+		"filter":       in.Filter,
 		"size":         normalizeSize(in.Size, style),
 		"rank":         in.Rank,
 		"status":       in.Status,
@@ -208,12 +243,14 @@ func (s *sModule) Update(ctx context.Context, in service.ModuleInput) error {
 		return gerror.New("模块ID非法")
 	}
 	style := normalizeStyle(in.Style)
+	s.bindFilter(&in)
 	data := g.Map{
 		"position":     normalizePosition(in.Position),
 		"style":        style,
 		"icon":         normalizeIcon(in.Icon),
 		"category_ids": encodeI64s(in.CategoryIds),
 		"tag_ids":      encodeI64s(in.TagIds),
+		"filter":       in.Filter,
 		"size":         normalizeSize(in.Size, style),
 		"rank":         in.Rank,
 		"updated_at":   gtime.Now(),
@@ -249,12 +286,9 @@ func (s *sModule) FrontRepo(ctx context.Context, position string) ([]*service.Mo
 	}
 	out := make([]*service.ModuleFrontDTO, 0, len(list))
 	for _, r := range list {
-		tagNames := s.tagNames(ctx, decodeI64s(r.TagIds))
-		catNames := s.categoryNames(ctx, decodeI64s(r.CategoryIds))
+		q, catNames, tagNames := s.queryOf(ctx, r)
 		size := normalizeSize(r.Size, r.Style)
-		items, _, err := s.comics.FrontList(ctx, 0, service.ListFilter{
-			Categories: catNames, Tags: tagNames, Sort: 2, Page: 1, Size: size,
-		})
+		items, _, err := s.comics.FrontList(ctx, 0, q.listFilter(catNames, tagNames, size, false))
 		if err != nil {
 			items = nil
 		}
@@ -266,10 +300,10 @@ func (s *sModule) FrontRepo(ctx context.Context, position string) ([]*service.Mo
 	return out, nil
 }
 
-func (s *sModule) pickShuffle(ctx context.Context, catNames, tagNames []string, size int, exclude []int64) ([]*service.ComicsDTO, error) {
-	items, _, err := s.comics.FrontList(ctx, 0, service.ListFilter{
-		Categories: catNames, Tags: tagNames, Shuffle: true, ExcludeIds: exclude, Page: 1, Size: size,
-	})
+func (s *sModule) pickShuffle(ctx context.Context, q moduleQuery, catNames, tagNames []string, size int, exclude []int64) ([]*service.ComicsDTO, error) {
+	f := q.listFilter(catNames, tagNames, size, true)
+	f.ExcludeIds = exclude
+	items, _, err := s.comics.FrontList(ctx, 0, f)
 	if err != nil {
 		return nil, err
 	}
@@ -280,9 +314,9 @@ func (s *sModule) pickShuffle(ctx context.Context, catNames, tagNames []string, 
 	for _, it := range items {
 		picked = append(picked, it.Id)
 	}
-	more, _, err := s.comics.FrontList(ctx, 0, service.ListFilter{
-		Categories: catNames, Tags: tagNames, Shuffle: true, ExcludeIds: picked, Page: 1, Size: size - len(items),
-	})
+	moreFilter := q.listFilter(catNames, tagNames, size-len(items), true)
+	moreFilter.ExcludeIds = picked
+	more, _, err := s.comics.FrontList(ctx, 0, moreFilter)
 	if err != nil {
 		return items, nil
 	}
@@ -302,10 +336,9 @@ func (s *sModule) FrontRefresh(ctx context.Context, id int64, exclude []int64) (
 	if r == nil {
 		return nil, gerror.New("模块不存在")
 	}
-	tagNames := s.tagNames(ctx, decodeI64s(r.TagIds))
-	catNames := s.categoryNames(ctx, decodeI64s(r.CategoryIds))
+	q, catNames, tagNames := s.queryOf(ctx, r)
 	size := normalizeSize(r.Size, r.Style)
-	items, err := s.pickShuffle(ctx, catNames, tagNames, size, exclude)
+	items, err := s.pickShuffle(ctx, q, catNames, tagNames, size, exclude)
 	if err != nil {
 		return nil, err
 	}
