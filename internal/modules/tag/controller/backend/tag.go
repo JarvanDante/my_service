@@ -32,7 +32,7 @@ func (c *Controller) List(ctx context.Context, req *v1.ListReq) (res *v1.ListRes
 	for _, r := range list {
 		res.List = append(res.List, v1.Item{
 			Id: r.Id, ContentType: r.ContentType, Name: r.Name,
-			Rank: r.Rank, Status: r.Status, CreatedAt: r.CreatedAt,
+			Rank: r.Rank, Status: r.Status, UseCount: r.UseCount, CreatedAt: r.CreatedAt,
 		})
 	}
 	return res, nil

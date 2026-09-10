@@ -15,6 +15,7 @@ type ItemDTO struct {
 	Name        string
 	Rank        int
 	Status      int
+	UseCount    int
 	CreatedAt   string
 }
 

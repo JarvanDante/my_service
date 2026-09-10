@@ -5,6 +5,7 @@ package logic
 
 import (
 	"context"
+	"encoding/json"
 
 	"github.com/gogf/gf/v2/errors/gerror"
 	"github.com/gogf/gf/v2/frame/g"
@@ -87,7 +88,47 @@ func (s *sTag) List(ctx context.Context, f service.ListFilter) ([]*service.ItemD
 			Rank: r.Rank, Status: r.Status, CreatedAt: created,
 		})
 	}
+	s.fillUseCounts(ctx, out)
 	return out, total, nil
+}
+
+// fillUseCounts 只给当前页标签补引用数，一条 SQL，走 comics.tags 的 GIN。
+func (s *sTag) fillUseCounts(ctx context.Context, list []*service.ItemDTO) {
+	names := make([]string, 0, len(list))
+	seen := map[string]struct{}{}
+	for _, it := range list {
+		if it.ContentType != 4 || it.Name == "" {
+			continue
+		}
+		if _, ok := seen[it.Name]; ok {
+			continue
+		}
+		seen[it.Name] = struct{}{}
+		names = append(names, it.Name)
+	}
+	if len(names) == 0 {
+		return
+	}
+	cnt := make(map[string]int, len(names))
+	for _, name := range names {
+		b, err := json.Marshal([]string{name})
+		if err != nil {
+			continue
+		}
+		n, err := g.Model("comics").Ctx(ctx).
+			Where("site_id", tagSiteId).
+			Where("tags @> ?::jsonb", string(b)).
+			Count()
+		if err != nil {
+			continue
+		}
+		cnt[name] = n
+	}
+	for _, it := range list {
+		if it.ContentType == 4 {
+			it.UseCount = cnt[it.Name]
+		}
+	}
 }
 
 func (s *sTag) Create(ctx context.Context, in service.CreateInput) (int64, error) {

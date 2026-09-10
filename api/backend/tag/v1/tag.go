@@ -9,6 +9,7 @@ type Item struct {
 	Name        string `json:"name"`
 	Rank        int    `json:"rank"`
 	Status      int    `json:"status"`
+	UseCount    int    `json:"use_count"`
 	CreatedAt   string `json:"created_at"`
 }
 
