@@ -61,7 +61,7 @@ func encodeI64s(ids []int64) string {
 }
 
 func normalizeStyle(style int) int {
-	if style < 1 || style > 7 {
+	if style < 1 || style > 8 {
 		return 2
 	}
 	return style
@@ -86,6 +86,9 @@ func normalizeSize(n, style int) int {
 	if n <= 0 {
 		if style == 7 {
 			return 9
+		}
+		if style == 8 {
+			return 6
 		}
 		if style == 5 || style == 6 {
 			return 10

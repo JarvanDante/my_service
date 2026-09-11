@@ -37,7 +37,7 @@ type VideoModuleCreateReq struct {
 	g.Meta      `path:"/video-modules" method:"post" tags:"Backend/Video" summary:"新增视频模块"`
 	Name        string  `json:"name" v:"required#模块名必填"`
 	Position    string  `json:"position"`
-	Style       int     `json:"style" v:"in:1,2,3,4,5,6,7#样式非法"`
+	Style       int     `json:"style" v:"in:1,2,3,4,5,6,7,8#样式非法"`
 	Icon        int     `json:"icon" v:"in:1,2,3#图标非法"`
 	CategoryIds []int64 `json:"category_ids"`
 	TagIds      []int64 `json:"tag_ids"`
@@ -54,7 +54,7 @@ type VideoModuleUpdateReq struct {
 	Id          int64   `json:"id" in:"path" v:"required|min:1#模块ID必填"`
 	Name        string  `json:"name"`
 	Position    string  `json:"position"`
-	Style       int     `json:"style" v:"in:1,2,3,4,5,6,7#样式非法"`
+	Style       int     `json:"style" v:"in:1,2,3,4,5,6,7,8#样式非法"`
 	Icon        int     `json:"icon" v:"in:1,2,3#图标非法"`
 	CategoryIds []int64 `json:"category_ids"`
 	TagIds      []int64 `json:"tag_ids"`
@@ -88,7 +88,7 @@ type CartoonModuleCreateReq struct {
 	g.Meta      `path:"/cartoon-modules" method:"post" tags:"Backend/Cartoon" summary:"新增动漫模块"`
 	Name        string  `json:"name" v:"required#模块名必填"`
 	Position    string  `json:"position"`
-	Style       int     `json:"style" v:"in:1,2,3,4,5,6,7#样式非法"`
+	Style       int     `json:"style" v:"in:1,2,3,4,5,6,7,8#样式非法"`
 	Icon        int     `json:"icon" v:"in:1,2,3#图标非法"`
 	CategoryIds []int64 `json:"category_ids"`
 	TagIds      []int64 `json:"tag_ids"`
@@ -105,7 +105,7 @@ type CartoonModuleUpdateReq struct {
 	Id          int64   `json:"id" in:"path" v:"required|min:1#模块ID必填"`
 	Name        string  `json:"name"`
 	Position    string  `json:"position"`
-	Style       int     `json:"style" v:"in:1,2,3,4,5,6,7#样式非法"`
+	Style       int     `json:"style" v:"in:1,2,3,4,5,6,7,8#样式非法"`
 	Icon        int     `json:"icon" v:"in:1,2,3#图标非法"`
 	CategoryIds []int64 `json:"category_ids"`
 	TagIds      []int64 `json:"tag_ids"`

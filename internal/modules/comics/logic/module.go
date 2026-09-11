@@ -40,7 +40,7 @@ func encodeI64s(ids []int64) string {
 }
 
 func normalizeStyle(style int) int {
-	if style < 1 || style > 7 {
+	if style < 1 || style > 8 {
 		return entity.ComicsModuleStylePoster3x3
 	}
 	return style
@@ -78,6 +78,9 @@ func normalizeSize(n, style int) int {
 	if n <= 0 {
 		if style == entity.ComicsModuleStylePoster3x3 {
 			return 9
+		}
+		if style == entity.ComicsModuleStylePoster3x2 {
+			return 6
 		}
 		if style == entity.ComicsModuleStylePosterRail || style == entity.ComicsModuleStyleWideRail {
 			return 10

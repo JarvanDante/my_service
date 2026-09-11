@@ -38,7 +38,7 @@ type ModuleCreateReq struct {
 	g.Meta      `path:"/comics-modules" method:"post" tags:"Backend/Comics" summary:"新增漫画模块"`
 	Name        string  `json:"name" v:"required#模块名必填"`
 	Position    string  `json:"position"`
-	Style       int     `json:"style" v:"in:1,2,3,4,5,6,7#样式非法"`
+	Style       int     `json:"style" v:"in:1,2,3,4,5,6,7,8#样式非法"`
 	Icon        int     `json:"icon" v:"in:1,2,3#图标非法"`
 	CategoryIds []int64 `json:"category_ids"`
 	TagIds      []int64 `json:"tag_ids"`
@@ -56,7 +56,7 @@ type ModuleUpdateReq struct {
 	Id          int64   `json:"id" in:"path" v:"required|min:1#模块ID必填"`
 	Name        string  `json:"name"`
 	Position    string  `json:"position"`
-	Style       int     `json:"style" v:"in:1,2,3,4,5,6,7#样式非法"`
+	Style       int     `json:"style" v:"in:1,2,3,4,5,6,7,8#样式非法"`
 	Icon        int     `json:"icon" v:"in:1,2,3#图标非法"`
 	CategoryIds []int64 `json:"category_ids"`
 	TagIds      []int64 `json:"tag_ids"`
