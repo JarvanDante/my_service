@@ -3,6 +3,7 @@ package logic
 import (
 	"context"
 	"encoding/json"
+	"strconv"
 	"strings"
 
 	"github.com/gogf/gf/v2/errors/gerror"
@@ -74,10 +75,23 @@ func normalizeIcon(icon int) int {
 	return icon
 }
 
-func (s *sModule) normalizePosition(pos string) string {
+func (s *sModule) defaultCatPosition(ctx context.Context) string {
+	var row struct {
+		Id int64 `orm:"id"`
+	}
+	_ = g.Model(s.spec.CategoryTable).Ctx(ctx).
+		Where("site_id", vdSiteId).Where("status", 1).
+		OrderDesc("rank").OrderDesc("id").Limit(1).Scan(&row)
+	if row.Id <= 0 {
+		return ""
+	}
+	return "cat_" + strconv.FormatInt(row.Id, 10)
+}
+
+func (s *sModule) resolvePosition(ctx context.Context, pos string) string {
 	pos = strings.TrimSpace(pos)
-	if pos == "" {
-		return s.spec.DefaultPos
+	if pos == "" || pos == s.spec.DefaultPos {
+		return s.defaultCatPosition(ctx)
 	}
 	return pos
 }
@@ -145,7 +159,7 @@ func (s *sModule) tagNames(ctx context.Context, ids []int64) []string {
 	return out
 }
 
-func toModuleDTO(r *entity.VideoModule, catNames, tagNames []string) *service.ModuleDTO {
+func toModuleDTO(r *entity.VideoModule, catNames, tagNames []string, filter string) *service.ModuleDTO {
 	created, updated := "", ""
 	if r.CreatedAt != nil {
 		created = r.CreatedAt.String()
@@ -162,9 +176,40 @@ func toModuleDTO(r *entity.VideoModule, catNames, tagNames []string) *service.Mo
 	return &service.ModuleDTO{
 		Id: r.Id, Name: r.Name, Position: r.Position, Style: r.Style, Icon: r.Icon,
 		CategoryIds: decodeI64s(r.CategoryIds), CategoryNames: catNames,
-		TagIds: decodeI64s(r.TagIds), TagNames: tagNames, Size: r.Size, Rank: r.Rank, Status: r.Status,
+		TagIds: decodeI64s(r.TagIds), TagNames: tagNames, Filter: filter, Size: r.Size, Rank: r.Rank, Status: r.Status,
 		CreatedAt: created, UpdatedAt: updated,
 	}
+}
+
+func (s *sModule) bindFilter(in *service.ModuleInput) moduleQuery {
+	q := parseModuleFilter(in.Filter, in.CategoryIds, in.TagIds)
+	in.CategoryIds = q.CatIDs
+	in.TagIds = q.TagIDs
+	in.Filter = encodeFilter(q)
+	return q
+}
+
+func (s *sModule) queryOf(ctx context.Context, r *entity.VideoModule) (moduleQuery, []string, []string) {
+	q := parseModuleFilter(r.Filter, decodeI64s(r.CategoryIds), decodeI64s(r.TagIds))
+	if id := parseCatPosition(r.Position); id > 0 && len(q.CatIDs) == 0 {
+		if name, kind := s.categoryKind(ctx, id); kind == entity.VideoCategoryKindNormal && name != "" {
+			q.CatIDs = []int64{id}
+		}
+	}
+	return q, s.categoryNames(ctx, q.CatIDs), s.tagNames(ctx, q.TagIDs)
+}
+
+func (s *sModule) categoryKind(ctx context.Context, id int64) (string, int) {
+	if id <= 0 {
+		return "", -1
+	}
+	var row struct {
+		Name string `orm:"name"`
+		Kind int    `orm:"kind"`
+	}
+	_ = g.Model(s.spec.CategoryTable).Ctx(ctx).
+		Where("site_id", vdSiteId).Where("id", id).Scan(&row)
+	return row.Name, row.Kind
 }
 
 func (s *sModule) List(ctx context.Context, f service.ModuleFilter) ([]*service.ModuleDTO, int, error) {
@@ -197,7 +242,8 @@ func (s *sModule) List(ctx context.Context, f service.ModuleFilter) ([]*service.
 	}
 	out := make([]*service.ModuleDTO, 0, len(list))
 	for _, r := range list {
-		out = append(out, toModuleDTO(r, s.categoryNames(ctx, decodeI64s(r.CategoryIds)), s.tagNames(ctx, decodeI64s(r.TagIds))))
+		q := parseModuleFilter(r.Filter, decodeI64s(r.CategoryIds), decodeI64s(r.TagIds))
+		out = append(out, toModuleDTO(r, s.categoryNames(ctx, q.CatIDs), s.tagNames(ctx, q.TagIDs), encodeFilter(q)))
 	}
 	return out, total, nil
 }
@@ -211,14 +257,20 @@ func (s *sModule) Create(ctx context.Context, in service.ModuleInput) (int64, er
 		in.Status = 1
 	}
 	style := normalizeStyle(in.Style)
+	s.bindFilter(&in)
+	pos := s.resolvePosition(ctx, in.Position)
+	if pos == "" {
+		return 0, gerror.New("请先配置分类")
+	}
 	return g.Model(s.spec.Table).Ctx(ctx).Data(g.Map{
 		"site_id":      vdSiteId,
 		"name":         name,
-		"position":     s.normalizePosition(in.Position),
+		"position":     pos,
 		"style":        style,
 		"icon":         normalizeIcon(in.Icon),
 		"category_ids": encodeI64s(in.CategoryIds),
 		"tag_ids":      encodeI64s(in.TagIds),
+		"filter":       in.Filter,
 		"size":         normalizeSize(in.Size, style),
 		"rank":         in.Rank,
 		"status":       in.Status,
@@ -230,12 +282,18 @@ func (s *sModule) Update(ctx context.Context, in service.ModuleInput) error {
 		return gerror.New("模块ID非法")
 	}
 	style := normalizeStyle(in.Style)
+	s.bindFilter(&in)
+	pos := s.resolvePosition(ctx, in.Position)
+	if pos == "" {
+		return gerror.New("请先配置分类")
+	}
 	data := g.Map{
-		"position":     s.normalizePosition(in.Position),
+		"position":     pos,
 		"style":        style,
 		"icon":         normalizeIcon(in.Icon),
 		"category_ids": encodeI64s(in.CategoryIds),
 		"tag_ids":      encodeI64s(in.TagIds),
+		"filter":       in.Filter,
 		"size":         normalizeSize(in.Size, style),
 		"rank":         in.Rank,
 		"updated_at":   gtime.Now(),
@@ -261,7 +319,7 @@ func (s *sModule) Delete(ctx context.Context, id int64) error {
 }
 
 func (s *sModule) FrontRepo(ctx context.Context, position string) ([]*service.ModuleFrontDTO, error) {
-	pos := s.normalizePosition(position)
+	pos := s.resolvePosition(ctx, position)
 	var list []*entity.VideoModule
 	err := g.Model(s.spec.Table).Ctx(ctx).
 		Where("site_id", vdSiteId).Where("status", 1).Where("position", pos).
@@ -271,12 +329,9 @@ func (s *sModule) FrontRepo(ctx context.Context, position string) ([]*service.Mo
 	}
 	out := make([]*service.ModuleFrontDTO, 0, len(list))
 	for _, r := range list {
-		tagNames := s.tagNames(ctx, decodeI64s(r.TagIds))
-		catNames := s.categoryNames(ctx, decodeI64s(r.CategoryIds))
+		q, catNames, tagNames := s.queryOf(ctx, r)
 		size := normalizeSize(r.Size, r.Style)
-		dto, err := s.video.FrontList(ctx, service.FrontListInput{
-			Categories: catNames, Tags: tagNames, Kind: s.spec.VideoKind, Sort: 1, Page: 1, Size: size,
-		})
+		dto, err := s.video.FrontList(ctx, q.frontInput(catNames, tagNames, size, s.spec.VideoKind, false))
 		var items []*service.VideoDTO
 		if err == nil && dto != nil {
 			items = dto.List
@@ -289,11 +344,10 @@ func (s *sModule) FrontRepo(ctx context.Context, position string) ([]*service.Mo
 	return out, nil
 }
 
-func (s *sModule) pickShuffle(ctx context.Context, catNames, tagNames []string, size int, exclude []int64) ([]*service.VideoDTO, error) {
-	dto, err := s.video.FrontList(ctx, service.FrontListInput{
-		Categories: catNames, Tags: tagNames, Kind: s.spec.VideoKind,
-		Shuffle: true, ExcludeIds: exclude, Page: 1, Size: size,
-	})
+func (s *sModule) pickShuffle(ctx context.Context, q moduleQuery, catNames, tagNames []string, size int, exclude []int64) ([]*service.VideoDTO, error) {
+	in := q.frontInput(catNames, tagNames, size, s.spec.VideoKind, true)
+	in.ExcludeIds = exclude
+	dto, err := s.video.FrontList(ctx, in)
 	if err != nil {
 		return nil, err
 	}
@@ -308,10 +362,9 @@ func (s *sModule) pickShuffle(ctx context.Context, catNames, tagNames []string, 
 	for _, it := range items {
 		picked = append(picked, it.Id)
 	}
-	more, err := s.video.FrontList(ctx, service.FrontListInput{
-		Categories: catNames, Tags: tagNames, Kind: s.spec.VideoKind,
-		Shuffle: true, ExcludeIds: picked, Page: 1, Size: size - len(items),
-	})
+	moreIn := q.frontInput(catNames, tagNames, size-len(items), s.spec.VideoKind, true)
+	moreIn.ExcludeIds = picked
+	more, err := s.video.FrontList(ctx, moreIn)
 	if err != nil || more == nil {
 		return items, nil
 	}
@@ -331,10 +384,9 @@ func (s *sModule) FrontRefresh(ctx context.Context, id int64, exclude []int64) (
 	if r == nil {
 		return nil, gerror.New("模块不存在")
 	}
-	tagNames := s.tagNames(ctx, decodeI64s(r.TagIds))
-	catNames := s.categoryNames(ctx, decodeI64s(r.CategoryIds))
+	q, catNames, tagNames := s.queryOf(ctx, r)
 	size := normalizeSize(r.Size, r.Style)
-	items, err := s.pickShuffle(ctx, catNames, tagNames, size, exclude)
+	items, err := s.pickShuffle(ctx, q, catNames, tagNames, size, exclude)
 	if err != nil {
 		return nil, err
 	}

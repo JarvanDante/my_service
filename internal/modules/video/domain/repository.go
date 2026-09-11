@@ -21,6 +21,7 @@ type ListFilter struct {
 	Tags      []string // 标签名, 命中 tags jsonb 数组中任一项
 	UpUserIds  []int64 // 只出这些 UP 主的作品(关注流)
 	ExcludeIds []int64
+	Ids        []int64
 	Shuffle    bool // 随机取一页, 给模块「换一换」
 }
 

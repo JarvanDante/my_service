@@ -61,6 +61,9 @@ func (r *videoRepo) List(ctx context.Context, f videodomain.ListFilter, page, si
 	} else if f.Status != 9 {
 		m = m.Where("status", f.Status)
 	}
+	if len(f.Ids) > 0 {
+		m = m.WhereIn("id", f.Ids)
+	}
 	if len(f.ExcludeIds) > 0 {
 		m = m.WhereNotIn("id", f.ExcludeIds)
 	}

@@ -68,6 +68,7 @@ type FrontListInput struct {
 	FollowOnly bool
 	UpUserId   int64 // >0 只出该 UP 主
 	ExcludeIds []int64
+	Ids        []int64
 	Shuffle    bool // 随机取一页, 给模块「换一换」
 }
 

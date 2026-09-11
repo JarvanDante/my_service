@@ -17,6 +17,7 @@ type VideoModule struct {
 	Icon        int         `json:"icon"        orm:"icon"`
 	CategoryIds string      `json:"categoryIds" orm:"category_ids"`
 	TagIds      string      `json:"tagIds"      orm:"tag_ids"`
+	Filter      string      `json:"filter"      orm:"filter"`
 	Size        int         `json:"size"      orm:"size"`
 	Rank        int         `json:"rank"      orm:"rank"`
 	Status      int         `json:"status"    orm:"status"`

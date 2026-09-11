@@ -12,6 +12,7 @@ type ModuleDTO struct {
 	CategoryNames []string
 	TagIds        []int64
 	TagNames      []string
+	Filter        string
 	Size          int
 	Rank          int
 	Status        int
@@ -27,6 +28,7 @@ type ModuleInput struct {
 	Icon        int
 	CategoryIds []int64
 	TagIds      []int64
+	Filter      string
 	Size        int
 	Rank        int
 	Status      int

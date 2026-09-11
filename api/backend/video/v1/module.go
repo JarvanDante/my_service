@@ -12,6 +12,7 @@ type ModuleItem struct {
 	CategoryNames []string `json:"category_names"`
 	TagIds        []int64  `json:"tag_ids"`
 	TagNames      []string `json:"tag_names"`
+	Filter        string   `json:"filter"`
 	Size          int      `json:"size"`
 	Rank          int      `json:"rank"`
 	Status        int      `json:"status"`
@@ -41,6 +42,7 @@ type VideoModuleCreateReq struct {
 	Icon        int     `json:"icon" v:"in:1,2,3#图标非法"`
 	CategoryIds []int64 `json:"category_ids"`
 	TagIds      []int64 `json:"tag_ids"`
+	Filter      string  `json:"filter"`
 	Size        int     `json:"size"`
 	Rank        int     `json:"rank"`
 	Status      int     `json:"status" v:"in:0,1#状态非法"`
@@ -58,6 +60,7 @@ type VideoModuleUpdateReq struct {
 	Icon        int     `json:"icon" v:"in:1,2,3#图标非法"`
 	CategoryIds []int64 `json:"category_ids"`
 	TagIds      []int64 `json:"tag_ids"`
+	Filter      string  `json:"filter"`
 	Size        int     `json:"size"`
 	Rank        int     `json:"rank"`
 	Status      int     `json:"status" v:"in:0,1#状态非法"`
@@ -92,6 +95,7 @@ type CartoonModuleCreateReq struct {
 	Icon        int     `json:"icon" v:"in:1,2,3#图标非法"`
 	CategoryIds []int64 `json:"category_ids"`
 	TagIds      []int64 `json:"tag_ids"`
+	Filter      string  `json:"filter"`
 	Size        int     `json:"size"`
 	Rank        int     `json:"rank"`
 	Status      int     `json:"status" v:"in:0,1#状态非法"`
@@ -109,6 +113,7 @@ type CartoonModuleUpdateReq struct {
 	Icon        int     `json:"icon" v:"in:1,2,3#图标非法"`
 	CategoryIds []int64 `json:"category_ids"`
 	TagIds      []int64 `json:"tag_ids"`
+	Filter      string  `json:"filter"`
 	Size        int     `json:"size"`
 	Rank        int     `json:"rank"`
 	Status      int     `json:"status" v:"in:0,1#状态非法"`
