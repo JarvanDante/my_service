@@ -2,13 +2,16 @@ package logic
 
 import (
 	"context"
+	"strings"
 
+	"github.com/gogf/gf/v2/database/gdb"
 	"github.com/gogf/gf/v2/errors/gerror"
 	"github.com/gogf/gf/v2/frame/g"
 	"github.com/gogf/gf/v2/os/gtime"
 
 	"github.com/JarvanDante/my_service/internal/model/entity"
 	"github.com/JarvanDante/my_service/internal/modules/post/service"
+	"github.com/JarvanDante/my_service/internal/shared/worklabel"
 )
 
 type sCategory struct{}
@@ -79,9 +82,18 @@ func (s *sCategory) Update(ctx context.Context, in service.CategoryInput) error 
 	if in.Id <= 0 {
 		return gerror.New("分类ID非法")
 	}
-	if in.Name != "" {
+	var old entity.VideoCategory
+	if err := g.Model("post_category").Ctx(ctx).
+		Where("site_id", postSiteId).Where("id", in.Id).Scan(&old); err != nil {
+		return err
+	}
+	if old.Id == 0 {
+		return gerror.New("分类不存在")
+	}
+	newName := strings.TrimSpace(in.Name)
+	if newName != "" {
 		cnt, err := g.Model("post_category").Ctx(ctx).
-			Where("site_id", postSiteId).Where("name", in.Name).WhereNot("id", in.Id).Count()
+			Where("site_id", postSiteId).Where("name", newName).WhereNot("id", in.Id).Count()
 		if err != nil {
 			return err
 		}
@@ -90,15 +102,22 @@ func (s *sCategory) Update(ctx context.Context, in service.CategoryInput) error 
 		}
 	}
 	data := g.Map{"rank": in.Rank, "kind": in.Kind, "updated_at": gtime.Now()}
-	if in.Name != "" {
-		data["name"] = in.Name
+	if newName != "" {
+		data["name"] = newName
 	}
 	if in.Status == 0 || in.Status == 1 {
 		data["status"] = in.Status
 	}
-	_, err := g.Model("post_category").Ctx(ctx).
-		Where("site_id", postSiteId).Where("id", in.Id).Data(data).Update()
-	return err
+	return g.DB().Transaction(ctx, func(ctx context.Context, _ gdb.TX) error {
+		if _, err := g.Model("post_category").Ctx(ctx).
+			Where("site_id", postSiteId).Where("id", in.Id).Data(data).Update(); err != nil {
+			return err
+		}
+		if newName == "" || newName == old.Name {
+			return nil
+		}
+		return worklabel.RewriteCategoryCSV(ctx, "post", old.Name, newName, nil)
+	})
 }
 
 func (s *sCategory) Delete(ctx context.Context, id int64) error {

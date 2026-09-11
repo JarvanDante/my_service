@@ -2,13 +2,16 @@ package logic
 
 import (
 	"context"
+	"strings"
 
+	"github.com/gogf/gf/v2/database/gdb"
 	"github.com/gogf/gf/v2/errors/gerror"
 	"github.com/gogf/gf/v2/frame/g"
 	"github.com/gogf/gf/v2/os/gtime"
 
 	"github.com/JarvanDante/my_service/internal/model/entity"
 	"github.com/JarvanDante/my_service/internal/modules/video/service"
+	"github.com/JarvanDante/my_service/internal/shared/worklabel"
 )
 
 const vdSiteId = 1
@@ -108,9 +111,18 @@ func (s *sCategory) Update(ctx context.Context, in service.CategoryInput) error 
 	if in.Id <= 0 {
 		return gerror.New("分类ID非法")
 	}
-	if in.Name != "" {
+	var old entity.VideoCategory
+	if err := g.Model(s.table).Ctx(ctx).
+		Where("site_id", vdSiteId).Where("id", in.Id).Scan(&old); err != nil {
+		return err
+	}
+	if old.Id == 0 {
+		return gerror.New("分类不存在")
+	}
+	newName := strings.TrimSpace(in.Name)
+	if newName != "" {
 		cnt, err := g.Model(s.table).Ctx(ctx).
-			Where("site_id", vdSiteId).Where("name", in.Name).WhereNot("id", in.Id).Count()
+			Where("site_id", vdSiteId).Where("name", newName).WhereNot("id", in.Id).Count()
 		if err != nil {
 			return err
 		}
@@ -119,15 +131,39 @@ func (s *sCategory) Update(ctx context.Context, in service.CategoryInput) error 
 		}
 	}
 	data := g.Map{"rank": in.Rank, "kind": in.Kind, "updated_at": gtime.Now()}
-	if in.Name != "" {
-		data["name"] = in.Name
+	if newName != "" {
+		data["name"] = newName
 	}
 	if in.Status == 0 || in.Status == 1 {
 		data["status"] = in.Status
 	}
-	_, err := g.Model(s.table).Ctx(ctx).
-		Where("site_id", vdSiteId).Where("id", in.Id).Data(data).Update()
-	return err
+	return g.DB().Transaction(ctx, func(ctx context.Context, _ gdb.TX) error {
+		if _, err := g.Model(s.table).Ctx(ctx).
+			Where("site_id", vdSiteId).Where("id", in.Id).Data(data).Update(); err != nil {
+			return err
+		}
+		if newName == "" || newName == old.Name {
+			return nil
+		}
+		kind, ok := videoKindForCategoryTable(s.table)
+		if !ok {
+			return nil
+		}
+		return worklabel.RewriteCategoryCSV(ctx, "video", old.Name, newName, g.Map{"kind": kind})
+	})
+}
+
+func videoKindForCategoryTable(table string) (int, bool) {
+	switch table {
+	case "video_category":
+		return entity.VideoKindVideo, true
+	case "cartoon_category":
+		return entity.VideoKindCartoon, true
+	case "douyin_category":
+		return entity.VideoKindDouyin, true
+	default:
+		return 0, false
+	}
 }
 
 func (s *sCategory) Delete(ctx context.Context, id int64) error {

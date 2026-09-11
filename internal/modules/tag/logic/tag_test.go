@@ -6,6 +6,29 @@ import (
 	"github.com/JarvanDante/my_service/internal/model/entity"
 )
 
+func TestTaggedWorkTable(t *testing.T) {
+	cases := []struct {
+		ct    int
+		table string
+		field string
+	}{
+		{1, "video", "tags"},
+		{2, "video", "tags"},
+		{3, "video", "tags"},
+		{4, "comics", "tags"},
+		{5, "photo_album", "tags"},
+		{6, "post", "topics"},
+		{7, "novel", "tags"},
+		{99, "", ""},
+	}
+	for _, c := range cases {
+		table, field := taggedWorkTable(c.ct)
+		if table != c.table || field != c.field {
+			t.Fatalf("ct=%d got %s.%s", c.ct, table, field)
+		}
+	}
+}
+
 func TestUseCountMapping(t *testing.T) {
 	cases := []struct {
 		ct    int

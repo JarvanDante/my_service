@@ -6,13 +6,16 @@ package logic
 import (
 	"context"
 	"encoding/json"
+	"strings"
 
+	"github.com/gogf/gf/v2/database/gdb"
 	"github.com/gogf/gf/v2/errors/gerror"
 	"github.com/gogf/gf/v2/frame/g"
 	"github.com/gogf/gf/v2/os/gtime"
 
 	"github.com/JarvanDante/my_service/internal/model/entity"
 	"github.com/JarvanDante/my_service/internal/modules/tag/service"
+	"github.com/JarvanDante/my_service/internal/shared/worklabel"
 )
 
 const (
@@ -208,16 +211,72 @@ func (s *sTag) Update(ctx context.Context, in service.UpdateInput) error {
 	if in.Id <= 0 {
 		return gerror.New("标签ID非法")
 	}
+	var old entity.Tag
+	if err := g.Model("tag").Ctx(ctx).
+		Where("site_id", tagSiteId).Where("id", in.Id).Scan(&old); err != nil {
+		return err
+	}
+	if old.Id == 0 {
+		return gerror.New("标签不存在")
+	}
+	newName := strings.TrimSpace(in.Name)
+	if newName != "" && newName != old.Name {
+		cnt, err := g.Model("tag").Ctx(ctx).
+			Where("site_id", tagSiteId).Where("content_type", old.ContentType).
+			Where("name", newName).WhereNot("id", in.Id).Count()
+		if err != nil {
+			return err
+		}
+		if cnt > 0 {
+			return gerror.New("该类型下已存在同名标签")
+		}
+	}
 	data := g.Map{"rank": in.Rank, "updated_at": gtime.Now()}
-	if in.Name != "" {
-		data["name"] = in.Name
+	if newName != "" {
+		data["name"] = newName
 	}
 	if in.Status == 0 || in.Status == 1 {
 		data["status"] = in.Status
 	}
-	_, err := g.Model("tag").Ctx(ctx).
-		Where("site_id", tagSiteId).Where("id", in.Id).Data(data).Update()
-	return err
+	return g.DB().Transaction(ctx, func(ctx context.Context, _ gdb.TX) error {
+		if _, err := g.Model("tag").Ctx(ctx).
+			Where("site_id", tagSiteId).Where("id", in.Id).Data(data).Update(); err != nil {
+			return err
+		}
+		if newName == "" || newName == old.Name {
+			return nil
+		}
+		return rewriteTaggedWorks(ctx, old.ContentType, old.Name, newName)
+	})
+}
+
+func rewriteTaggedWorks(ctx context.Context, contentType int, oldName, newName string) error {
+	table, field := taggedWorkTable(contentType)
+	if table == "" {
+		return nil
+	}
+	extra := map[string]any{}
+	if kind, ok := useCountKind(contentType); ok {
+		extra["kind"] = kind
+	}
+	return worklabel.RewriteJSONNames(ctx, table, field, oldName, newName, extra)
+}
+
+func taggedWorkTable(contentType int) (table, field string) {
+	switch contentType {
+	case 1, 2, 3:
+		return "video", "tags"
+	case 4:
+		return "comics", "tags"
+	case 5:
+		return "photo_album", "tags"
+	case 6:
+		return "post", "topics"
+	case 7:
+		return "novel", "tags"
+	default:
+		return "", ""
+	}
 }
 
 func (s *sTag) Delete(ctx context.Context, id int64) error {
