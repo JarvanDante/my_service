@@ -11,7 +11,6 @@ const (
 	ComicsModuleStylePosterRail = 5 // 竖图横滑
 	ComicsModuleStyleWideRail   = 6 // 横图横滑
 	ComicsModuleStylePoster3x3  = 7 // 竖图3X3
-	ComicsModuleStylePoster3x2  = 8 // 竖图3X2
 )
 
 const (
