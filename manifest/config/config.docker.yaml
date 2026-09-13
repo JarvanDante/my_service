@@ -95,7 +95,8 @@ play_gateway:
 image_aes:
   key: "dafb787c76b5ce8a"
 
-# 前台 JSON 接口 AES-128-ECB+Base64; docker/生产不接受明文 JSON
+# 前台 JSON 接口 AES-128-ECB+Base64; 不接受明文 JSON
+# 本文件是 Docker 回退。连上 Nacos 后以站点 YAML 为准。生产请把 debug_header 留空。
 api_aes:
   enabled: true
   key: "9f3a6c1e8b4d0275"

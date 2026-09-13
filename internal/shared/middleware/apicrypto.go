@@ -118,7 +118,10 @@ func isApiDebug(r *ghttp.Request) bool {
 	if got == "" {
 		return false
 	}
-	want := strings.TrimSpace(g.Cfg().MustGet(r.GetCtx(), "api_aes.debug_header", aesapi.DefaultDebugHeader).String())
+	want := strings.TrimSpace(g.Cfg().MustGet(r.GetCtx(), "api_aes.debug_header", "").String())
+	if want == "" {
+		return false
+	}
 	return got == want
 }
 

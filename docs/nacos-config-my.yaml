@@ -90,6 +90,7 @@ image_aes:
   key: "dafb787c76b5ce8a"
 
 # 前台 JSON 接口 AES-128-ECB+Base64, 必须 16 字节, 与 H5 VITE_API_AES_KEY 相同
+# 测试可留 debug_*; 生产把 debug_header 留空, 明文调试关闭
 api_aes:
   enabled: true
   key: "9f3a6c1e8b4d0275"
