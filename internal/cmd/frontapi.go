@@ -17,10 +17,11 @@ var FrontAPI = gcmd.Command{
 	Brief: "前台 API(面向 C 端)",
 	Func: func(ctx context.Context, parser *gcmd.Parser) error {
 		boot.LoadImageAES(ctx)
+		boot.LoadApiAES(ctx)
 		s := g.Server("frontapi")
 		s.SetAddr(cfgAddr(ctx, "frontapi.address", ":8001"))
 		mountStatic(ctx, s)
-		s.Use(middleware.CORS, ghttp.MiddlewareHandlerResponse)
+		s.Use(middleware.CORS, middleware.ApiCrypto, ghttp.MiddlewareHandlerResponse)
 		s.BindStatusHandler(404, middleware.NotFound)
 		s.BindHandler("/health", middleware.Health)
 		mountFront(s)

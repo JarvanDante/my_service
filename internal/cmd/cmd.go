@@ -39,9 +39,10 @@ var Main = gcmd.Command{
 	Brief: "漫隐 API · 一体化开发入口",
 	Func: func(ctx context.Context, parser *gcmd.Parser) error {
 		boot.LoadImageAES(ctx)
+		boot.LoadApiAES(ctx)
 		s := g.Server()
 		mountStatic(ctx, s)
-		s.Use(middleware.CORS, ghttp.MiddlewareHandlerResponse)
+		s.Use(middleware.CORS, middleware.ApiCrypto, ghttp.MiddlewareHandlerResponse)
 		s.BindStatusHandler(404, middleware.NotFound)
 		s.BindHandler("/health", middleware.Health)
 

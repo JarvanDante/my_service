@@ -95,6 +95,14 @@ play_gateway:
 image_aes:
   key: "dafb787c76b5ce8a"
 
+# 前台 JSON 接口 AES-128-ECB+Base64; docker/生产不接受明文 JSON
+api_aes:
+  enabled: true
+  key: "c4e91b7a02d65f38"
+  debug_key: "weaas821862941ws"
+  debug_header: "8ed1a631a6ab789a34256b44ff571476"
+  allow_plain: false
+
 # 前台限流(Redis 固定窗口)。ip_* 登录前按客户端IP; user_* 登录后按用户ID。
 # 阈值按站点真实流量调; 正常用户远达不到, 批量刷接口会触发 429。
 front_ratelimit:

@@ -88,3 +88,11 @@ upload:
 # 封面/用户图 AES-128-ECB, 必须 16 字节, 与 H5 VITE_AES_BNC_KEY 相同
 image_aes:
   key: "dafb787c76b5ce8a"
+
+# 前台 JSON 接口 AES-128-ECB+Base64, 必须 16 字节, 与 H5 VITE_API_AES_KEY 相同
+api_aes:
+  enabled: true
+  key: "c4e91b7a02d65f38"
+  debug_key: "weaas821862941ws"
+  debug_header: "8ed1a631a6ab789a34256b44ff571476"
+  allow_plain: false
