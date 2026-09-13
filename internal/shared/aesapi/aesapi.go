@@ -9,9 +9,9 @@ import (
 	"strings"
 )
 
-const DefaultKey = "c4e91b7a02d65f38"
-const DefaultDebugKey = "weaas821862941ws"
-const DefaultDebugHeader = "8ed1a631a6ab789a34256b44ff571476"
+const DefaultKey = "9f3a6c1e8b4d0275"
+const DefaultDebugKey = "myh5dbg7k2p9q4x1"
+const DefaultDebugHeader = "c7e4a19b3f6820d54e8a16c2b9f735d1"
 
 var activeKey = DefaultKey
 

@@ -37,7 +37,7 @@ func TestKnownVector(t *testing.T) {
 	if string(got) != "hello-api" {
 		t.Fatalf("got %q", got)
 	}
-	if enc != "L1lHB2VCC3rJCPu9rDqBwA==" {
+	if enc != "bDaEQQA7U0vsgogEDJxyKw==" {
 		t.Fatalf("known vector got %q", enc)
 	}
 }

@@ -107,9 +107,9 @@ image_aes:
 # allow_plain: 本地 http 测试可继续发 JSON; 生产/docker 关掉
 api_aes:
   enabled: true
-  key: "c4e91b7a02d65f38"
-  debug_key: "weaas821862941ws"
-  debug_header: "8ed1a631a6ab789a34256b44ff571476"
+  key: "9f3a6c1e8b4d0275"
+  debug_key: "myh5dbg7k2p9q4x1"
+  debug_header: "c7e4a19b3f6820d54e8a16c2b9f735d1"
   allow_plain: true
 
 # 前台限流(Redis 固定窗口)。ip_* 登录前按客户端IP; user_* 登录后按用户ID。
