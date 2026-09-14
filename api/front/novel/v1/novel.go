@@ -29,12 +29,13 @@ type Item struct {
 // ListReq 小说列表(公开)。sort: 0综合(rank) 1最多观看 2最新 3最多点赞。
 type ListReq struct {
 	g.Meta   `path:"/novel/list" method:"get" tags:"Front/Novel" summary:"小说列表"`
-	Category string `json:"category"`
-	Tag      string `json:"tag"`
-	Keyword  string `json:"keyword"`
-	Sort     int    `json:"sort"`
-	Page     int    `json:"page"`
-	Size     int    `json:"size"`
+	Category  string `json:"category"`
+	Tag       string `json:"tag"`
+	Keyword   string `json:"keyword"`
+	Sort      int    `json:"sort"`
+	Recommend int    `json:"recommend"`
+	Page      int    `json:"page"`
+	Size      int    `json:"size"`
 }
 type ListRes struct {
 	List  []Item `json:"list"`
