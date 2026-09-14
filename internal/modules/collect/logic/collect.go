@@ -1,10 +1,12 @@
 // Package logic 收藏/点赞业务(移植自 tianbi collectser)。
 // 幂等设计: 添加用 ON CONFLICT DO NOTHING(唯一约束), 取消用 DELETE, 重复操作不报错。
+// 漫画/小说/图集的 like_count 记收藏数, 帖子的 like_count 记点赞数; 只在真正写入/删除后回写。
 package logic
 
 import (
 	"context"
 
+	"github.com/gogf/gf/v2/database/gdb"
 	"github.com/gogf/gf/v2/errors/gerror"
 	"github.com/gogf/gf/v2/frame/g"
 
@@ -16,11 +18,46 @@ import (
 const (
 	colSiteId   = 1   // 单站点样板
 	colBatchMax = 100 // 单次批量上限
+	opFav       = 1
+	opLike      = 2
+	mediaPost   = 2
+	mediaComics = 3
+	mediaNovel  = 4
+	mediaPhoto  = 5
 )
 
 type sCollect struct{}
 
 func New() service.ICollect { return &sCollect{} }
+
+// countTarget 哪种操作要回写哪张表的 like_count。
+func countTarget(mediaType, opType int) (table string, ok bool) {
+	switch {
+	case mediaType == mediaPost && opType == opLike:
+		return "post", true
+	case mediaType == mediaComics && opType == opFav:
+		return "comics", true
+	case mediaType == mediaNovel && opType == opFav:
+		return "novel", true
+	case mediaType == mediaPhoto && opType == opFav:
+		return "photo", true
+	default:
+		return "", false
+	}
+}
+
+func bumpLikeCount(ctx context.Context, tx gdb.TX, mediaType, opType int, contentId, delta int64) error {
+	table, ok := countTarget(mediaType, opType)
+	if !ok || contentId <= 0 || delta == 0 {
+		return nil
+	}
+	m := tx.Model(table).Ctx(ctx).Where("id", contentId)
+	if delta < 0 {
+		m = m.Where("like_count > ?", 0)
+	}
+	_, err := m.Data(g.Map{"like_count": &gdb.Counter{Field: "like_count", Value: float64(delta)}}).Update()
+	return err
+}
 
 // Operate 添加/取消 收藏/点赞/踩。
 func (s *sCollect) Operate(ctx context.Context, in service.OperateInput) error {
@@ -30,34 +67,45 @@ func (s *sCollect) Operate(ctx context.Context, in service.OperateInput) error {
 	if len(in.Ids) > colBatchMax {
 		return gerror.New("单次最多操作100条")
 	}
-	if in.Flag {
-		// 添加: 唯一约束 + ON CONFLICT DO NOTHING 幂等
-		rows := make([]g.Map, 0, len(in.Ids))
-		for _, id := range in.Ids {
-			if id <= 0 {
-				continue
-			}
-			rows = append(rows, g.Map{
-				"site_id": colSiteId, "user_id": in.UserId, "op_type": in.Type,
-				"media_type": in.MediaType, "content_id": id,
-			})
-		}
-		if len(rows) == 0 {
-			return gerror.New("对象ID非法")
-		}
-		// InsertIgnore 在 PG 生成 ON CONFLICT DO NOTHING, 重复添加幂等
-		_, err := g.Model("user_collect").Ctx(ctx).Data(rows).InsertIgnore()
-		if err == nil && in.Type == 2 && in.MediaType == 2 {
+	if !in.Flag {
+		err := s.Delete(ctx, in.UserId, in.Ids, in.MediaType, in.Type)
+		if err == nil && in.Type == opLike && in.MediaType == mediaPost {
 			for _, id := range in.Ids {
-				msglogic.NotifyPostLike(ctx, in.UserId, id, true)
+				msglogic.NotifyPostLike(ctx, in.UserId, id, false)
 			}
 		}
 		return err
 	}
-	err := s.Delete(ctx, in.UserId, in.Ids, in.MediaType, in.Type)
-	if err == nil && in.Type == 2 && in.MediaType == 2 {
-		for _, id := range in.Ids {
-			msglogic.NotifyPostLike(ctx, in.UserId, id, false)
+	ids := make([]int64, 0, len(in.Ids))
+	for _, id := range in.Ids {
+		if id > 0 {
+			ids = append(ids, id)
+		}
+	}
+	if len(ids) == 0 {
+		return gerror.New("对象ID非法")
+	}
+	err := g.DB().Transaction(ctx, func(ctx context.Context, tx gdb.TX) error {
+		for _, id := range ids {
+			res, err := tx.Model("user_collect").Ctx(ctx).Data(g.Map{
+				"site_id": colSiteId, "user_id": in.UserId, "op_type": in.Type,
+				"media_type": in.MediaType, "content_id": id,
+			}).InsertIgnore()
+			if err != nil {
+				return err
+			}
+			n, _ := res.RowsAffected()
+			if n > 0 {
+				if err = bumpLikeCount(ctx, tx, in.MediaType, in.Type, id, 1); err != nil {
+					return err
+				}
+			}
+		}
+		return nil
+	})
+	if err == nil && in.Type == opLike && in.MediaType == mediaPost {
+		for _, id := range ids {
+			msglogic.NotifyPostLike(ctx, in.UserId, id, true)
 		}
 	}
 	return err
@@ -71,11 +119,27 @@ func (s *sCollect) Delete(ctx context.Context, userId int64, ids []int64, mediaT
 	if len(ids) > colBatchMax {
 		return gerror.New("单次最多操作100条")
 	}
-	_, err := g.Model("user_collect").Ctx(ctx).
-		Where("site_id", colSiteId).Where("user_id", userId).
-		Where("op_type", opType).Where("media_type", mediaType).
-		WhereIn("content_id", ids).Delete()
-	return err
+	return g.DB().Transaction(ctx, func(ctx context.Context, tx gdb.TX) error {
+		for _, id := range ids {
+			if id <= 0 {
+				continue
+			}
+			res, err := tx.Model("user_collect").Ctx(ctx).
+				Where("site_id", colSiteId).Where("user_id", userId).
+				Where("op_type", opType).Where("media_type", mediaType).
+				Where("content_id", id).Delete()
+			if err != nil {
+				return err
+			}
+			n, _ := res.RowsAffected()
+			if n > 0 {
+				if err = bumpLikeCount(ctx, tx, mediaType, opType, id, -1); err != nil {
+					return err
+				}
+			}
+		}
+		return nil
+	})
 }
 
 // List 我的收藏/点赞列表。

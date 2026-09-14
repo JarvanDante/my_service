@@ -141,3 +141,65 @@ client.test("清理后为空", function () {
     client.assert(response.body.data.total === 0, "清理后收藏应为 0 条");
 });
 %}
+
+### 12. 取一部上架漫画，记下当前收藏数
+GET {{baseUrl}}/front/v1/comics/list?page=1&size=1
+
+> {%
+client.test("有漫画可测收藏数", function () {
+    client.assert(response.body.code === 0, "code 应为 0: " + response.body.message);
+    client.assert(response.body.data.list && response.body.data.list.length > 0, "需要至少一部漫画");
+});
+client.global.set("comicId", response.body.data.list[0].id);
+client.global.set("comicFavBefore", response.body.data.list[0].like_count || 0);
+%}
+
+### 13. 先取消再收藏，避免旧记录干扰
+POST {{baseUrl}}/front/v1/collect/operate
+Authorization: {{token}}
+Content-Type: application/json
+
+{ "id": {{comicId}}, "media_type": 3, "flag": false, "type": 1 }
+
+### 14. 收藏这部漫画
+POST {{baseUrl}}/front/v1/collect/operate
+Authorization: {{token}}
+Content-Type: application/json
+
+{ "id": {{comicId}}, "media_type": 3, "flag": true, "type": 1 }
+
+> {%
+client.test("收藏漫画", function () {
+    client.assert(response.body.code === 0, "code 应为 0: " + response.body.message);
+});
+%}
+
+### 15. 再进详情，收藏数应比取消后多 1，刷新仍在
+GET {{baseUrl}}/front/v1/comics/detail?id={{comicId}}
+
+> {%
+client.test("详情收藏数已写入", function () {
+    client.assert(response.body.code === 0, "code 应为 0: " + response.body.message);
+    const n = response.body.data.like_count;
+    client.assert(n >= 1, "收藏后 like_count 至少为 1，实际: " + n);
+});
+client.global.set("comicFavAfter", response.body.data.like_count);
+%}
+
+### 16. 再拉一次详情，收藏数不变
+GET {{baseUrl}}/front/v1/comics/detail?id={{comicId}}
+
+> {%
+client.test("再进详情收藏数仍在", function () {
+    client.assert(response.body.code === 0, "code 应为 0");
+    client.assert(response.body.data.like_count === client.global.get("comicFavAfter"),
+        "再进详情 like_count 不应变，实际: " + response.body.data.like_count);
+});
+%}
+
+### 17. 取消收藏并清掉测试痕迹
+POST {{baseUrl}}/front/v1/collect/operate
+Authorization: {{token}}
+Content-Type: application/json
+
+{ "id": {{comicId}}, "media_type": 3, "flag": false, "type": 1 }

@@ -196,6 +196,7 @@ func (s *sComics) query(ctx context.Context, f service.ListFilter) ([]*service.C
 		out = append(out, toDTO(r))
 	}
 	s.hydrateMedia(ctx, out)
+	s.hydrateFavCount(ctx, out)
 	return out, total, nil
 }
 
@@ -251,6 +252,7 @@ func (s *sComics) Detail(ctx context.Context, userId, id int64) (*service.Detail
 		Data(g.Map{"view_count": &gdb.Counter{Field: "view_count", Value: 1}}).Update()
 	d := toDTO(r)
 	s.hydrateMedia(ctx, []*service.ComicsDTO{d})
+	s.hydrateFavCount(ctx, []*service.ComicsDTO{d})
 	d.IsBuy = acc.IsBuy
 	d.ViewCount++
 	return &service.DetailDTO{
@@ -377,6 +379,8 @@ func (s *sComics) MayLike(ctx context.Context, id int64, size int) ([]*service.C
 	for _, r := range list {
 		out = append(out, toDTO(r))
 	}
+	s.hydrateMedia(ctx, out)
+	s.hydrateFavCount(ctx, out)
 	return out, nil
 }
 
@@ -663,4 +667,40 @@ func (s *sComics) ChapterDelete(ctx context.Context, id int64) error {
 		}
 		return syncChapterCount(ctx, tx, c.ComicsId)
 	})
+}
+
+// hydrateFavCount 用 user_collect 实收藏数覆盖 like_count（列上的数只给排序用）。
+func (s *sComics) hydrateFavCount(ctx context.Context, list []*service.ComicsDTO) {
+	if len(list) == 0 {
+		return
+	}
+	ids := make([]int64, 0, len(list))
+	for _, d := range list {
+		if d != nil && d.Id > 0 {
+			ids = append(ids, d.Id)
+		}
+	}
+	if len(ids) == 0 {
+		return
+	}
+	recs, err := g.Model("user_collect").Ctx(ctx).
+		Fields("content_id, count(1) AS n").
+		Where("site_id", cmSiteId).
+		Where("media_type", paywall.MediaComics).
+		Where("op_type", 1).
+		WhereIn("content_id", ids).
+		Group("content_id").All()
+	if err != nil {
+		return
+	}
+	counts := make(map[int64]int64, len(recs))
+	for _, rec := range recs {
+		counts[rec["content_id"].Int64()] = rec["n"].Int64()
+	}
+	for _, d := range list {
+		if d == nil {
+			continue
+		}
+		d.LikeCount = counts[d.Id]
+	}
 }
