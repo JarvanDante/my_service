@@ -10,6 +10,7 @@ type NovelDTO struct {
 	Cover        string
 	Intro        string
 	Category     string
+	Categories   []string
 	Tags         []string
 	IsVip        int
 	Price        float64
@@ -22,6 +23,7 @@ type NovelDTO struct {
 	LikeCount    int64
 	UpdateStatus int
 	Rank         int
+	IsRecommend  int
 	Status       int
 	PublishId    int64
 	MediaCode    string
@@ -83,6 +85,7 @@ type SaveInput struct {
 	Cover        string
 	Intro        string
 	Category     string
+	Categories   []string
 	Tags         []string
 	IsVip        int
 	Price        float64
@@ -90,6 +93,7 @@ type SaveInput struct {
 	IsAudio      int
 	UpdateStatus int
 	Rank         int
+	IsRecommend  int
 	Status       int
 	PublishId    int64
 }
@@ -116,9 +120,10 @@ type ListFilter struct {
 	Size         int
 	PayType      int
 	UpdateStatus int
-	Ids          []int64
-	ExcludeIds   []int64
-	Shuffle      bool
+	Ids           []int64
+	ExcludeIds    []int64
+	Shuffle       bool
+	OnlyRecommend bool
 }
 
 type INovel interface {

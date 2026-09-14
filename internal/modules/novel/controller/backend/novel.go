@@ -37,10 +37,10 @@ func (c *Controller) List(ctx context.Context, req *v1.ListReq) (res *v1.ListRes
 	for _, d := range list {
 		res.List = append(res.List, v1.Item{
 			Id: d.Id, Title: d.Title, Author: d.Author, Cover: d.Cover, Intro: d.Intro,
-			Category: d.Category, Tags: d.Tags, IsVip: d.IsVip, Price: d.Price,
+			Category: d.Category, Categories: d.Categories, Tags: d.Tags, IsVip: d.IsVip, Price: d.Price,
 			FreeChapter: d.FreeChapter, ChapterCount: d.ChapterCount, WordCount: d.WordCount,
 			IsAudio: d.IsAudio, ViewCount: d.ViewCount, BuyCount: d.BuyCount,
-			LikeCount: d.LikeCount, UpdateStatus: d.UpdateStatus, Rank: d.Rank,
+			LikeCount: d.LikeCount, UpdateStatus: d.UpdateStatus, Rank: d.Rank, IsRecommend: d.IsRecommend,
 			Status: d.Status, PublishId: d.PublishId, MediaCode: d.MediaCode, CreatedAt: d.CreatedAt,
 		})
 	}
@@ -50,9 +50,9 @@ func (c *Controller) List(ctx context.Context, req *v1.ListReq) (res *v1.ListRes
 func (c *Controller) Create(ctx context.Context, req *v1.CreateReq) (res *v1.CreateRes, err error) {
 	id, err := c.svc.Create(ctx, service.SaveInput{
 		Title: req.Title, Author: req.Author, Cover: req.Cover, Intro: req.Intro,
-		Category: req.Category, Tags: req.Tags, IsVip: req.IsVip, Price: req.Price,
+		Category: req.Category, Categories: req.Categories, Tags: req.Tags, IsVip: req.IsVip, Price: req.Price,
 		FreeChapter: req.FreeChapter, IsAudio: req.IsAudio, UpdateStatus: req.UpdateStatus,
-		Rank: req.Rank, Status: req.Status,
+		Rank: req.Rank, IsRecommend: req.IsRecommend, Status: req.Status,
 	})
 	if err != nil {
 		return nil, err
@@ -63,9 +63,9 @@ func (c *Controller) Create(ctx context.Context, req *v1.CreateReq) (res *v1.Cre
 func (c *Controller) Update(ctx context.Context, req *v1.UpdateReq) (res *v1.UpdateRes, err error) {
 	if err = c.svc.Update(ctx, service.SaveInput{
 		Id: req.Id, Title: req.Title, Author: req.Author, Cover: req.Cover, Intro: req.Intro,
-		Category: req.Category, Tags: req.Tags, IsVip: req.IsVip, Price: req.Price,
+		Category: req.Category, Categories: req.Categories, Tags: req.Tags, IsVip: req.IsVip, Price: req.Price,
 		FreeChapter: req.FreeChapter, IsAudio: req.IsAudio, UpdateStatus: req.UpdateStatus,
-		Rank: req.Rank, Status: req.Status,
+		Rank: req.Rank, IsRecommend: req.IsRecommend, Status: req.Status,
 	}); err != nil {
 		return nil, err
 	}

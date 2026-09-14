@@ -202,15 +202,16 @@ func parseModuleFilter(raw string, fallbackCats, fallbackTags []int64) moduleQue
 
 func (q moduleQuery) listFilter(catNames, tagNames []string, size int, shuffle bool) service.ListFilter {
 	f := service.ListFilter{
-		Categories:  catNames,
-		Tags:        tagNames,
-		Keyword:     q.Keywords,
-		PayType:     q.PayType,
-		Ids:         q.IDs,
-		Page:        1,
-		Size:        size,
-		Sort:        2,
-		Shuffle:     shuffle || q.Order == "rand",
+		Categories:    catNames,
+		Tags:          tagNames,
+		Keyword:       q.Keywords,
+		PayType:       q.PayType,
+		OnlyRecommend: q.Recommend,
+		Ids:           q.IDs,
+		Page:          1,
+		Size:          size,
+		Sort:          2,
+		Shuffle:       shuffle || q.Order == "rand",
 	}
 	switch q.Order {
 	case "hot":

@@ -11,6 +11,7 @@ type Item struct {
 	Cover        string   `json:"cover"`
 	Intro        string   `json:"intro"`
 	Category     string   `json:"category"`
+	Categories   []string `json:"categories"`
 	Tags         []string `json:"tags"`
 	IsVip        int      `json:"is_vip"`
 	Price        float64  `json:"price"`
@@ -23,6 +24,7 @@ type Item struct {
 	LikeCount    int64    `json:"like_count"`
 	UpdateStatus int      `json:"update_status"`
 	Rank         int      `json:"rank"`
+	IsRecommend  int      `json:"is_recommend"`
 	Status       int      `json:"status"`
 	PublishId    int64    `json:"publish_id"`
 	MediaCode    string   `json:"media_code"`
@@ -49,6 +51,7 @@ type CreateReq struct {
 	Cover        string   `json:"cover"`
 	Intro        string   `json:"intro"`
 	Category     string   `json:"category"`
+	Categories   []string `json:"categories"`
 	Tags         []string `json:"tags"`
 	IsVip        int      `json:"is_vip" v:"in:0,1#VIP标记非法"`
 	Price        float64  `json:"price"`
@@ -56,6 +59,7 @@ type CreateReq struct {
 	IsAudio      int      `json:"is_audio" v:"in:0,1#有声标记非法"`
 	UpdateStatus int      `json:"update_status" v:"in:0,1,2#连载状态非法"`
 	Rank         int      `json:"rank"`
+	IsRecommend  int      `json:"is_recommend" v:"in:0,1#推荐标记非法"`
 	Status       int      `json:"status" v:"in:0,1,2#状态非法"`
 }
 type CreateRes struct {
@@ -70,6 +74,7 @@ type UpdateReq struct {
 	Cover        string   `json:"cover"`
 	Intro        string   `json:"intro"`
 	Category     string   `json:"category"`
+	Categories   []string `json:"categories"`
 	Tags         []string `json:"tags"`
 	IsVip        int      `json:"is_vip" v:"in:0,1#VIP标记非法"`
 	Price        float64  `json:"price"`
@@ -77,6 +82,7 @@ type UpdateReq struct {
 	IsAudio      int      `json:"is_audio" v:"in:0,1#有声标记非法"`
 	UpdateStatus int      `json:"update_status" v:"in:0,1,2#连载状态非法"`
 	Rank         int      `json:"rank"`
+	IsRecommend  int      `json:"is_recommend" v:"in:0,1#推荐标记非法"`
 	Status       int      `json:"status" v:"in:0,1,2#状态非法"`
 }
 type UpdateRes struct{}

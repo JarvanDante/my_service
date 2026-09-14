@@ -21,6 +21,7 @@ import (
 
 	"github.com/JarvanDante/my_service/internal/model/entity"
 	"github.com/JarvanDante/my_service/internal/modules/novel/service"
+	"github.com/JarvanDante/my_service/internal/shared/kit"
 	"github.com/JarvanDante/my_service/internal/shared/paas"
 	"github.com/JarvanDante/my_service/internal/shared/paywall"
 )
@@ -59,14 +60,34 @@ func fmtTime(t *gtime.Time) string {
 	return t.String()
 }
 
+func parseCategories(raw string) []string {
+	out := kit.NamesCSV(raw)
+	if out == nil {
+		return []string{}
+	}
+	return out
+}
+
+func joinCategories(list []string) string {
+	return strings.Join(parseCategories(strings.Join(list, ",")), ",")
+}
+
+func resolveCategory(in *service.SaveInput) string {
+	if in.Categories != nil {
+		return joinCategories(in.Categories)
+	}
+	return joinCategories(parseCategories(in.Category))
+}
+
 func toDTO(r *entity.Novel) *service.NovelDTO {
+	cates := parseCategories(r.Category)
 	return &service.NovelDTO{
 		Id: r.Id, Title: r.Title, Author: r.Author, Cover: r.Cover, Intro: r.Intro,
-		Category: r.Category, Tags: decodeTags(r.Tags), IsVip: r.IsVip, Price: r.Price,
+		Category: r.Category, Categories: cates, Tags: decodeTags(r.Tags), IsVip: r.IsVip, Price: r.Price,
 		FreeChapter: r.FreeChapter, ChapterCount: r.ChapterCount, WordCount: r.WordCount,
 		IsAudio: r.IsAudio, ViewCount: r.ViewCount, BuyCount: r.BuyCount, LikeCount: r.LikeCount,
-		UpdateStatus: r.UpdateStatus, Rank: r.Rank, Status: r.Status, PublishId: r.PublishId,
-		MediaCode: r.MediaCode, CreatedAt: fmtTime(r.CreatedAt),
+		UpdateStatus: r.UpdateStatus, Rank: r.Rank, IsRecommend: r.IsRecommend, Status: r.Status,
+		PublishId: r.PublishId, MediaCode: r.MediaCode, CreatedAt: fmtTime(r.CreatedAt),
 	}
 }
 
@@ -99,14 +120,12 @@ func (s *sNovel) query(ctx context.Context, f service.ListFilter) ([]*service.No
 	if f.Status >= 0 {
 		base = base.Where("status", f.Status)
 	}
-	cates := append([]string{}, f.Categories...)
-	if f.Category != "" {
-		cates = append(cates, f.Category)
+	cates := kit.MergeNames(kit.NamesCSV(f.Category), f.Categories)
+	if len(cates) > 0 {
+		base = base.Where(kit.CategoryOverlapWhere(), strings.Join(cates, ","))
 	}
-	if len(cates) == 1 {
-		base = base.Where("category", cates[0])
-	} else if len(cates) > 1 {
-		base = base.WhereIn("category", cates)
+	if f.OnlyRecommend {
+		base = base.Where("is_recommend", 1)
 	}
 	tagNames := append([]string{}, f.Tags...)
 	if f.Tag != "" {
@@ -417,6 +436,13 @@ func normalize(in *service.SaveInput) error {
 	if in.UpdateStatus != 1 && in.UpdateStatus != 2 {
 		in.UpdateStatus = 1
 	}
+	in.Category = resolveCategory(in)
+	if in.IsRecommend != 1 {
+		in.IsRecommend = 0
+	}
+	if in.Status == entity.ContentStatusOnline && in.Category == "" {
+		return gerror.New("请先选择本站分类后再上架")
+	}
 	return nil
 }
 
@@ -429,7 +455,7 @@ func (s *sNovel) Create(ctx context.Context, in service.SaveInput) (int64, error
 		"intro": in.Intro, "category": in.Category, "tags": encodeJSON(in.Tags),
 		"is_vip": in.IsVip, "price": in.Price, "free_chapter": in.FreeChapter,
 		"is_audio": in.IsAudio, "update_status": in.UpdateStatus, "rank": in.Rank,
-		"status": in.Status, "publish_id": in.PublishId,
+		"is_recommend": in.IsRecommend, "status": in.Status, "publish_id": in.PublishId,
 	}).InsertAndGetId()
 }
 
@@ -440,10 +466,15 @@ func (s *sNovel) Update(ctx context.Context, in service.SaveInput) error {
 	if in.IsVip == 1 && in.Price > 0 {
 		return gerror.New("VIP专享与金币定价互斥, 只能二选一")
 	}
+	if in.IsRecommend != 1 {
+		in.IsRecommend = 0
+	}
+	in.Category = resolveCategory(&in)
 	// word_count 不在这里改: 它是章节汇总出来的, 人工改会和正文对不上
 	data := g.Map{
 		"is_vip": in.IsVip, "price": in.Price, "free_chapter": in.FreeChapter,
-		"is_audio": in.IsAudio, "rank": in.Rank, "status": in.Status, "updated_at": gtime.Now(),
+		"is_audio": in.IsAudio, "rank": in.Rank, "is_recommend": in.IsRecommend,
+		"status": in.Status, "category": in.Category, "updated_at": gtime.Now(),
 	}
 	if in.Title != "" {
 		data["title"] = in.Title
@@ -457,14 +488,24 @@ func (s *sNovel) Update(ctx context.Context, in service.SaveInput) error {
 	if in.Intro != "" {
 		data["intro"] = in.Intro
 	}
-	if in.Category != "" {
-		data["category"] = in.Category
-	}
 	if in.Tags != nil {
 		data["tags"] = encodeJSON(in.Tags)
 	}
 	if in.UpdateStatus == 1 || in.UpdateStatus == 2 {
 		data["update_status"] = in.UpdateStatus
+	}
+	if in.Status == entity.ContentStatusOnline {
+		if in.Category == "" {
+			old, err := s.find(ctx, in.Id, false)
+			if err != nil {
+				return err
+			}
+			in.Category = strings.TrimSpace(old.Category)
+			data["category"] = in.Category
+		}
+		if in.Category == "" {
+			return gerror.New("请先选择本站分类后再上架")
+		}
 	}
 	_, err := g.Model("novel").Ctx(ctx).
 		Where("site_id", nvSiteId).Where("id", in.Id).Data(data).Update()
@@ -489,6 +530,15 @@ func (s *sNovel) Delete(ctx context.Context, id int64) error {
 func (s *sNovel) Audit(ctx context.Context, id int64, status int) error {
 	if status < 0 || status > 2 {
 		return gerror.New("状态非法")
+	}
+	if status == entity.ContentStatusOnline {
+		r, err := s.find(ctx, id, false)
+		if err != nil {
+			return err
+		}
+		if strings.TrimSpace(r.Category) == "" {
+			return gerror.New("请先编辑并选择本站分类后再上架")
+		}
 	}
 	res, err := g.Model("novel").Ctx(ctx).
 		Where("site_id", nvSiteId).Where("id", id).
