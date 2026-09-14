@@ -15,24 +15,138 @@ import (
 	"github.com/JarvanDante/my_service/internal/shared/paas"
 )
 
-func (s *sNovel) ListMediaNovels(ctx context.Context, page, size int, keyword string) ([]service.MediaNovelDTO, int, error) {
-	list, total, err := paas.ListAssets(ctx, page, size, strings.TrimSpace(keyword), 4)
+func (s *sNovel) ListMediaNovels(ctx context.Context, page, size int, keyword string, picked int) ([]service.MediaNovelDTO, int, error) {
+	keyword = strings.TrimSpace(keyword)
+	if page <= 0 {
+		page = 1
+	}
+	if size <= 0 {
+		size = 20
+	}
+	if picked == 1 {
+		return s.listLocalPickedNovels(ctx, page, size, keyword)
+	}
+	if picked == 2 {
+		return s.listUnpickedMediaNovels(ctx, page, size, keyword)
+	}
+	return s.listAllMediaNovels(ctx, page, size, keyword)
+}
+
+func (s *sNovel) listAllMediaNovels(ctx context.Context, page, size int, keyword string) ([]service.MediaNovelDTO, int, error) {
+	list, total, err := paas.ListAssets(ctx, page, size, keyword, 4)
 	if err != nil {
 		return nil, 0, err
 	}
 	out := make([]service.MediaNovelDTO, 0, len(list))
 	for _, a := range list {
-		item := service.MediaNovelDTO{
-			Id: a.Id, Title: a.Title, CoverUrl: a.CoverUrl, Intro: a.Intro,
-			ChapterCount: a.ChapterCount, Picked: a.Picked,
-		}
-		if local, _ := s.findByMediaCode(ctx, a.Id); local != nil {
-			item.LocalId = local.Id
-			item.Picked = true
-		}
-		out = append(out, item)
+		out = append(out, s.mediaNovelOf(ctx, a))
 	}
 	return out, total, nil
+}
+
+func (s *sNovel) listLocalPickedNovels(ctx context.Context, page, size int, keyword string) ([]service.MediaNovelDTO, int, error) {
+	m := g.Model("novel").Ctx(ctx).Where("site_id", nvSiteId).Where("media_code <> ?", "")
+	if keyword != "" {
+		m = m.WhereLike("title", "%"+keyword+"%")
+	}
+	total, err := m.Clone().Count()
+	if err != nil {
+		return nil, 0, err
+	}
+	var rows []*entity.Novel
+	if err := m.OrderDesc("id").Page(page, size).Scan(&rows); err != nil {
+		return nil, 0, err
+	}
+	out := make([]service.MediaNovelDTO, 0, len(rows))
+	for _, r := range rows {
+		if r == nil {
+			continue
+		}
+		out = append(out, service.MediaNovelDTO{
+			Id: r.MediaCode, Title: r.Title, CoverUrl: r.Cover, Intro: r.Intro,
+			ChapterCount: r.ChapterCount, Picked: true, LocalId: r.Id,
+		})
+	}
+	return out, total, nil
+}
+
+func (s *sNovel) listUnpickedMediaNovels(ctx context.Context, page, size int, keyword string) ([]service.MediaNovelDTO, int, error) {
+	local, err := s.localMediaCodes(ctx)
+	if err != nil {
+		return nil, 0, err
+	}
+	need := page * size
+	collected := make([]service.MediaNovelDTO, 0, need)
+	srcTotal := 0
+	for p := 1; p <= 30 && len(collected) < need; p++ {
+		chunk, total, e := paas.ListAssets(ctx, p, size, keyword, 4)
+		if e != nil {
+			return nil, 0, e
+		}
+		srcTotal = total
+		if len(chunk) == 0 {
+			break
+		}
+		for _, a := range chunk {
+			if local[a.Id] > 0 {
+				continue
+			}
+			item := s.mediaNovelOf(ctx, a)
+			item.LocalId = 0
+			item.Picked = false
+			collected = append(collected, item)
+		}
+		if p*size >= total {
+			break
+		}
+	}
+	start := (page - 1) * size
+	if start > len(collected) {
+		start = len(collected)
+	}
+	end := start + size
+	if end > len(collected) {
+		end = len(collected)
+	}
+	total := srcTotal - len(local)
+	if total < len(collected) {
+		total = len(collected)
+	}
+	if total < 0 {
+		total = 0
+	}
+	return collected[start:end], total, nil
+}
+
+func (s *sNovel) mediaNovelOf(ctx context.Context, a paas.MediaAsset) service.MediaNovelDTO {
+	item := service.MediaNovelDTO{
+		Id: a.Id, Title: a.Title, CoverUrl: a.CoverUrl, Intro: a.Intro,
+		ChapterCount: a.ChapterCount, Picked: a.Picked,
+	}
+	if local, _ := s.findByMediaCode(ctx, a.Id); local != nil {
+		item.LocalId = local.Id
+		item.Picked = true
+	}
+	return item
+}
+
+func (s *sNovel) localMediaCodes(ctx context.Context) (map[string]int64, error) {
+	var rows []*entity.Novel
+	err := g.Model("novel").Ctx(ctx).
+		Fields("id", "media_code").
+		Where("site_id", nvSiteId).Where("media_code <> ?", "").
+		Scan(&rows)
+	if err != nil {
+		return nil, err
+	}
+	out := make(map[string]int64, len(rows))
+	for _, r := range rows {
+		if r == nil || r.MediaCode == "" {
+			continue
+		}
+		out[r.MediaCode] = r.Id
+	}
+	return out, nil
 }
 
 func (s *sNovel) PickMedia(ctx context.Context, code string) (int64, error) {

@@ -168,6 +168,7 @@ type MediaNovelItem struct {
 type MediaNovelsListReq struct {
 	g.Meta  `path:"/media-novels" method:"get" tags:"Backend/Novel" summary:"媒资中心可选用小说"`
 	Keyword string `json:"keyword"`
+	Picked  int    `json:"picked"` // 0全部 1已入库 2未入库
 	Page    int    `json:"page"`
 	Size    int    `json:"size"`
 }

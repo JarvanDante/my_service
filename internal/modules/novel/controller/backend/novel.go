@@ -138,7 +138,7 @@ func (c *Controller) MediaNovels(ctx context.Context, req *v1.MediaNovelsListReq
 	if size <= 0 {
 		size = 20
 	}
-	list, total, err := c.svc.ListMediaNovels(ctx, page, size, req.Keyword)
+	list, total, err := c.svc.ListMediaNovels(ctx, page, size, req.Keyword, req.Picked)
 	if err != nil {
 		return nil, err
 	}

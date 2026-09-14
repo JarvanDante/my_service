@@ -152,6 +152,6 @@ type INovel interface {
 	ChapterUpdate(ctx context.Context, in ChapterInput) error
 	ChapterDelete(ctx context.Context, id int64) error
 
-	ListMediaNovels(ctx context.Context, page, size int, keyword string) ([]MediaNovelDTO, int, error)
+	ListMediaNovels(ctx context.Context, page, size int, keyword string, picked int) ([]MediaNovelDTO, int, error)
 	PickMedia(ctx context.Context, code string) (int64, error)
 }
