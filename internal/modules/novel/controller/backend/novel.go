@@ -9,9 +9,15 @@ import (
 	"github.com/JarvanDante/my_service/internal/modules/novel/service"
 )
 
-type Controller struct{ svc service.INovel }
+type Controller struct {
+	svc service.INovel
+	cat service.ICategory
+	mod service.IModule
+}
 
-func New(svc service.INovel) *Controller { return &Controller{svc: svc} }
+func New(svc service.INovel, cat service.ICategory, mod service.IModule) *Controller {
+	return &Controller{svc: svc, cat: cat, mod: mod}
+}
 
 func (c *Controller) List(ctx context.Context, req *v1.ListReq) (res *v1.ListRes, err error) {
 	status := -1

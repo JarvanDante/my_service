@@ -99,34 +99,75 @@ func (s *sNovel) query(ctx context.Context, f service.ListFilter) ([]*service.No
 	if f.Status >= 0 {
 		base = base.Where("status", f.Status)
 	}
+	cates := append([]string{}, f.Categories...)
 	if f.Category != "" {
-		base = base.Where("category", f.Category)
+		cates = append(cates, f.Category)
 	}
+	if len(cates) == 1 {
+		base = base.Where("category", cates[0])
+	} else if len(cates) > 1 {
+		base = base.WhereIn("category", cates)
+	}
+	tagNames := append([]string{}, f.Tags...)
 	if f.Tag != "" {
-		base = base.Where("tags @> ?::jsonb", encodeJSON([]string{f.Tag}))
+		tagNames = append(tagNames, f.Tag)
+	}
+	if len(tagNames) == 1 {
+		base = base.Where("tags @> ?::jsonb", encodeJSON([]string{tagNames[0]}))
+	} else if len(tagNames) > 1 {
+		ors := make([]string, 0, len(tagNames))
+		args := make([]any, 0, len(tagNames))
+		for _, t := range tagNames {
+			ors = append(ors, "tags @> ?::jsonb")
+			args = append(args, encodeJSON([]string{t}))
+		}
+		base = base.Where("("+strings.Join(ors, " OR ")+")", args...)
 	}
 	if f.Keyword != "" {
 		kw := "%" + f.Keyword + "%"
 		base = base.Where("(title ILIKE ? OR author ILIKE ?)", kw, kw)
+	}
+	switch f.PayType {
+	case 1:
+		base = base.Where("is_vip", 1)
+	case 2:
+		base = base.Where("is_vip", 0).Where("price > ?", 0)
+	case 3:
+		base = base.Where("is_vip", 0).Where("price <= ?", 0)
+	}
+	if f.UpdateStatus == 1 || f.UpdateStatus == 2 {
+		base = base.Where("update_status", f.UpdateStatus)
+	}
+	if len(f.Ids) > 0 {
+		base = base.WhereIn("id", f.Ids)
+	}
+	if len(f.ExcludeIds) > 0 {
+		base = base.WhereNotIn("id", f.ExcludeIds)
 	}
 	total, err := base.Clone().Count()
 	if err != nil {
 		return nil, 0, err
 	}
 	m := base.Clone()
-	switch f.Sort {
-	case 1:
-		m = m.OrderDesc("view_count")
-	case 2:
-		m = m.OrderDesc("id")
-	case 3:
-		m = m.OrderDesc("like_count")
-	default:
-		m = m.OrderDesc("rank")
-	}
 	var list []*entity.Novel
-	if err := m.OrderDesc("id").Page(f.Page, f.Size).Scan(&list); err != nil {
-		return nil, 0, err
+	if f.Shuffle {
+		if err := m.OrderRandom().Limit(f.Size).Scan(&list); err != nil {
+			return nil, 0, err
+		}
+	} else {
+		switch f.Sort {
+		case 1:
+			m = m.OrderDesc("view_count")
+		case 2:
+			m = m.OrderDesc("id")
+		case 3:
+			m = m.OrderDesc("like_count")
+		default:
+			m = m.OrderDesc("rank")
+		}
+		if err := m.OrderDesc("id").Page(f.Page, f.Size).Scan(&list); err != nil {
+			return nil, 0, err
+		}
 	}
 	out := make([]*service.NovelDTO, 0, len(list))
 	for _, r := range list {

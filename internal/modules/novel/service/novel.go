@@ -105,13 +105,20 @@ type ChapterInput struct {
 }
 
 type ListFilter struct {
-	Category string
-	Tag      string
-	Keyword  string
-	Status   int // -1=全部, 前台固定传 1
-	Sort     int // 0综合 1最多观看 2最新 3最多点赞
-	Page     int
-	Size     int
+	Category     string
+	Categories   []string
+	Tag          string
+	Tags         []string
+	Keyword      string
+	Status       int // -1=全部, 前台固定传 1
+	Sort         int // 0综合 1最多观看 2最新 3最多点赞
+	Page         int
+	Size         int
+	PayType      int
+	UpdateStatus int
+	Ids          []int64
+	ExcludeIds   []int64
+	Shuffle      bool
 }
 
 type INovel interface {

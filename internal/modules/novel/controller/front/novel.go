@@ -11,11 +11,18 @@ import (
 	v1 "github.com/JarvanDante/my_service/api/front/novel/v1"
 	"github.com/JarvanDante/my_service/internal/modules/novel/service"
 	"github.com/JarvanDante/my_service/internal/shared/consts"
+	"github.com/JarvanDante/my_service/internal/shared/kit"
 )
 
-type Controller struct{ svc service.INovel }
+type Controller struct {
+	svc service.INovel
+	cat service.ICategory
+	mod service.IModule
+}
 
-func New(svc service.INovel) *Controller { return &Controller{svc: svc} }
+func New(svc service.INovel, cat service.ICategory, mod service.IModule) *Controller {
+	return &Controller{svc: svc, cat: cat, mod: mod}
+}
 
 // optionalUid 公开接口: 带 token 就取到用户, 不带返回 0(用于标记 is_buy/解锁态)。
 func optionalUid(ctx context.Context) int64 {
@@ -56,15 +63,46 @@ func (c *Controller) List(ctx context.Context, req *v1.ListReq) (res *v1.ListRes
 }
 
 func (c *Controller) CategoryList(ctx context.Context, _ *v1.CategoryListReq) (res *v1.CategoryListRes, err error) {
-	names, err := c.svc.FrontCategories(ctx)
+	list, err := c.cat.Repo(ctx)
 	if err != nil {
 		return nil, err
 	}
-	res = &v1.CategoryListRes{List: make([]v1.FrontCategoryItem, 0, len(names))}
-	for i, name := range names {
-		res.List = append(res.List, v1.FrontCategoryItem{Id: int64(i + 1), Name: name, Kind: 0})
+	res = &v1.CategoryListRes{List: make([]v1.FrontCategoryItem, 0, len(list))}
+	for _, d := range list {
+		res.List = append(res.List, v1.FrontCategoryItem{Id: d.Id, Name: d.Name, Kind: d.Kind})
 	}
 	return res, nil
+}
+
+func toFrontModule(d *service.ModuleFrontDTO) v1.FrontModuleItem {
+	row := v1.FrontModuleItem{
+		Id: d.Id, Name: d.Name, Style: d.Style, Icon: d.Icon, Size: d.Size, Tags: d.Tags, Categories: d.Categories,
+		Items: make([]v1.Item, 0, len(d.Items)),
+	}
+	for _, item := range d.Items {
+		row.Items = append(row.Items, toItem(item))
+	}
+	return row
+}
+
+func (c *Controller) ModuleList(ctx context.Context, req *v1.ModuleListReq) (res *v1.ModuleListRes, err error) {
+	list, err := c.mod.FrontRepo(ctx, req.Position)
+	if err != nil {
+		return nil, err
+	}
+	res = &v1.ModuleListRes{List: make([]v1.FrontModuleItem, 0, len(list))}
+	for _, d := range list {
+		res.List = append(res.List, toFrontModule(d))
+	}
+	return res, nil
+}
+
+func (c *Controller) ModuleRefresh(ctx context.Context, req *v1.ModuleRefreshReq) (res *v1.ModuleRefreshRes, err error) {
+	d, err := c.mod.FrontRefresh(ctx, req.Id, kit.ParseI64CSV(req.Exclude))
+	if err != nil {
+		return nil, err
+	}
+	return &v1.ModuleRefreshRes{FrontModuleItem: toFrontModule(d)}, nil
 }
 
 func (c *Controller) Detail(ctx context.Context, req *v1.DetailReq) (res *v1.DetailRes, err error) {

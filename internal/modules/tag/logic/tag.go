@@ -136,7 +136,7 @@ func (s *sTag) fillUseCounts(ctx context.Context, list []*service.ItemDTO) {
 
 func supportsUseCount(contentType int) bool {
 	switch contentType {
-	case 1, 2, 3, 4:
+	case 1, 2, 3, 4, 7:
 		return true
 	default:
 		return false
@@ -158,10 +158,14 @@ func countTaggedWorks(ctx context.Context, contentType int, name string) (int, e
 }
 
 func useCountTable(contentType int) string {
-	if contentType == 4 {
+	switch contentType {
+	case 4:
 		return "comics"
+	case 7:
+		return "novel"
+	default:
+		return "video"
 	}
-	return "video"
 }
 
 func useCountKind(contentType int) (int, bool) {
