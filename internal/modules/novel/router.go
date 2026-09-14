@@ -29,5 +29,6 @@ func RegisterBackend(group *ghttp.RouterGroup) {
 	group.Bind(
 		ctrl.List, ctrl.Create, ctrl.Update, ctrl.Delete, ctrl.Audit,
 		ctrl.Chapters, ctrl.ChapterCreate, ctrl.ChapterUpdate, ctrl.ChapterDelete,
+		ctrl.MediaNovels, ctrl.MediaPick,
 	)
 }

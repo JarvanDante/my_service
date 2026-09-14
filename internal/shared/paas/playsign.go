@@ -146,6 +146,7 @@ func isMinioHls(u string) bool {
 		strings.Contains(u, "/my-media/video/") ||
 		strings.Contains(u, "/my-media/cartoon/") ||
 		strings.Contains(u, "/my-media/comics/") ||
+		strings.Contains(u, "/my-media/novels/") ||
 		strings.Contains(u, ":19000/my-media/") ||
 		(strings.Contains(u, "host.docker.internal") && strings.Contains(u, "/my-media/"))
 }
@@ -167,7 +168,8 @@ func ApplyGatewayURLsPreview(ctx context.Context, cover, play, code string, prev
 	if u := CoverURL(ctx, code); u != "" && !isSiteStorageCover(cover) && (cover == "" || isMinioHls(cover) ||
 		strings.Contains(cover, "/hls/"+code+"/cover.jpg") ||
 		strings.Contains(cover, "/hls/"+code+"/cover.bnc") ||
-		strings.Contains(cover, "/comics/"+code+"/cover.")) {
+		strings.Contains(cover, "/comics/"+code+"/cover.") ||
+		strings.Contains(cover, "/novels/"+code+"/cover.")) {
 		cover = u
 	}
 	if u := PlaylistURL(ctx, code, play, previewSec); u != "" && (play == "" || isMinioHls(play) || strings.Contains(play, "/hls/"+code+"/")) {

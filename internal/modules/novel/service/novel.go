@@ -24,8 +24,20 @@ type NovelDTO struct {
 	Rank         int
 	Status       int
 	PublishId    int64
+	MediaCode    string
 	CreatedAt    string
 	IsBuy        bool
+}
+
+type MediaNovelDTO struct {
+	Id           string
+	Title        string
+	CoverUrl     string
+	Intro        string
+	ChapterCount int
+	WordCount    int
+	Picked       bool
+	LocalId      int64
 }
 
 type ChapterDTO struct {
@@ -127,4 +139,7 @@ type INovel interface {
 	ChapterCreate(ctx context.Context, in ChapterInput) (int64, error)
 	ChapterUpdate(ctx context.Context, in ChapterInput) error
 	ChapterDelete(ctx context.Context, id int64) error
+
+	ListMediaNovels(ctx context.Context, page, size int, keyword string) ([]MediaNovelDTO, int, error)
+	PickMedia(ctx context.Context, code string) (int64, error)
 }

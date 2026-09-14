@@ -25,6 +25,7 @@ type Item struct {
 	Rank         int      `json:"rank"`
 	Status       int      `json:"status"`
 	PublishId    int64    `json:"publish_id"`
+	MediaCode    string   `json:"media_code"`
 	CreatedAt    string   `json:"created_at"`
 }
 
@@ -147,3 +148,34 @@ type ChapterDeleteReq struct {
 	Id     int64 `json:"id" in:"path" v:"required|min:1#ID必填"`
 }
 type ChapterDeleteRes struct{}
+
+type MediaNovelItem struct {
+	Id           string `json:"id"`
+	Title        string `json:"title"`
+	CoverUrl     string `json:"cover_url"`
+	Intro        string `json:"intro"`
+	ChapterCount int    `json:"chapter_count"`
+	Picked       bool   `json:"picked"`
+	LocalId      int64  `json:"local_id"`
+}
+
+type MediaNovelsListReq struct {
+	g.Meta  `path:"/media-novels" method:"get" tags:"Backend/Novel" summary:"媒资中心可选用小说"`
+	Keyword string `json:"keyword"`
+	Page    int    `json:"page"`
+	Size    int    `json:"size"`
+}
+type MediaNovelsListRes struct {
+	List  []MediaNovelItem `json:"list"`
+	Total int              `json:"total"`
+	Page  int              `json:"page"`
+	Size  int              `json:"size"`
+}
+
+type MediaNovelsPickReq struct {
+	g.Meta `path:"/media-novels/{id}/pick" method:"post" tags:"Backend/Novel" summary:"选用小说媒资并写入本站列表"`
+	Id     string `json:"id" v:"required#媒资ID必填"`
+}
+type MediaNovelsPickRes struct {
+	Id int64 `json:"id"`
+}

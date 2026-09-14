@@ -35,7 +35,7 @@ func (c *Controller) List(ctx context.Context, req *v1.ListReq) (res *v1.ListRes
 			FreeChapter: d.FreeChapter, ChapterCount: d.ChapterCount, WordCount: d.WordCount,
 			IsAudio: d.IsAudio, ViewCount: d.ViewCount, BuyCount: d.BuyCount,
 			LikeCount: d.LikeCount, UpdateStatus: d.UpdateStatus, Rank: d.Rank,
-			Status: d.Status, PublishId: d.PublishId, CreatedAt: d.CreatedAt,
+			Status: d.Status, PublishId: d.PublishId, MediaCode: d.MediaCode, CreatedAt: d.CreatedAt,
 		})
 	}
 	return res, nil
@@ -122,4 +122,34 @@ func (c *Controller) ChapterDelete(ctx context.Context, req *v1.ChapterDeleteReq
 		return nil, err
 	}
 	return &v1.ChapterDeleteRes{}, nil
+}
+
+func (c *Controller) MediaNovels(ctx context.Context, req *v1.MediaNovelsListReq) (res *v1.MediaNovelsListRes, err error) {
+	page, size := req.Page, req.Size
+	if page <= 0 {
+		page = 1
+	}
+	if size <= 0 {
+		size = 20
+	}
+	list, total, err := c.svc.ListMediaNovels(ctx, page, size, req.Keyword)
+	if err != nil {
+		return nil, err
+	}
+	items := make([]v1.MediaNovelItem, 0, len(list))
+	for _, a := range list {
+		items = append(items, v1.MediaNovelItem{
+			Id: a.Id, Title: a.Title, CoverUrl: a.CoverUrl, Intro: a.Intro,
+			ChapterCount: a.ChapterCount, Picked: a.Picked, LocalId: a.LocalId,
+		})
+	}
+	return &v1.MediaNovelsListRes{List: items, Total: total, Page: page, Size: size}, nil
+}
+
+func (c *Controller) MediaPick(ctx context.Context, req *v1.MediaNovelsPickReq) (res *v1.MediaNovelsPickRes, err error) {
+	id, err := c.svc.PickMedia(ctx, req.Id)
+	if err != nil {
+		return nil, err
+	}
+	return &v1.MediaNovelsPickRes{Id: id}, nil
 }

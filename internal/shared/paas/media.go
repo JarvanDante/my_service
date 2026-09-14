@@ -31,6 +31,8 @@ type MediaChapter struct {
 	Title     string      `json:"title"`
 	PageCount int         `json:"page_count"`
 	Pages     []MediaPage `json:"pages"`
+	Content   string      `json:"content"`
+	WordCount int         `json:"word_count"`
 }
 
 type MediaPage struct {

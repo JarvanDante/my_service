@@ -21,6 +21,7 @@ import (
 
 	"github.com/JarvanDante/my_service/internal/model/entity"
 	"github.com/JarvanDante/my_service/internal/modules/novel/service"
+	"github.com/JarvanDante/my_service/internal/shared/paas"
 	"github.com/JarvanDante/my_service/internal/shared/paywall"
 )
 
@@ -65,7 +66,17 @@ func toDTO(r *entity.Novel) *service.NovelDTO {
 		FreeChapter: r.FreeChapter, ChapterCount: r.ChapterCount, WordCount: r.WordCount,
 		IsAudio: r.IsAudio, ViewCount: r.ViewCount, BuyCount: r.BuyCount, LikeCount: r.LikeCount,
 		UpdateStatus: r.UpdateStatus, Rank: r.Rank, Status: r.Status, PublishId: r.PublishId,
-		CreatedAt: fmtTime(r.CreatedAt),
+		MediaCode: r.MediaCode, CreatedAt: fmtTime(r.CreatedAt),
+	}
+}
+
+func overlayNovelCover(ctx context.Context, d *service.NovelDTO) {
+	if d == nil || d.MediaCode == "" {
+		return
+	}
+	cover, _ := paas.ApplyGatewayURLs(ctx, d.Cover, "", d.MediaCode)
+	if cover != "" {
+		d.Cover = cover
 	}
 }
 
@@ -119,7 +130,9 @@ func (s *sNovel) query(ctx context.Context, f service.ListFilter) ([]*service.No
 	}
 	out := make([]*service.NovelDTO, 0, len(list))
 	for _, r := range list {
-		out = append(out, toDTO(r))
+		d := toDTO(r)
+		overlayNovelCover(ctx, d)
+		out = append(out, d)
 	}
 	return out, total, nil
 }
@@ -208,6 +221,7 @@ func (s *sNovel) Detail(ctx context.Context, userId, id int64) (*service.DetailD
 	_, _ = g.Model("novel").Ctx(ctx).Where("id", r.Id).
 		Data(g.Map{"view_count": &gdb.Counter{Field: "view_count", Value: 1}}).Update()
 	d := toDTO(r)
+	overlayNovelCover(ctx, d)
 	d.IsBuy = acc.IsBuy
 	d.ViewCount++
 	return &service.DetailDTO{
@@ -332,7 +346,9 @@ func (s *sNovel) MayLike(ctx context.Context, id int64, size int) ([]*service.No
 	}
 	out := make([]*service.NovelDTO, 0, len(list))
 	for _, r := range list {
-		out = append(out, toDTO(r))
+		d := toDTO(r)
+		overlayNovelCover(ctx, d)
+		out = append(out, d)
 	}
 	return out, nil
 }
