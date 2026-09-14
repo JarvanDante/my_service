@@ -69,7 +69,7 @@ func (c *Controller) CategoryList(ctx context.Context, _ *v1.CategoryListReq) (r
 	}
 	res = &v1.CategoryListRes{List: make([]v1.FrontCategoryItem, 0, len(list))}
 	for _, d := range list {
-		res.List = append(res.List, v1.FrontCategoryItem{Id: d.Id, Name: d.Name, Kind: d.Kind})
+		res.List = append(res.List, v1.FrontCategoryItem{Id: d.Id, Name: d.Name, Kind: d.Kind, Rank: d.Rank})
 	}
 	return res, nil
 }

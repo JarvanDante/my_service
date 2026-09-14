@@ -46,6 +46,7 @@ type FrontCategoryItem struct {
 	Id   int64  `json:"id"`
 	Name string `json:"name"`
 	Kind int    `json:"kind"`
+	Rank int    `json:"rank"`
 }
 
 type CategoryListReq struct {
