@@ -18,3 +18,7 @@ main
 manifest/config/config.local.yaml
 .env
 temp/
+
+# 构建产物与编译输出
+dist/
+/my_service
