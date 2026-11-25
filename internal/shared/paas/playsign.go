@@ -39,10 +39,19 @@ func siteCode(ctx context.Context) string {
 	return strings.ToUpper(s)
 }
 
-func playSign(secret, code, site string, exp int64, d int, ip string, iat int64) string {
+// playSign 签名 v4 带用途 p(img/hls)，与 my_play 校验一致。
+func playSign(secret, code, site string, exp int64, d int, ip string, iat int64, p string) string {
 	mac := hmac.New(sha256.New, []byte(secret))
-	_, _ = fmt.Fprintf(mac, "%s|%s|%d|%d|%s|%d", code, site, exp, d, ip, iat)
+	_, _ = fmt.Fprintf(mac, "%s|%s|%d|%d|%s|%d|%s", code, site, exp, d, ip, iat, p)
 	return hex.EncodeToString(mac.Sum(nil))
+}
+
+// signPurpose 清单签 hls，其余(封面/页图)签 img。
+func signPurpose(file string) string {
+	if strings.HasSuffix(strings.ToLower(file), ".m3u8") {
+		return "hls"
+	}
+	return "img"
 }
 
 func playURL(ctx context.Context, code, site, file string, previewSec int) string {
@@ -55,8 +64,9 @@ func playURL(ctx context.Context, code, site, file string, previewSec int) strin
 	}
 	now := time.Now().Unix()
 	exp := now + cfg.ttl
-	u := fmt.Sprintf("%s/hls/%s/%s?e=%d&s=%s&t=%d&sig=%s",
-		cfg.base, url.PathEscape(code), file, exp, url.QueryEscape(site), now, playSign(cfg.secret, code, site, exp, previewSec, "", now))
+	p := signPurpose(file)
+	u := fmt.Sprintf("%s/hls/%s/%s?e=%d&s=%s&t=%d&p=%s&sig=%s",
+		cfg.base, url.PathEscape(code), file, exp, url.QueryEscape(site), now, p, playSign(cfg.secret, code, site, exp, previewSec, "", now, p))
 	if previewSec > 0 {
 		u += fmt.Sprintf("&d=%d", previewSec)
 	}
