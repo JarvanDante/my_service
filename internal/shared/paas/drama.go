@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/url"
+	"time"
 
 	"github.com/gogf/gf/v2/errors/gerror"
 	"github.com/gogf/gf/v2/frame/g"
@@ -68,10 +69,15 @@ func PickDrama(ctx context.Context, code string) (*MediaDrama, error) {
 	return &a, nil
 }
 
-// DramaPlayToken 按剧集短码签发，媒资中心会校验整部已被本站选用。
+// DramaPlayToken 按剧集短码签发，媒资中心会校验整部已被本站选用；结果按集+试看秒数短时缓存以节省站点签发额度。
 func DramaPlayToken(ctx context.Context, episodeCode string, previewSec int) (string, error) {
+	cacheKey := fmt.Sprintf("paas:dramaplay:%s:%s:%d", siteCode(ctx), episodeCode, previewSec)
+	if v, err := g.Redis().Do(ctx, "GET", cacheKey); err == nil && !v.IsNil() && v.String() != "" {
+		return v.String(), nil
+	}
 	var data struct {
-		PlayUrl string `json:"play_url"`
+		PlayUrl   string `json:"play_url"`
+		ExpiresAt int64  `json:"expires_at"`
 	}
 	if err := doOpenPost(ctx, "/open/assets/"+url.PathEscape(episodeCode)+"/play-token",
 		g.Map{"preview_sec": previewSec}, &data); err != nil {
@@ -79,6 +85,13 @@ func DramaPlayToken(ctx context.Context, episodeCode string, previewSec int) (st
 	}
 	if data.PlayUrl == "" {
 		return "", gerror.New("播放网关未配置")
+	}
+	ttl := g.Cfg().MustGet(ctx, "paas.play_token_cache_sec", 300).Int64()
+	if left := data.ExpiresAt - time.Now().Unix() - 60; left < ttl {
+		ttl = left
+	}
+	if ttl > 0 {
+		_, _ = g.Redis().Do(ctx, "SETEX", cacheKey, ttl, data.PlayUrl)
 	}
 	return data.PlayUrl, nil
 }

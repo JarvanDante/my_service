@@ -88,6 +88,7 @@ paas:
   app_key: "ak_baee2346281a74bfb654425b"
   app_secret: "3cdcfe258d1854ed90facfaa9000b9e4a7f2c46f8cbc345ebd939868357880e9"
   media_base: "http://127.0.0.1:8004"
+  play_token_cache_sec: 300   # 短剧 play-token 结果缓存秒数，0=不缓存
   media_admin_token: "488ac147a8b24d2b0541b24f4fdfb5f8b10c20129f6b46fcce6d2091094e872a"
   storage_base: "http://127.0.0.1:8015"
   ad_base: "http://127.0.0.1:8016"
@@ -119,3 +120,5 @@ front_ratelimit:
   ip_per_hour: 5000
   user_per_min: 120
   user_per_hour: 1500
+  play_per_min: 30     # 播放地址签发每用户(游客按 IP)每分钟上限
+  play_per_hour: 600

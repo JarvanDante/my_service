@@ -87,6 +87,23 @@ func UserRateLimit(r *ghttp.Request) {
 	r.Middleware.Next()
 }
 
+// PlayRateLimit 播放地址签发按用户限流，游客按 IP(须在 AuthOptional 之后挂载)。
+func PlayRateLimit(r *ghttp.Request) {
+	ctx := r.Context()
+	id := "ip:" + r.GetClientIp()
+	if uid := r.GetCtxVar(consts.CtxUserId).Int64(); uid > 0 {
+		id = "u:" + strconv.FormatInt(uid, 10)
+	}
+	perMin := g.Cfg().MustGet(ctx, "front_ratelimit.play_per_min", 30).Int()
+	perHour := g.Cfg().MustGet(ctx, "front_ratelimit.play_per_hour", 600).Int()
+	if ok, retry, reason := ratelimit.Allow(ctx, "play", id, perMin, perHour); !ok {
+		g.Log().Warningf(ctx, "播放签发限流命中 id=%s path=%s: %s", id, r.URL.Path, reason)
+		rlDeny(r, retry, reason)
+		return
+	}
+	r.Middleware.Next()
+}
+
 // rlDeny 统一返回 429 + Retry-After。
 func rlDeny(r *ghttp.Request, retryAfter int, reason string) {
 	r.Response.Header().Set("Retry-After", strconv.Itoa(retryAfter))
