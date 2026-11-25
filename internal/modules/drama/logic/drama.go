@@ -257,14 +257,15 @@ func (s *sDrama) Episodes(ctx context.Context, userId, id int64, desc bool) (str
 
 // applyAccess 批量判定解锁态，规则与 paywall.Check 一致，只把会员和已购查询合并成各一次。
 func (s *sDrama) applyAccess(ctx context.Context, userId int64, d *entity.Drama, list []*entity.DramaEpisode) ([]*service.EpisodeDTO, error) {
-	coinIds := make([]int64, 0, len(list))
+	paidIds := make([]int64, 0, len(list))
 	hasVip := false
 	for _, e := range list {
 		isVip, price := episodeRule(d, e)
 		if isVip {
 			hasVip = true
-		} else if price > 0 {
-			coinIds = append(coinIds, e.Id)
+		}
+		if isVip || price > 0 {
+			paidIds = append(paidIds, e.Id)
 		}
 	}
 	vipActive := false
@@ -275,7 +276,7 @@ func (s *sDrama) applyAccess(ctx context.Context, userId int64, d *entity.Drama,
 		}
 		vipActive = ok
 	}
-	bought, err := paywall.PurchasedSet(ctx, userId, paywall.MediaDrama, coinIds)
+	bought, err := paywall.PurchasedSet(ctx, userId, paywall.MediaDrama, paidIds)
 	if err != nil {
 		return nil, err
 	}
@@ -285,6 +286,9 @@ func (s *sDrama) applyAccess(ctx context.Context, userId int64, d *entity.Drama,
 		isVip, price := episodeRule(d, e)
 		dto.IsVip, dto.Price = isVip, price
 		switch {
+		case (isVip || price > 0) && bought[e.Id]:
+			// 已购优先：买过的集无论之后改成 VIP 还是改价都可看全片。
+			dto.IsBuy, dto.Playable = true, true
 		case isVip:
 			dto.Playable, dto.NeedVip = vipActive, !vipActive
 		case price > 0:
@@ -304,8 +308,17 @@ func (s *sDrama) Play(ctx context.Context, userId, episodeId int64) (*service.Pl
 		return nil, err
 	}
 	isVip, price := episodeRule(d, e)
-	acc, err := paywall.Check(ctx, userId, paywall.MediaDrama, e.Id, isVip, price)
-	if err != nil {
+	acc := &paywall.Access{Price: price}
+	// 已购优先：VIP 集先查购买记录，金币集由 paywall.Check 自身先查已购。
+	bought := false
+	if isVip && userId > 0 {
+		if bought, err = paywall.Purchased(ctx, userId, paywall.MediaDrama, e.Id); err != nil {
+			return nil, err
+		}
+	}
+	if bought {
+		acc.Playable, acc.IsBuy = true, true
+	} else if acc, err = paywall.Check(ctx, userId, paywall.MediaDrama, e.Id, isVip, price); err != nil {
 		return nil, err
 	}
 	preview := 0
