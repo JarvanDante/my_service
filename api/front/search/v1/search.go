@@ -13,7 +13,7 @@ import "github.com/gogf/gf/v2/frame/g"
 // 缺的一律给零值, 让前端只认这一套结构, 不用按 media_type 切换解析逻辑。
 type Item struct {
 	Id        int64   `json:"id"`
-	MediaType int     `json:"media_type"` // 1视频 2帖子 3漫画 4小说 5图集(与 paywall 同一套编码)
+	MediaType int     `json:"media_type"` // 1视频 2帖子 3漫画 4小说 5图集 6短剧(与 paywall 同一套编码)
 	Title     string  `json:"title"`
 	Cover     string  `json:"cover"`
 	Author    string  `json:"author"`
@@ -28,7 +28,7 @@ type Item struct {
 type SearchReq struct {
 	g.Meta  `path:"/search" method:"get" tags:"Front/Search" summary:"全站搜索"`
 	Keyword string `json:"keyword" v:"required#关键词必填"`
-	Type    int    `json:"type" v:"in:0,1,2,3,4,5#资源类型非法" dc:"0全部 1视频 2帖子 3漫画 4小说 5图集"`
+	Type    int    `json:"type" v:"in:0,1,2,3,4,5,6#资源类型非法" dc:"0全部 1视频 2帖子 3漫画 4小说 5图集 6短剧"`
 	Page    int    `json:"page"`
 	Size    int    `json:"size"`
 }
@@ -40,6 +40,7 @@ type SearchRes struct {
 	Comics []Item `json:"comics,omitempty"`
 	Novels []Item `json:"novels,omitempty"`
 	Photos []Item `json:"photos,omitempty"`
+	Dramas []Item `json:"dramas,omitempty"`
 	// ---- type>0 单类分页(type=0 时不下发)----
 	List []Item `json:"list,omitempty"`
 	// TotalHit 全类命中总数(type=0 用), Total 当前类命中总数(type>0 用)。

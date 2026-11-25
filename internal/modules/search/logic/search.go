@@ -20,6 +20,7 @@ import (
 
 	"github.com/JarvanDante/my_service/internal/model/entity"
 	"github.com/JarvanDante/my_service/internal/modules/search/service"
+	"github.com/JarvanDante/my_service/internal/shared/paas"
 	"github.com/JarvanDante/my_service/internal/shared/paywall"
 )
 
@@ -46,6 +47,7 @@ type searchRow struct {
 	IsVip     int         `orm:"is_vip"`
 	ViewCount int64       `orm:"view_count"`
 	CreatedAt *gtime.Time `orm:"created_at"`
+	MediaCode string      `orm:"media_code"`
 }
 
 // source 一个可搜索的内容源。fields 决定该表能填上统一结构的哪些字段。
@@ -71,6 +73,8 @@ var schSources = []source{
 	{table: "novel", mediaType: paywall.MediaNovel, fields: "id, title, cover, author, price, is_vip, view_count, created_at"},
 	// photo_album 没有 author 列(图集按分类/标签组织, 不记作者)。
 	{table: "photo_album", mediaType: paywall.MediaPhoto, fields: "id, title, cover, price, is_vip, view_count, created_at"},
+	// drama 的 price/is_vip 是整部默认值，封面未自定义时用媒资封面签名地址。
+	{table: "drama", mediaType: paywall.MediaDrama, fields: "id, title, cover, price, is_vip, view_count, created_at, media_code"},
 }
 
 // likeEscaper 转义 LIKE 通配符。用户搜 "100%" 时不该被当成通配符扩大命中面,
@@ -110,6 +114,11 @@ func (s *sSearch) queryOne(ctx context.Context, src source, kw string, page, siz
 	}
 	out := make([]*service.ItemDTO, 0, len(rows))
 	for _, r := range rows {
+		if src.mediaType == paywall.MediaDrama && r.MediaCode != "" && !strings.Contains(r.Cover, "/my-storage/") {
+			if u := paas.CoverURL(ctx, r.MediaCode); u != "" {
+				r.Cover = u
+			}
+		}
 		out = append(out, toDTO(r, src.mediaType))
 	}
 	return out, total, nil
@@ -166,6 +175,8 @@ func (s *sSearch) Search(ctx context.Context, in service.SearchInput) (*service.
 			res.Novels = list
 		case paywall.MediaPhoto:
 			res.Photos = list
+		case paywall.MediaDrama:
+			res.Dramas = list
 		}
 	}
 	return res, nil

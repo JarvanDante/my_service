@@ -38,7 +38,7 @@ func (c *Controller) Search(ctx context.Context, req *v1.SearchReq) (res *v1.Sea
 	}
 	return &v1.SearchRes{
 		Videos: toItems(r.Videos), Posts: toItems(r.Posts), Comics: toItems(r.Comics),
-		Novels: toItems(r.Novels), Photos: toItems(r.Photos),
+		Novels: toItems(r.Novels), Photos: toItems(r.Photos), Dramas: toItems(r.Dramas),
 		List: toItems(r.List), TotalHit: r.TotalHit, Total: r.Total,
 	}, nil
 }

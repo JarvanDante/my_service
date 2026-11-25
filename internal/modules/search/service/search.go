@@ -23,6 +23,7 @@ type ResultDTO struct {
 	Comics   []*ItemDTO
 	Novels   []*ItemDTO
 	Photos   []*ItemDTO
+	Dramas   []*ItemDTO
 	TotalHit int
 
 	List  []*ItemDTO
@@ -31,7 +32,7 @@ type ResultDTO struct {
 
 type SearchInput struct {
 	Keyword string
-	Type    int // 0全部 1视频 2帖子 3漫画 4小说 5图集
+	Type    int // 0全部 1视频 2帖子 3漫画 4小说 5图集 6短剧
 	Page    int
 	Size    int
 }

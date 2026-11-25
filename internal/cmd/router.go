@@ -17,6 +17,7 @@ import (
 	commentmod "github.com/JarvanDante/my_service/internal/modules/comment"
 	configmod "github.com/JarvanDante/my_service/internal/modules/config"
 	couponmod "github.com/JarvanDante/my_service/internal/modules/coupon"
+	dramamod "github.com/JarvanDante/my_service/internal/modules/drama"
 	feedbackmod "github.com/JarvanDante/my_service/internal/modules/feedback"
 	finmod "github.com/JarvanDante/my_service/internal/modules/finance"
 	groupmod "github.com/JarvanDante/my_service/internal/modules/group"
@@ -70,6 +71,7 @@ func mountFront(s *ghttp.Server) {
 		couponmod.RegisterFront(group)
 		comicsmod.RegisterFront(group)
 		novelmod.RegisterFront(group)
+		dramamod.RegisterFront(group)
 		photomod.RegisterFront(group)
 		pubmod.RegisterFront(group)
 		searchmod.RegisterFront(group)
@@ -135,6 +137,7 @@ func mountBackend(s *ghttp.Server) {
 			couponmod.RegisterBackend(perm)
 			comicsmod.RegisterBackend(perm)
 			novelmod.RegisterBackend(perm)
+			dramamod.RegisterBackend(perm)
 			photomod.RegisterBackend(perm)
 			pubmod.RegisterBackend(perm)
 			lotterymod.RegisterBackend(perm)

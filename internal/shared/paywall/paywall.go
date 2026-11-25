@@ -31,6 +31,7 @@ const (
 	MediaComics = 3
 	MediaNovel  = 4
 	MediaPhoto  = 5
+	MediaDrama  = 6 // 短剧：购买按单集记录，content_id 为 drama_episode.id
 )
 
 // Access 解锁判定结果, 直接下发给前端决定 UI(去购买 / 去开会员 / 直接看)。
