@@ -257,6 +257,7 @@ func syncFrom(ctx context.Context, dramaId int64, a *paas.MediaDrama) (*service.
 	if err != nil {
 		return nil, err
 	}
+	paas.InvalidateDramaAuth(ctx, a.Id)
 	return out, nil
 }
 

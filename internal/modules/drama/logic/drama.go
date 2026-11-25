@@ -312,16 +312,23 @@ func (s *sDrama) Play(ctx context.Context, userId, episodeId int64) (*service.Pl
 	if !acc.Playable {
 		preview = dmPreviewSec
 	}
-	raw, err := paas.DramaPlayToken(ctx, e.MediaCode, preview)
+	list, err := paas.DramaPlaylist(ctx, d.MediaCode, e.MediaCode)
 	if err != nil {
-		g.Log().Warningf(ctx, "短剧播放签发失败 episode=%d code=%s: %v", e.Id, e.MediaCode, err)
+		g.Log().Warningf(ctx, "短剧播放授权失败 episode=%d code=%s: %v", e.Id, e.MediaCode, err)
 		return nil, gerror.New("播放地址获取失败")
+	}
+	playUrl := paas.PlaylistURL(ctx, e.MediaCode, "/"+list, preview)
+	if playUrl == "/"+list {
+		if playUrl, err = paas.DramaPlayToken(ctx, e.MediaCode, preview); err != nil {
+			g.Log().Warningf(ctx, "短剧播放签发失败 episode=%d code=%s: %v", e.Id, e.MediaCode, err)
+			return nil, gerror.New("播放地址获取失败")
+		}
 	}
 	dto := toEpisodeDTO(ctx, e)
 	dto.IsVip, dto.Price, dto.IsFree = isVip, price, !isVip && price <= 0
 	dto.Playable, dto.IsBuy, dto.NeedPay, dto.NeedVip = acc.Playable, acc.IsBuy, acc.NeedPay, acc.NeedVip
 	out := &service.PlayDTO{
-		Episode: dto, PlayUrl: paas.PlaylistURL(ctx, e.MediaCode, raw, preview),
+		Episode: dto, PlayUrl: playUrl,
 		PreviewSec: preview, Enough: acc.Enough, Reason: acc.Reason,
 	}
 	near := g.Model("drama_episode").Ctx(ctx).

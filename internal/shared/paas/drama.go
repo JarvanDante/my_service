@@ -2,6 +2,7 @@ package paas
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/url"
 	"time"
@@ -29,6 +30,7 @@ type MediaEpisode struct {
 	Title       string `json:"title"`
 	DurationSec int    `json:"duration_sec"`
 	CoverUrl    string `json:"cover_url"`
+	Playlist    string `json:"playlist"`
 }
 
 const mediaKindDrama = 5
@@ -69,15 +71,10 @@ func PickDrama(ctx context.Context, code string) (*MediaDrama, error) {
 	return &a, nil
 }
 
-// DramaPlayToken 按剧集短码签发，媒资中心会校验整部已被本站选用；结果按集+试看秒数短时缓存以节省站点签发额度。
+// DramaPlayToken 按剧集短码向媒资中心签发(不缓存)，仅在本站未配置播放网关时兜底使用。
 func DramaPlayToken(ctx context.Context, episodeCode string, previewSec int) (string, error) {
-	cacheKey := fmt.Sprintf("paas:dramaplay:%s:%s:%d", siteCode(ctx), episodeCode, previewSec)
-	if v, err := g.Redis().Do(ctx, "GET", cacheKey); err == nil && !v.IsNil() && v.String() != "" {
-		return v.String(), nil
-	}
 	var data struct {
-		PlayUrl   string `json:"play_url"`
-		ExpiresAt int64  `json:"expires_at"`
+		PlayUrl string `json:"play_url"`
 	}
 	if err := doOpenPost(ctx, "/open/assets/"+url.PathEscape(episodeCode)+"/play-token",
 		g.Map{"preview_sec": previewSec}, &data); err != nil {
@@ -86,14 +83,73 @@ func DramaPlayToken(ctx context.Context, episodeCode string, previewSec int) (st
 	if data.PlayUrl == "" {
 		return "", gerror.New("播放网关未配置")
 	}
-	ttl := g.Cfg().MustGet(ctx, "paas.play_token_cache_sec", 300).Int64()
-	if left := data.ExpiresAt - time.Now().Unix() - 60; left < ttl {
-		ttl = left
-	}
-	if ttl > 0 {
-		_, _ = g.Redis().Do(ctx, "SETEX", cacheKey, ttl, data.PlayUrl)
-	}
 	return data.PlayUrl, nil
+}
+
+// dramaAuth 整部短剧在本站的播放授权缓存，只存选用标记和各集清单文件名，不存签名地址。
+type dramaAuth struct {
+	Picked    bool              `json:"picked"`
+	Lists     map[string]string `json:"lists"`
+	FetchedAt int64             `json:"fetched_at"`
+}
+
+func dramaAuthKey(ctx context.Context, seriesCode string) string {
+	return fmt.Sprintf("paas:dramaauth:%s:%s", siteCode(ctx), seriesCode)
+}
+
+func loadDramaAuth(ctx context.Context, seriesCode string) (*dramaAuth, error) {
+	var a struct {
+		Picked   bool           `json:"picked"`
+		Episodes []MediaEpisode `json:"episodes"`
+	}
+	if err := doJSON(ctx, "GET", "/open/assets/"+url.PathEscape(seriesCode), &a); err != nil {
+		return nil, err
+	}
+	out := &dramaAuth{Picked: a.Picked, Lists: map[string]string{}, FetchedAt: time.Now().Unix()}
+	for _, e := range a.Episodes {
+		name := e.Playlist
+		if name == "" {
+			name = "master.m3u8"
+		}
+		out.Lists[e.Id] = name
+	}
+	if ttl := g.Cfg().MustGet(ctx, "paas.drama_auth_cache_sec", 300).Int64(); ttl > 0 {
+		if b, err := json.Marshal(out); err == nil {
+			_, _ = g.Redis().Do(ctx, "SETEX", dramaAuthKey(ctx, seriesCode), ttl, string(b))
+		}
+	}
+	return out, nil
+}
+
+// DramaPlaylist 校验整部已被本站选用且该集在媒资中心可播，返回清单文件名；同一部剧按整部缓存，集缺失时最多每 30 秒回源一次。
+func DramaPlaylist(ctx context.Context, seriesCode, episodeCode string) (string, error) {
+	var auth *dramaAuth
+	if v, err := g.Redis().Do(ctx, "GET", dramaAuthKey(ctx, seriesCode)); err == nil && !v.IsNil() && v.String() != "" {
+		var a dramaAuth
+		if json.Unmarshal([]byte(v.String()), &a) == nil {
+			auth = &a
+		}
+	}
+	if auth == nil || (auth.Lists[episodeCode] == "" && time.Now().Unix()-auth.FetchedAt >= 30) {
+		a, err := loadDramaAuth(ctx, seriesCode)
+		if err != nil {
+			return "", err
+		}
+		auth = a
+	}
+	if !auth.Picked {
+		return "", gerror.New("请先选用该媒资")
+	}
+	name := auth.Lists[episodeCode]
+	if name == "" {
+		return "", gerror.New("剧集在媒资中心不可播")
+	}
+	return name, nil
+}
+
+// InvalidateDramaAuth 选用或同步剧集后清掉整部授权缓存。
+func InvalidateDramaAuth(ctx context.Context, seriesCode string) {
+	_, _ = g.Redis().Do(ctx, "DEL", dramaAuthKey(ctx, seriesCode))
 }
 
 func doOpenPost(ctx context.Context, path string, body any, out any) error {

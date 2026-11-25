@@ -2,8 +2,10 @@
 package middleware
 
 import (
+	"net"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/gogf/gf/v2/errors/gcode"
 	"github.com/gogf/gf/v2/errors/gerror"
@@ -87,13 +89,27 @@ func UserRateLimit(r *ghttp.Request) {
 	r.Middleware.Next()
 }
 
-// PlayRateLimit 播放地址签发按用户限流，游客按 IP(须在 AuthOptional 之后挂载)。
+// trustedClientIp 取可信头(默认 CF-Connecting-IP)里的客户端 IP，缺失时回退 TCP 对端地址，不信任 X-Forwarded-For。
+func trustedClientIp(r *ghttp.Request) string {
+	for _, h := range g.Cfg().MustGet(r.Context(), "front_ratelimit.trusted_ip_headers", []string{"CF-Connecting-IP"}).Strings() {
+		if ip := net.ParseIP(strings.TrimSpace(r.Header.Get(h))); ip != nil {
+			return ip.String()
+		}
+	}
+	if host, _, err := net.SplitHostPort(r.RemoteAddr); err == nil {
+		return host
+	}
+	return r.RemoteAddr
+}
+
+// PlayRateLimit 播放地址签发按站点+用户限流，游客按可信客户端 IP(须在 AuthOptional 之后挂载)。
 func PlayRateLimit(r *ghttp.Request) {
 	ctx := r.Context()
-	id := "ip:" + r.GetClientIp()
+	id := "ip:" + trustedClientIp(r)
 	if uid := r.GetCtxVar(consts.CtxUserId).Int64(); uid > 0 {
 		id = "u:" + strconv.FormatInt(uid, 10)
 	}
+	id = strings.ToLower(strings.TrimSpace(g.Cfg().MustGet(ctx, "site.code", "my").String())) + ":" + id
 	perMin := g.Cfg().MustGet(ctx, "front_ratelimit.play_per_min", 30).Int()
 	perHour := g.Cfg().MustGet(ctx, "front_ratelimit.play_per_hour", 600).Int()
 	if ok, retry, reason := ratelimit.Allow(ctx, "play", id, perMin, perHour); !ok {
