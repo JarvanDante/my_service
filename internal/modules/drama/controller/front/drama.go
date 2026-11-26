@@ -17,10 +17,11 @@ import (
 type Controller struct {
 	svc service.IDrama
 	cat service.ICategory
+	mod service.IModule
 }
 
-func New(svc service.IDrama, cat service.ICategory) *Controller {
-	return &Controller{svc: svc, cat: cat}
+func New(svc service.IDrama, cat service.ICategory, mod service.IModule) *Controller {
+	return &Controller{svc: svc, cat: cat, mod: mod}
 }
 
 func optionalUid(ctx context.Context) int64 {
@@ -124,4 +125,35 @@ func (c *Controller) Buy(ctx context.Context, req *v1.BuyReq) (res *v1.BuyRes, e
 		return nil, err
 	}
 	return &v1.BuyRes{Price: price, Balance: bal}, nil
+}
+
+func toFrontModule(d *service.ModuleFrontDTO) v1.FrontModuleItem {
+	row := v1.FrontModuleItem{
+		Id: d.Id, Name: d.Name, Style: d.Style, Icon: d.Icon, Size: d.Size, Tags: d.Tags, Categories: d.Categories,
+		Items: make([]v1.Item, 0, len(d.Items)),
+	}
+	for _, item := range d.Items {
+		row.Items = append(row.Items, toItem(item))
+	}
+	return row
+}
+
+func (c *Controller) ModuleList(ctx context.Context, req *v1.ModuleListReq) (res *v1.ModuleListRes, err error) {
+	list, err := c.mod.FrontRepo(ctx, req.Position)
+	if err != nil {
+		return nil, err
+	}
+	res = &v1.ModuleListRes{List: make([]v1.FrontModuleItem, 0, len(list))}
+	for _, d := range list {
+		res.List = append(res.List, toFrontModule(d))
+	}
+	return res, nil
+}
+
+func (c *Controller) ModuleRefresh(ctx context.Context, req *v1.ModuleRefreshReq) (res *v1.ModuleRefreshRes, err error) {
+	d, err := c.mod.FrontRefresh(ctx, req.Id, kit.ParseI64CSV(req.Exclude))
+	if err != nil {
+		return nil, err
+	}
+	return &v1.ModuleRefreshRes{FrontModuleItem: toFrontModule(d)}, nil
 }

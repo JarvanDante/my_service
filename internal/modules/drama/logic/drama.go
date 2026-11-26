@@ -143,6 +143,15 @@ func (s *sDrama) query(ctx context.Context, f service.ListFilter) ([]*service.Dr
 	if f.OnlyRecommend {
 		base = base.Where("is_recommend", 1)
 	}
+	if f.UpdateStatus == 1 || f.UpdateStatus == 2 {
+		base = base.Where("update_status", f.UpdateStatus)
+	}
+	if len(f.Ids) > 0 {
+		base = base.WhereIn("id", f.Ids)
+	}
+	if len(f.ExcludeIds) > 0 {
+		base = base.WhereNotIn("id", f.ExcludeIds)
+	}
 	switch f.PayType {
 	case 1:
 		base = base.Where("is_vip", 1)
@@ -159,19 +168,25 @@ func (s *sDrama) query(ctx context.Context, f service.ListFilter) ([]*service.Dr
 		return nil, 0, err
 	}
 	m := base.Clone()
-	switch f.Sort {
-	case 1:
-		m = m.OrderDesc("view_count")
-	case 2:
-		m = m.OrderDesc("updated_at")
-	case 3:
-		m = m.OrderDesc("like_count")
-	default:
-		m = m.OrderDesc("rank")
-	}
 	var list []*entity.Drama
-	if err := m.OrderDesc("id").Page(f.Page, f.Size).Scan(&list); err != nil {
-		return nil, 0, err
+	if f.Shuffle {
+		if err := m.OrderRandom().Limit(f.Size).Scan(&list); err != nil {
+			return nil, 0, err
+		}
+	} else {
+		switch f.Sort {
+		case 1:
+			m = m.OrderDesc("view_count")
+		case 2:
+			m = m.OrderDesc("updated_at")
+		case 3:
+			m = m.OrderDesc("like_count")
+		default:
+			m = m.OrderDesc("rank")
+		}
+		if err := m.OrderDesc("id").Page(f.Page, f.Size).Scan(&list); err != nil {
+			return nil, 0, err
+		}
 	}
 	out := make([]*service.DramaDTO, 0, len(list))
 	for _, r := range list {

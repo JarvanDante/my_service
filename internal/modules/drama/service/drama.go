@@ -91,6 +91,10 @@ type ListFilter struct {
 	Status        int // -1=全部, 前台固定传 1
 	Sort          int // 0综合 1最多观看 2最新 3最多点赞
 	PayType       int // 0全部 1VIP 2金币 3免费(按整部默认)
+	UpdateStatus  int // 0不限 1连载 2完结
+	Ids           []int64
+	ExcludeIds    []int64
+	Shuffle       bool
 	OnlyRecommend bool
 	Page          int
 	Size          int

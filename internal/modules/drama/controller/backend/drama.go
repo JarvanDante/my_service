@@ -12,10 +12,11 @@ import (
 type Controller struct {
 	svc service.IDrama
 	cat service.ICategory
+	mod service.IModule
 }
 
-func New(svc service.IDrama, cat service.ICategory) *Controller {
-	return &Controller{svc: svc, cat: cat}
+func New(svc service.IDrama, cat service.ICategory, mod service.IModule) *Controller {
+	return &Controller{svc: svc, cat: cat, mod: mod}
 }
 
 func (c *Controller) List(ctx context.Context, req *v1.ListReq) (res *v1.ListRes, err error) {

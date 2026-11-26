@@ -19,6 +19,7 @@ func TestTaggedWorkTable(t *testing.T) {
 		{5, "photo_album", "tags"},
 		{6, "post", "topics"},
 		{7, "novel", "tags"},
+		{8, "drama", "tags"},
 		{99, "", ""},
 	}
 	for _, c := range cases {
@@ -41,9 +42,12 @@ func TestUseCountMapping(t *testing.T) {
 		{3, "video", entity.VideoKindCartoon, true},
 		{4, "comics", 0, false},
 		{5, "video", 0, false},
+		{7, "novel", 0, false},
+		{8, "drama", 0, false},
 	}
 	for _, c := range cases {
-		if supportsUseCount(c.ct) != (c.ct >= 1 && c.ct <= 4) {
+		wantSupport := c.ct == 1 || c.ct == 2 || c.ct == 3 || c.ct == 4 || c.ct == 7 || c.ct == 8
+		if supportsUseCount(c.ct) != wantSupport {
 			t.Fatalf("ct=%d supports", c.ct)
 		}
 		if got := useCountTable(c.ct); got != c.table {

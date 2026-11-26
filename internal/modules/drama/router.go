@@ -12,10 +12,10 @@ import (
 
 // RegisterFront 列表/详情/选集/播放公开(带登录态返回解锁态)，单集购买需登录。
 func RegisterFront(group *ghttp.RouterGroup) {
-	ctrl := front.New(logic.New(), logic.NewCategory())
+	ctrl := front.New(logic.New(), logic.NewCategory(), logic.NewModule())
 	group.Group("/", func(pub *ghttp.RouterGroup) {
 		pub.Middleware(middleware.AuthOptional)
-		pub.Bind(ctrl.CategoryList, ctrl.List, ctrl.Detail, ctrl.Episodes)
+		pub.Bind(ctrl.CategoryList, ctrl.List, ctrl.Detail, ctrl.Episodes, ctrl.ModuleList, ctrl.ModuleRefresh)
 	})
 	group.Group("/", func(play *ghttp.RouterGroup) {
 		play.Middleware(middleware.AuthOptional, middleware.PlayRateLimit)
@@ -27,13 +27,14 @@ func RegisterFront(group *ghttp.RouterGroup) {
 	})
 }
 
-// RegisterBackend 短剧/剧集/分类/媒资选用(挂权限组)。
+// RegisterBackend 短剧/剧集/分类/模块/媒资选用(挂权限组)。
 func RegisterBackend(group *ghttp.RouterGroup) {
-	ctrl := backend.New(logic.New(), logic.NewCategory())
+	ctrl := backend.New(logic.New(), logic.NewCategory(), logic.NewModule())
 	group.Bind(
 		ctrl.List, ctrl.Update, ctrl.Delete, ctrl.Audit,
 		ctrl.Episodes, ctrl.EpisodeUpdate, ctrl.Sync,
 		ctrl.CategoryList, ctrl.CategoryCreate, ctrl.CategoryUpdate, ctrl.CategoryDelete,
+		ctrl.ModuleList, ctrl.ModuleCreate, ctrl.ModuleUpdate, ctrl.ModuleDelete,
 		ctrl.MediaDramas, ctrl.MediaPick,
 	)
 }

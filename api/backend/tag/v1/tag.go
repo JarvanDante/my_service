@@ -28,7 +28,7 @@ type ListRes struct {
 
 type CreateReq struct {
 	g.Meta      `path:"/tag" method:"post" tags:"Backend/Tag" summary:"新增标签"`
-	ContentType int    `json:"content_type" v:"required|in:1,2,3,4,5,6,7#内容类型必填|内容类型非法"`
+	ContentType int    `json:"content_type" v:"required|in:1,2,3,4,5,6,7,8#内容类型必填|内容类型非法"`
 	Name        string `json:"name" v:"required#标签名必填"`
 	Rank        int    `json:"rank"`
 	Status      int    `json:"status" v:"in:0,1#状态非法"`

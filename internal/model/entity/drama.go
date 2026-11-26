@@ -51,6 +51,13 @@ type DramaEpisode struct {
 	UpdatedAt  *gtime.Time `json:"updatedAt"  orm:"updated_at"`
 }
 
+const (
+	DramaCategoryKindNormal = 0
+	DramaCategoryKindNew    = 1
+	DramaCategoryKindHot    = 2
+	DramaCategoryKindRank   = 3
+)
+
 type DramaCategory struct {
 	Id        int64       `json:"id"        orm:"id"`
 	SiteId    int64       `json:"siteId"    orm:"site_id"`
