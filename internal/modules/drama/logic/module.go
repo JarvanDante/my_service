@@ -332,7 +332,8 @@ func (s *sModule) pickShuffle(ctx context.Context, q moduleQuery, catNames, tagN
 	if len(items) >= size {
 		return items[:size], nil
 	}
-	picked := make([]int64, 0, len(items))
+	picked := make([]int64, 0, len(exclude)+len(items))
+	picked = append(picked, exclude...)
 	for _, it := range items {
 		picked = append(picked, it.Id)
 	}
