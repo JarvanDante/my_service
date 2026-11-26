@@ -22,6 +22,9 @@ import (
 const (
 	dmSiteId     = 1
 	dmPreviewSec = 5
+	// 互动编码: user_collect.media_type=7, comment.media_type=6, content_id 均为 drama.id
+	dmCollectMedia = 7
+	dmCommentMedia = 6
 )
 
 type sDrama struct{}
@@ -245,6 +248,34 @@ func (s *sDrama) Detail(ctx context.Context, id int64) (*service.DramaDTO, error
 	hydrateCover(ctx, []*service.DramaDTO{d})
 	d.ViewCount++
 	return d, nil
+}
+
+func (s *sDrama) Interact(ctx context.Context, userId, id int64) (*service.InteractDTO, error) {
+	out := &service.InteractDTO{}
+	n, err := g.Model("comment").Ctx(ctx).Where("site_id", dmSiteId).Where("media_type", dmCommentMedia).
+		Where("content_id", id).Where("status", 1).Count()
+	if err != nil {
+		return nil, err
+	}
+	out.CommentCount = n
+	if userId <= 0 {
+		return out, nil
+	}
+	ops, err := g.Model("user_collect").Ctx(ctx).Where("site_id", dmSiteId).Where("user_id", userId).
+		Where("media_type", dmCollectMedia).Where("content_id", id).WhereIn("op_type", g.Slice{1, 2}).
+		Fields("op_type").Array()
+	if err != nil {
+		return nil, err
+	}
+	for _, v := range ops {
+		switch v.Int() {
+		case 1:
+			out.IsCollected = true
+		case 2:
+			out.IsLiked = true
+		}
+	}
+	return out, nil
 }
 
 func (s *sDrama) Episodes(ctx context.Context, userId, id int64, desc bool) (string, []*service.EpisodeDTO, error) {

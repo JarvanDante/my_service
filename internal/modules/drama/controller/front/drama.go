@@ -78,7 +78,11 @@ func (c *Controller) Detail(ctx context.Context, req *v1.DetailReq) (res *v1.Det
 	if err != nil {
 		return nil, err
 	}
-	return &v1.DetailRes{Item: toItem(d)}, nil
+	st, err := c.svc.Interact(ctx, optionalUid(ctx), d.Id)
+	if err != nil {
+		return nil, err
+	}
+	return &v1.DetailRes{Item: toItem(d), CommentCount: st.CommentCount, IsLiked: st.IsLiked, IsCollected: st.IsCollected}, nil
 }
 
 func toEpisode(d *service.EpisodeDTO) v1.EpisodeItem {

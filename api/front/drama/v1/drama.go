@@ -54,12 +54,16 @@ type ListRes struct {
 	Total int    `json:"total"`
 }
 
+// DetailReq 短剧详情(公开; 带登录态返回当前用户已点赞/已收藏)。
 type DetailReq struct {
 	g.Meta `path:"/drama/detail" method:"get" tags:"Front/Drama" summary:"短剧详情"`
 	Id     int64 `json:"id" v:"required|min:1#短剧ID必填"`
 }
 type DetailRes struct {
 	Item
+	CommentCount int  `json:"comment_count"`
+	IsLiked      bool `json:"is_liked"`
+	IsCollected  bool `json:"is_collected"`
 }
 
 type EpisodeItem struct {

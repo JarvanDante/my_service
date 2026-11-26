@@ -24,6 +24,7 @@ const (
 	mediaComics = 3
 	mediaNovel  = 4
 	mediaPhoto  = 5
+	mediaDrama  = 7 // 短剧按整部收藏/点赞, content_id 为 drama.id
 )
 
 type sCollect struct{}
@@ -41,6 +42,8 @@ func countTarget(mediaType, opType int) (table string, ok bool) {
 		return "novel", true
 	case mediaType == mediaPhoto && opType == opFav:
 		return "photo", true
+	case mediaType == mediaDrama && opType == opLike:
+		return "drama", true
 	default:
 		return "", false
 	}
@@ -57,6 +60,23 @@ func bumpLikeCount(ctx context.Context, tx gdb.TX, mediaType, opType int, conten
 	}
 	_, err := m.Data(g.Map{"like_count": &gdb.Counter{Field: "like_count", Value: float64(delta)}}).Update()
 	return err
+}
+
+// checkDramaOnline 添加短剧收藏/点赞前确认每部都存在且已上架。
+func checkDramaOnline(ctx context.Context, ids []int64) error {
+	uniq := make(map[int64]struct{}, len(ids))
+	for _, id := range ids {
+		uniq[id] = struct{}{}
+	}
+	n, err := g.Model("drama").Ctx(ctx).Where("site_id", colSiteId).
+		Where("status", entity.ContentStatusOnline).WhereIn("id", ids).Count()
+	if err != nil {
+		return err
+	}
+	if n != len(uniq) {
+		return gerror.New("短剧不存在或已下架")
+	}
+	return nil
 }
 
 // Operate 添加/取消 收藏/点赞/踩。
@@ -84,6 +104,11 @@ func (s *sCollect) Operate(ctx context.Context, in service.OperateInput) error {
 	}
 	if len(ids) == 0 {
 		return gerror.New("对象ID非法")
+	}
+	if in.MediaType == mediaDrama {
+		if err := checkDramaOnline(ctx, ids); err != nil {
+			return err
+		}
 	}
 	err := g.DB().Transaction(ctx, func(ctx context.Context, tx gdb.TX) error {
 		for _, id := range ids {

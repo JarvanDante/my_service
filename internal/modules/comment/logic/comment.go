@@ -23,6 +23,7 @@ const (
 	cmtSiteId           = 1
 	collectMediaComment = 6 // user_collect.media_type, 评论点赞
 	collectLike         = 2
+	mediaDrama          = 6 // comment.media_type, 短剧按整部评论, content_id 为 drama.id
 )
 
 const (
@@ -101,6 +102,16 @@ func (s *sComment) Add(ctx context.Context, in service.AddInput) (int64, int, er
 		return 0, 0, err
 	} else if hit != "" {
 		return 0, 0, gerror.New("内容包含违禁词, 请修改后重试")
+	}
+	if in.MediaType == mediaDrama {
+		n, err := g.Model("drama").Ctx(ctx).Where("site_id", cmtSiteId).Where("id", in.ContentId).
+			Where("status", entity.ContentStatusOnline).Count()
+		if err != nil {
+			return 0, 0, err
+		}
+		if n == 0 {
+			return 0, 0, gerror.New("短剧不存在或已下架")
+		}
 	}
 	rootId := int64(0)
 	if in.ParentId > 0 {
@@ -472,6 +483,8 @@ func mediaBelongLabel(mediaType int) string {
 		return "帖子"
 	case 4:
 		return "漫画"
+	case mediaDrama:
+		return "短剧"
 	case 7:
 		return "小说"
 	default:

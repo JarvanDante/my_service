@@ -318,6 +318,14 @@ func resolveObject(ctx context.Context, mediaType int, contentId int64) (int64, 
 		}
 		return 0, c.Title
 	}
+	if mediaType == 6 { // 评论编码 6 为短剧
+		var d *entity.Drama
+		if err := g.Model("drama").Ctx(ctx).Where("site_id", msgSiteId).Where("id", contentId).
+			Fields("title").Scan(&d); err != nil || d == nil {
+			return 0, ""
+		}
+		return 0, d.Title
+	}
 	if mediaType == 7 {
 		var n *entity.Novel
 		if err := g.Model("novel").Ctx(ctx).Where("site_id", msgSiteId).Where("id", contentId).

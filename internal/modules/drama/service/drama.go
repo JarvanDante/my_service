@@ -48,6 +48,12 @@ type EpisodeDTO struct {
 	NeedVip    bool
 }
 
+type InteractDTO struct {
+	CommentCount int
+	IsLiked      bool
+	IsCollected  bool
+}
+
 type PlayDTO struct {
 	Episode    *EpisodeDTO
 	PlayUrl    string
@@ -124,6 +130,8 @@ type IDrama interface {
 	FrontList(ctx context.Context, f ListFilter) ([]*DramaDTO, int, error)
 	// Detail 上架短剧详情并 +1 观看数。
 	Detail(ctx context.Context, id int64) (*DramaDTO, error)
+	// Interact 已上墙评论数及当前用户是否已点赞/已收藏(游客均为 false)。
+	Interact(ctx context.Context, userId, id int64) (*InteractDTO, error)
 	// Episodes 可播剧集, 逐集标出当前用户的解锁态。
 	Episodes(ctx context.Context, userId, id int64, desc bool) (string, []*EpisodeDTO, error)
 	// Play 签发播放地址, 未解锁只给试看地址。

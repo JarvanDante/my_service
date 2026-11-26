@@ -25,7 +25,7 @@ type Item struct {
 // AddReq 发表评论/回复(需登录, 过敏感词)。
 type AddReq struct {
 	g.Meta    `path:"/comment/add" method:"post" tags:"Front/Comment" summary:"发表评论"`
-	MediaType int    `json:"media_type" v:"required|in:1,2,4,7#资源类型必填|资源类型非法"`
+	MediaType int    `json:"media_type" v:"required|in:1,2,4,6,7#资源类型必填|资源类型非法"`
 	ContentId int64  `json:"content_id" v:"required|min:1#内容ID必填"`
 	ParentId  int64    `json:"parent_id"` // 0=顶层, >0=回复
 	Content   string   `json:"content" v:"max-length:1000#内容过长"`
@@ -39,7 +39,7 @@ type AddRes struct {
 // ListReq 评论列表(顶层分页, 每条带回复; 公开)。
 type ListReq struct {
 	g.Meta    `path:"/comment/list" method:"post" tags:"Front/Comment" summary:"评论列表"`
-	MediaType int   `json:"media_type" v:"required|in:1,2,4,7#资源类型必填|资源类型非法"`
+	MediaType int   `json:"media_type" v:"required|in:1,2,4,6,7#资源类型必填|资源类型非法"`
 	ContentId int64 `json:"content_id" v:"required|min:1#内容ID必填"`
 	Sort      int   `json:"sort"` // 0最新 1最热
 	Page      int   `json:"page"`
