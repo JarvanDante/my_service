@@ -39,7 +39,7 @@ func (c *Controller) List(ctx context.Context, req *v1.ListReq) (res *v1.ListRes
 			Categories: d.Categories, Tags: d.Tags, IsVip: d.IsVip, Price: d.Price, FreeEpisode: d.FreeEpisode,
 			EpisodeCount: d.EpisodeCount, ViewCount: d.ViewCount, BuyCount: d.BuyCount, LikeCount: d.LikeCount,
 			UpdateStatus: d.UpdateStatus, Rank: d.Rank, IsRecommend: d.IsRecommend, Status: d.Status,
-			MediaCode: d.MediaCode, CreatedAt: d.CreatedAt,
+			MediaCode: d.MediaCode, PublishedAt: d.PublishedAt, CreatedAt: d.CreatedAt,
 		})
 	}
 	return res, nil
@@ -50,6 +50,7 @@ func (c *Controller) Update(ctx context.Context, req *v1.UpdateReq) (res *v1.Upd
 		Id: req.Id, Title: req.Title, Cover: req.Cover, Intro: req.Intro, Category: req.Category,
 		Categories: req.Categories, Tags: req.Tags, IsVip: req.IsVip, Price: req.Price, FreeEpisode: req.FreeEpisode,
 		UpdateStatus: req.UpdateStatus, Rank: req.Rank, IsRecommend: req.IsRecommend, Status: req.Status,
+		PublishedAt: req.PublishedAt,
 	}); err != nil {
 		return nil, err
 	}

@@ -31,6 +31,7 @@ type Drama struct {
 	IsRecommend  int         `json:"isRecommend"  orm:"is_recommend"`
 	Status       int         `json:"status"       orm:"status"`
 	MediaCode    string      `json:"mediaCode"    orm:"media_code"`
+	PublishedAt  *gtime.Time `json:"publishedAt"  orm:"published_at"`
 	CreatedAt    *gtime.Time `json:"createdAt"    orm:"created_at"`
 	UpdatedAt    *gtime.Time `json:"updatedAt"    orm:"updated_at"`
 }

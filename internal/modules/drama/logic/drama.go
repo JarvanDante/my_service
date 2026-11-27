@@ -48,10 +48,39 @@ func encodeJSON(v interface{}) string {
 }
 
 func fmtTime(t *gtime.Time) string {
-	if t == nil {
+	if t == nil || t.IsZero() {
 		return ""
 	}
 	return t.String()
+}
+
+const sortPublishedAt = 4 // FrontList 把 sort=0 改写成按上架时间倒序
+
+// parsePublishedAt 解析后台提交的上架时间，空值表示未填写。
+func parsePublishedAt(raw string) (*gtime.Time, error) {
+	s := strings.TrimSpace(raw)
+	if s == "" {
+		return nil, nil
+	}
+	t := gtime.NewFromStr(s)
+	if t == nil || t.IsZero() {
+		return nil, gerror.New("上架时间格式非法, 如: 2026-11-27 15:04:05")
+	}
+	return t, nil
+}
+
+// firstPublishedAt 首次上架且尚无上架时间时补当前时间；已有值或未上架则保留原值。
+func firstPublishedAt(online bool, incoming, old *gtime.Time) *gtime.Time {
+	if incoming != nil && !incoming.IsZero() {
+		return incoming
+	}
+	if !online {
+		return nil
+	}
+	if old != nil && !old.IsZero() {
+		return nil
+	}
+	return gtime.Now()
 }
 
 func resolveCategory(in *service.SaveInput) string {
@@ -68,7 +97,7 @@ func toDTO(r *entity.Drama) *service.DramaDTO {
 		IsVip: r.IsVip, Price: r.Price, FreeEpisode: r.FreeEpisode, EpisodeCount: r.EpisodeCount,
 		ViewCount: r.ViewCount, BuyCount: r.BuyCount, LikeCount: r.LikeCount, UpdateStatus: r.UpdateStatus,
 		Rank: r.Rank, IsRecommend: r.IsRecommend, Status: r.Status, MediaCode: r.MediaCode,
-		CreatedAt: fmtTime(r.CreatedAt),
+		PublishedAt: fmtTime(r.PublishedAt), CreatedAt: fmtTime(r.CreatedAt),
 	}
 }
 
@@ -184,6 +213,8 @@ func (s *sDrama) query(ctx context.Context, f service.ListFilter) ([]*service.Dr
 			m = m.OrderDesc("updated_at")
 		case 3:
 			m = m.OrderDesc("like_count")
+		case sortPublishedAt:
+			m = m.Order("published_at DESC NULLS LAST")
 		default:
 			m = m.OrderDesc("rank")
 		}
@@ -234,6 +265,9 @@ func (s *sDrama) findEpisode(ctx context.Context, episodeId int64) (*entity.Dram
 
 func (s *sDrama) FrontList(ctx context.Context, f service.ListFilter) ([]*service.DramaDTO, int, error) {
 	f.Status = entity.ContentStatusOnline
+	if f.Sort == 0 {
+		f.Sort = sortPublishedAt
+	}
 	return s.query(ctx, f)
 }
 

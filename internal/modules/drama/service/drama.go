@@ -23,6 +23,7 @@ type DramaDTO struct {
 	IsRecommend  int
 	Status       int
 	MediaCode    string
+	PublishedAt  string
 	CreatedAt    string
 }
 
@@ -79,6 +80,7 @@ type SaveInput struct {
 	Rank         int
 	IsRecommend  int
 	Status       int
+	PublishedAt  string
 }
 
 type EpisodeInput struct {
@@ -95,7 +97,7 @@ type ListFilter struct {
 	Tags          []string
 	Keyword       string
 	Status        int // -1=全部, 前台固定传 1
-	Sort          int // 0综合 1最多观看 2最新 3最多点赞
+	Sort          int // 0综合(前台按上架时间, 后台按权重) 1最多观看 2最新 3最多点赞
 	PayType       int // 0全部 1VIP 2金币 3免费(按整部默认)
 	UpdateStatus  int // 0不限 1连载 2完结
 	Ids           []int64

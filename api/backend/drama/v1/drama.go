@@ -23,6 +23,7 @@ type Item struct {
 	IsRecommend  int      `json:"is_recommend"`
 	Status       int      `json:"status"`
 	MediaCode    string   `json:"media_code"`
+	PublishedAt  string   `json:"published_at"`
 	CreatedAt    string   `json:"created_at"`
 }
 
@@ -55,6 +56,7 @@ type UpdateReq struct {
 	Rank         int      `json:"rank"`
 	IsRecommend  int      `json:"is_recommend" v:"in:0,1#推荐标记非法"`
 	Status       int      `json:"status" v:"in:0,1,2#状态非法"`
+	PublishedAt  string   `json:"published_at"`
 }
 type UpdateRes struct{}
 

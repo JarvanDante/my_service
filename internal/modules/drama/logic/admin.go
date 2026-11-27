@@ -88,6 +88,13 @@ func (s *sDrama) Update(ctx context.Context, in service.SaveInput) error {
 	if in.UpdateStatus == 1 || in.UpdateStatus == 2 {
 		data["update_status"] = in.UpdateStatus
 	}
+	pub, err := parsePublishedAt(in.PublishedAt)
+	if err != nil {
+		return err
+	}
+	if v := firstPublishedAt(in.Status == entity.ContentStatusOnline, pub, old.PublishedAt); v != nil {
+		data["published_at"] = v
+	}
 	_, err = g.Model("drama").Ctx(ctx).Where("site_id", dmSiteId).Where("id", in.Id).Data(data).Update()
 	return err
 }
@@ -130,8 +137,11 @@ func (s *sDrama) Audit(ctx context.Context, id int64, status int) error {
 			return err
 		}
 	}
-	_, err = g.Model("drama").Ctx(ctx).Where("site_id", dmSiteId).Where("id", id).
-		Data(g.Map{"status": status, "updated_at": gtime.Now()}).Update()
+	data := g.Map{"status": status, "updated_at": gtime.Now()}
+	if v := firstPublishedAt(status == entity.ContentStatusOnline, nil, r.PublishedAt); v != nil {
+		data["published_at"] = v
+	}
+	_, err = g.Model("drama").Ctx(ctx).Where("site_id", dmSiteId).Where("id", id).Data(data).Update()
 	return err
 }
 
